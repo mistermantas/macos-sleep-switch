@@ -11,12 +11,12 @@ jobs:
   macos:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build and package
         run: |
           chmod +x build.sh package.sh
           ./package.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Sleep-Switch
           path: dist/Sleep-Switch.zip

@@ -1,9 +1,43 @@
-# Sleep Switch Privacy
+# Sleep Switch Privacy Policy
+
+**Last updated: July 25, 2026**
 
 Sleep Switch does not collect, transmit, sell, or share personal data.
 
-Agent detection happens locally on the Mac. The direct-download build reads the local process list and Codex task markers. The Mac App Store build reads Codex task markers only after the user chooses their `.codex` folder. That access is read-only and can be changed by reconnecting the folder.
+## Information used on your Mac
 
-Sleep Switch has no analytics, advertising, tracking, accounts, cloud service, or bundled third-party SDKs. Choosing a link in **Support & Creator** opens that public page in the default web browser.
+Sleep Switch processes only the local information needed to provide its features:
 
-Questions can be filed in the [Sleep Switch issue tracker](https://github.com/mistermantas/macos-sleep-switch/issues).
+- App preferences, such as keep-awake settings and timer choices, are stored locally in macOS user defaults.
+- The direct-download version checks the local process list and Codex task markers to detect supported agent sessions.
+- The Mac App Store version reads Codex task markers only after you select a `.codex` folder. Access is read-only and is stored as an app-scoped macOS security bookmark.
+
+This information stays on your Mac. It is not sent to the developer or any third party.
+
+## Data collection and tracking
+
+Sleep Switch has:
+
+- no analytics or telemetry;
+- no advertising or tracking;
+- no user accounts;
+- no cloud service or developer-operated server; and
+- no bundled third-party SDKs.
+
+The developer therefore does not retain personal data from the app. Local preferences and folder-access bookmarks remain on your Mac until you change them, reset the app, or remove the app’s data.
+
+## External links
+
+The **Support & Creator** menu can open the Uncascade website, YouTube, GitHub, and GitHub Sponsors in your default browser. Sleep Switch does not receive information about your activity on those services. Their own privacy policies apply after you leave the app.
+
+## Children’s privacy
+
+Sleep Switch does not knowingly collect information from anyone, including children.
+
+## Changes to this policy
+
+If Sleep Switch’s privacy practices change, this policy will be updated in the public repository and the revision date above will change.
+
+## Contact
+
+Privacy questions can be submitted through the [Sleep Switch issue tracker](https://github.com/mistermantas/macos-sleep-switch/issues).

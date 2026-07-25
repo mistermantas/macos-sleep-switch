@@ -99,6 +99,8 @@ struct AgentTrackerTests {
         )
         testPowerAssertions()
         testDisplayPowerCommand()
+        testAppLinks()
+        testDistribution()
         testStatusSymbols()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
@@ -417,6 +419,47 @@ struct AgentTrackerTests {
         }
     }
 
+    private static func testAppLinks() {
+        let links = AppLinks.groups.flatMap { $0 }
+        expect(links.count == 4, "keeps the support menu concise")
+        expect(
+            links.allSatisfy { $0.url.scheme == "https" },
+            "opens every external link over HTTPS"
+        )
+        expect(
+            AppLinks.uncascadeWebsite.url.absoluteString
+                == "https://www.uncascade.com/",
+            "links to the Uncascade website"
+        )
+        expect(
+            AppLinks.uncascadeYouTube.url.absoluteString
+                == "https://www.youtube.com/@uncascade",
+            "links to the Uncascade YouTube channel"
+        )
+        expect(
+            AppLinks.sourceCode.url.absoluteString
+                == "https://github.com/mistermantas/macos-sleep-switch",
+            "links to the Sleep Switch source"
+        )
+        expect(
+            AppLinks.sponsor.url.absoluteString
+                == "https://github.com/sponsors/mistermantas",
+            "uses GitHub's canonical Sponsors URL"
+        )
+    }
+
+    private static func testDistribution() {
+        expect(!AppDistribution.isAppStoreBuild, "tests the direct distribution")
+        expect(
+            AppDistribution.supportsGlobalAgentTracking,
+            "keeps global agent tracking in the direct build"
+        )
+        expect(
+            AppDistribution.supportsDisplaySleep,
+            "keeps display sleep in the direct build"
+        )
+    }
+
     private static func testStatusSymbols() {
         for symbolName in [
             "cup.and.saucer",
@@ -429,6 +472,11 @@ struct AgentTrackerTests {
             "stop.circle",
             "gearshape",
             "arrow.clockwise",
+            "info.circle",
+            "globe",
+            "play.rectangle",
+            "chevron.left.forwardslash.chevron.right",
+            "heart",
             "exclamationmark.triangle"
         ] {
             expect(

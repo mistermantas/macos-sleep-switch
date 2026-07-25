@@ -231,16 +231,36 @@ struct AgentTracker {
 
     let definitions: [AgentDefinition]
     let codexSessionTracker: CodexSessionTracker
+    let codexSessionsDirectory: (() -> URL?)?
 
     init(
         definitions: [AgentDefinition] = AgentTracker.supportedAgents,
-        codexSessionTracker: CodexSessionTracker = CodexSessionTracker()
+        codexSessionTracker: CodexSessionTracker = CodexSessionTracker(),
+        codexSessionsDirectory: (() -> URL?)? = nil
     ) {
         self.definitions = definitions
         self.codexSessionTracker = codexSessionTracker
+        self.codexSessionsDirectory = codexSessionsDirectory
     }
 
     func scan() -> [DetectedAgent]? {
+#if APP_STORE
+        guard let sessionsDirectory = codexSessionsDirectory?(),
+              let activeSessionCount = CodexSessionTracker(
+                  sessionsDirectory: sessionsDirectory
+              ).scan(),
+              let codex = definitions.first(where: { $0.id == "codex" }) else {
+            return []
+        }
+
+        guard activeSessionCount > 0 else { return [] }
+        return [
+            DetectedAgent(
+                definition: codex,
+                processCount: activeSessionCount
+            )
+        ]
+#else
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
@@ -266,6 +286,7 @@ struct AgentTracker {
         } catch {
             return nil
         }
+#endif
     }
 
     func detect(in processList: String, excludingPID: Int32? = nil) -> [DetectedAgent] {

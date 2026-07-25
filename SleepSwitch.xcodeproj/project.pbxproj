@@ -1,0 +1,361 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
+		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
+		213204C2ADD3B76D7DE8742F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6B98ED0F17BA35EEE482C2 /* main.swift */; };
+		454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */; };
+		5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C543EF1E4134BFDE371CDA /* AppDistribution.swift */; };
+		606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */; };
+		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
+		A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */; };
+		B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */; };
+		C6C5580CEE420A00E5F4BD47 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */; };
+		F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDirectoryAccess.swift; sourceTree = "<group>"; };
+		09C8FEC6CC81B7403F577C86 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
+		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
+		434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwakeSession.swift; sourceTree = "<group>"; };
+		5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTracker.swift; sourceTree = "<group>"; };
+		674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerAssertionController.swift; sourceTree = "<group>"; };
+		7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionTracker.swift; sourceTree = "<group>"; };
+		9E6B98ED0F17BA35EEE482C2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayPowerController.swift; sourceTree = "<group>"; };
+		D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SleepSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		11958F9140D296B85D6DCE9B /* AppStore */ = {
+			isa = PBXGroup;
+			children = (
+				F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */,
+				A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */,
+			);
+			path = AppStore;
+			sourceTree = "<group>";
+		};
+		6F1C8ED6E19F8623D4A372BC /* SleepSwitch */ = {
+			isa = PBXGroup;
+			children = (
+				5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */,
+				11C543EF1E4134BFDE371CDA /* AppDistribution.swift */,
+				09C8FEC6CC81B7403F577C86 /* AppLinks.swift */,
+				434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */,
+				04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */,
+				7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */,
+				CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */,
+				9E6B98ED0F17BA35EEE482C2 /* main.swift */,
+				674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */,
+			);
+			name = SleepSwitch;
+			path = Sources/SleepSwitch;
+			sourceTree = "<group>";
+		};
+		8841C9979F5E0779E1FA4F2D = {
+			isa = PBXGroup;
+			children = (
+				11958F9140D296B85D6DCE9B /* AppStore */,
+				6F1C8ED6E19F8623D4A372BC /* SleepSwitch */,
+				B31E40FEDFE40FBFAD8AB1FF /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B31E40FEDFE40FBFAD8AB1FF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		70E308924FC60B1F1498ABAB /* SleepSwitch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D7814FB97D5782A85D5F3C42 /* Build configuration list for PBXNativeTarget "SleepSwitch" */;
+			buildPhases = (
+				BECE18B88056456EB8D92616 /* Sources */,
+				4387A6A2C99F283FF4254A2E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SleepSwitch;
+			packageProductDependencies = (
+			);
+			productName = SleepSwitch;
+			productReference = D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		15E5BFD70B8DBE0CEA563CD5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					70E308924FC60B1F1498ABAB = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 04A0418721ACD489A8B4389E /* Build configuration list for PBXProject "SleepSwitch" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 8841C9979F5E0779E1FA4F2D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B31E40FEDFE40FBFAD8AB1FF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				70E308924FC60B1F1498ABAB /* SleepSwitch */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4387A6A2C99F283FF4254A2E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */,
+				C6C5580CEE420A00E5F4BD47 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BECE18B88056456EB8D92616 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */,
+				5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */,
+				1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */,
+				A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */,
+				7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */,
+				454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */,
+				F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */,
+				606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */,
+				213204C2ADD3B76D7DE8742F /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1E8086CC5B16F58CAD6B81B5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 7;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AppStore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
+				PRODUCT_NAME = "Sleep Switch";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+			};
+			name = Debug;
+		};
+		2930E88FC9933D21FF8B727C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		7CAA3AA97D57880EDA73EE30 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		AABB1044521512A13B3B16FB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 7;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = AppStore/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.1;
+				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
+				PRODUCT_NAME = "Sleep Switch";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		04A0418721ACD489A8B4389E /* Build configuration list for PBXProject "SleepSwitch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2930E88FC9933D21FF8B727C /* Debug */,
+				7CAA3AA97D57880EDA73EE30 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D7814FB97D5782A85D5F3C42 /* Build configuration list for PBXNativeTarget "SleepSwitch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1E8086CC5B16F58CAD6B81B5 /* Debug */,
+				AABB1044521512A13B3B16FB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 15E5BFD70B8DBE0CEA563CD5 /* Project object */;
+}

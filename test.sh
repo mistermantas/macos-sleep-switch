@@ -12,6 +12,8 @@ xcrun swiftc \
   -framework AppKit \
   -framework IOKit \
   "$script_dir/Sources/SleepSwitch/AgentTracker.swift" \
+  "$script_dir/Sources/SleepSwitch/AppDistribution.swift" \
+  "$script_dir/Sources/SleepSwitch/AppLinks.swift" \
   "$script_dir/Sources/SleepSwitch/AwakeSession.swift" \
   "$script_dir/Sources/SleepSwitch/CodexSessionTracker.swift" \
   "$script_dir/Sources/SleepSwitch/DisplayPowerController.swift" \

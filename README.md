@@ -22,6 +22,7 @@ Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu
 - **Sleep Display** turns off the display without sleeping or logging out of the Mac.
 - **Sleep Until Agents Finish** turns off the display and wakes it once every detected agent session has ended. This is a one-shot action and is never enabled by default.
 - **Keep Awake Manually** starts or stops an independent Caffeine-style session. Use **Manual Duration** for a preset or custom time.
+- **About & Support** links to Uncascade, the Uncascade YouTube channel, the source code, and GitHub Sponsors.
 
 Agent sessions allow the display to sleep. Manual sessions can optionally keep it lit. Settings cover manual display behavior, activation on launch, the default manual duration, and launch at login.
 
@@ -61,6 +62,19 @@ The assertions belong to the app process and are released when the manual or age
 When you choose a display action, Sleep Switch calls macOS’s built-in `pmset displaysleepnow`. This turns off only the display and does not alter any power setting. A queued agent-completion wake uses Apple’s `IOPMAssertionDeclareUserActivity` API.
 
 There are no analytics, network requests, privileged background services, or bundled dependencies.
+
+## Mac App Store
+
+The repository includes a sandboxed Mac App Store target. Apple’s sandbox allows the native keep-awake and display-wake APIs, but blocks the global process scan and `pmset displaysleepnow` used by the full download. The store build therefore supports manual Caffeine-style sessions, opt-in Codex tracking through a user-selected folder, and wake-on-completion. The GitHub download keeps all supported agents and display controls.
+
+See [APP_STORE.md](APP_STORE.md) for the Xcode target, submission metadata, and account handoff.
+
+## About & support
+
+- [Uncascade](https://www.uncascade.com/)
+- [Uncascade on YouTube](https://www.youtube.com/@uncascade)
+- [Sleep Switch on GitHub](https://github.com/mistermantas/macos-sleep-switch)
+- [Sponsor on GitHub](https://github.com/sponsors/mistermantas)
 
 ## A note on heat
 

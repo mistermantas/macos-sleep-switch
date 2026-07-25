@@ -7,23 +7,27 @@
     <key>CFBundleDisplayName</key>
     <string>Sleep Switch</string>
     <key>CFBundleExecutable</key>
-    <string>SleepSwitch</string>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>lt.mantas.sleepswitch</string>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Sleep Switch</string>
+    <string>$(PRODUCT_NAME)</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.5.1</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>7</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>

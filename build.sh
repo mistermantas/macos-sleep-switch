@@ -28,7 +28,7 @@ xcrun lipo -create \
   "$arch_dir/SleepSwitch-x86_64" \
   -output "$app_dir/Contents/MacOS/SleepSwitch"
 
-sips -s format png "$script_dir/Assets/AppIcon.svg" --out "$build_dir/AppIcon.png" >/dev/null
+cp "$script_dir/Assets/AppIcon.png" "$build_dir/AppIcon.png"
 for spec in "16:icon_16x16.png" "32:icon_16x16@2x.png" "32:icon_32x32.png" \
             "64:icon_32x32@2x.png" "128:icon_128x128.png" "256:icon_128x128@2x.png" \
             "256:icon_256x256.png" "512:icon_256x256@2x.png" "512:icon_512x512.png" \

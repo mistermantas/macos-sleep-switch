@@ -22,10 +22,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let sleepUntilAgentsFinishItem = NSMenuItem(
         title: "Sleep Until Agents Finish",
-        action: #selector(sleepUntilAgentsFinish),
+        action: nil,
         keyEquivalent: ""
     )
     private let settingsMenu = NSMenu(title: "Settings")
+    private let aboutMenu = NSMenu(title: "About & Support")
     private let keepDisplayAwakeItem = NSMenuItem(
         title: "Manual Sessions Keep Display Awake",
         action: #selector(toggleKeepDisplayAwake),
@@ -42,7 +43,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(toggleLaunchAtLogin),
         keyEquivalent: ""
     )
-    private let agentTracker = AgentTracker()
+    private let codexFolderItem = NSMenuItem(
+        title: "Connect Codex…",
+        action: #selector(connectCodex),
+        keyEquivalent: ""
+    )
+    private let codexDirectoryAccess = CodexDirectoryAccess()
+    private lazy var agentTracker: AgentTracker = {
+#if APP_STORE
+        let access = codexDirectoryAccess
+        return AgentTracker(codexSessionsDirectory: { access.sessionsDirectory })
+#else
+        return AgentTracker()
+#endif
+    }()
     private let powerAssertions = PowerAssertionController()
     private let displayPower = DisplayPowerController()
     private let agentScanQueue = DispatchQueue(
@@ -65,9 +79,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerDefaults()
+#if APP_STORE
+        codexDirectoryAccess.restoreAccess()
+#endif
         configureMenu()
         observeDisplayWake()
+#if !APP_STORE
         enableLaunchAtLoginByDefault()
+#endif
 
         if UserDefaults.standard.bool(forKey: activateOnLaunchKey) {
             startKeepingAwake(durationSeconds: defaultDurationSeconds)
@@ -110,8 +129,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func configureMenu() {
         menu.delegate = self
-        stateItem.isEnabled = false
+#if APP_STORE
+        automaticAgentAwakeItem.title = "Keep Awake for Codex"
+        agentsHeaderItem.target = self
+        agentsHeaderItem.action = #selector(connectCodex)
+        agentsHeaderItem.isEnabled = true
+        sleepUntilAgentsFinishItem.title = "Wake Display When Codex Finishes"
+        sleepUntilAgentsFinishItem.action = #selector(toggleWakeWhenAgentsFinish)
+#else
         agentsHeaderItem.isEnabled = false
+        sleepUntilAgentsFinishItem.action = #selector(sleepUntilAgentsFinish)
+#endif
+        stateItem.isEnabled = false
         toggleItem.target = self
         automaticAgentAwakeItem.target = self
         sleepDisplayItem.target = self
@@ -150,8 +179,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         configureSettingsMenu()
 
+#if APP_STORE
+        let refreshTitle = "Refresh Codex"
+#else
+        let refreshTitle = "Refresh Agents"
+#endif
         let refreshItem = NSMenuItem(
-            title: "Refresh Agents",
+            title: refreshTitle,
             action: #selector(refreshState),
             keyEquivalent: "r"
         )
@@ -160,6 +194,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: "arrow.clockwise",
             accessibilityDescription: "Refresh agent status"
         )
+
+        let aboutItem = NSMenuItem(title: "About & Support", action: nil, keyEquivalent: "")
+        aboutItem.submenu = aboutMenu
+        aboutItem.image = NSImage(
+            systemSymbolName: "info.circle",
+            accessibilityDescription: "About and support links"
+        )
+        configureAboutMenu()
 
         let quitItem = NSMenuItem(
             title: "Quit Sleep Switch",
@@ -171,14 +213,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
+#if APP_STORE
+        menu.addItem(sleepUntilAgentsFinishItem)
+#else
         menu.addItem(sleepDisplayItem)
         menu.addItem(sleepUntilAgentsFinishItem)
+#endif
         menu.addItem(.separator())
         menu.addItem(toggleItem)
         menu.addItem(durationItem)
         menu.addItem(.separator())
         menu.addItem(settingsItem)
         menu.addItem(refreshItem)
+        menu.addItem(aboutItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
         statusItem.menu = menu
@@ -220,6 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keepDisplayAwakeItem.target = self
         activateOnLaunchItem.target = self
         launchAtLoginItem.target = self
+        codexFolderItem.target = self
 
         let defaultDurationItem = NSMenuItem(
             title: "Default Duration",
@@ -229,11 +277,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         defaultDurationItem.submenu = defaultDurationMenu
         configureDefaultDurationMenu()
 
+#if APP_STORE
+        settingsMenu.addItem(codexFolderItem)
+        settingsMenu.addItem(.separator())
+#endif
         settingsMenu.addItem(keepDisplayAwakeItem)
         settingsMenu.addItem(activateOnLaunchItem)
         settingsMenu.addItem(defaultDurationItem)
         settingsMenu.addItem(.separator())
         settingsMenu.addItem(launchAtLoginItem)
+    }
+
+    private func configureAboutMenu() {
+        for (groupIndex, group) in AppLinks.groups.enumerated() {
+            if groupIndex > 0 {
+                aboutMenu.addItem(.separator())
+            }
+
+            for link in group {
+                let item = NSMenuItem(
+                    title: link.title,
+                    action: #selector(openAppLink(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = link
+                item.image = NSImage(
+                    systemSymbolName: link.symbolName,
+                    accessibilityDescription: link.title
+                )
+                aboutMenu.addItem(item)
+            }
+        }
     }
 
     private func configureDefaultDurationMenu() {
@@ -448,9 +523,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         agentItems.forEach(menu.removeItem)
         agentItems.removeAll()
 
+#if APP_STORE
+        if !codexDirectoryAccess.isConnected {
+            agentsHeaderItem.title = "Connect Codex…"
+            agentsHeaderItem.image = NSImage(
+                systemSymbolName: "folder.badge.plus",
+                accessibilityDescription: "Connect the Codex folder"
+            )
+            agentsHeaderItem.isEnabled = true
+            return
+        }
+        agentsHeaderItem.isEnabled = false
+#endif
+
         let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
         if sessionCount == 0 {
+#if APP_STORE
+            agentsHeaderItem.title = "No Codex tasks running"
+#else
             agentsHeaderItem.title = "No supported agents running"
+#endif
             agentsHeaderItem.image = NSImage(
                 systemSymbolName: "terminal",
                 accessibilityDescription: "No supported agents running"
@@ -496,6 +588,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateDisplayPresentation() {
+#if APP_STORE
+        if wakeDisplayWhenAgentsFinish {
+            sleepUntilAgentsFinishItem.title = "Cancel Wake When Codex Finishes"
+            sleepUntilAgentsFinishItem.state = .on
+            sleepUntilAgentsFinishItem.isEnabled = true
+            sleepUntilAgentsFinishItem.image = NSImage(
+                systemSymbolName: "moon.zzz.fill",
+                accessibilityDescription: "Display wake queued"
+            )
+            sleepUntilAgentsFinishItem.toolTip = "The display will wake after every Codex task ends"
+            return
+        }
+
+        sleepUntilAgentsFinishItem.title = "Wake Display When Codex Finishes"
+        sleepUntilAgentsFinishItem.state = .off
+        sleepUntilAgentsFinishItem.isEnabled = !detectedAgents.isEmpty
+        sleepUntilAgentsFinishItem.image = NSImage(
+            systemSymbolName: "sunrise",
+            accessibilityDescription: "Wake the display when Codex finishes"
+        )
+        sleepUntilAgentsFinishItem.toolTip = detectedAgents.isEmpty
+            ? "Available while a Codex task is running"
+            : "Wake the display after every Codex task ends"
+#else
         sleepDisplayItem.state = .off
         sleepDisplayItem.toolTip = "Turn off the display without sleeping or logging out of the Mac"
 
@@ -521,6 +637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         sleepUntilAgentsFinishItem.toolTip = detectedAgents.isEmpty
             ? "Available while a supported agent is running"
             : "Turn off the display, then wake it after every detected agent session ends"
+#endif
     }
 
     private func updateSettingsPresentation() {
@@ -535,6 +652,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.state = seconds == selectedDefault ? .on : .off
         }
 
+#if APP_STORE
+        codexFolderItem.title = codexDirectoryAccess.isConnected
+            ? "Change Codex Folder…"
+            : "Connect Codex…"
+#endif
         updateLaunchAtLoginPresentation()
     }
 
@@ -571,6 +693,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         sleepDisplay(wakeWhenAgentsFinish: false)
     }
 
+#if APP_STORE
+    @objc private func toggleWakeWhenAgentsFinish() {
+        if wakeDisplayWhenAgentsFinish {
+            wakeDisplayWhenAgentsFinish = false
+            _ = reconcilePowerAssertion()
+            reconcileAndUpdatePresentation()
+            return
+        }
+
+        guard !detectedAgents.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        wakeDisplayWhenAgentsFinish = true
+        if let error = reconcilePowerAssertion() {
+            wakeDisplayWhenAgentsFinish = false
+            presentAssertionError(error)
+        }
+        reconcileAndUpdatePresentation()
+    }
+#else
     @objc private func sleepUntilAgentsFinish() {
         if wakeDisplayWhenAgentsFinish {
             wakeDisplayWhenAgentsFinish = false
@@ -587,6 +731,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         sleepDisplay(wakeWhenAgentsFinish: true)
     }
+#endif
 
     private func sleepDisplay(wakeWhenAgentsFinish: Bool) {
         let previousWakeState = wakeDisplayWhenAgentsFinish
@@ -783,6 +928,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         updatePresentation()
         updateSettingsPresentation()
+    }
+
+    @objc private func openAppLink(_ sender: NSMenuItem) {
+        guard let link = sender.representedObject as? AppLink else { return }
+        NSWorkspace.shared.open(link.url)
+    }
+
+    @objc private func connectCodex() {
+#if APP_STORE
+        guard codexDirectoryAccess.requestAccess() else { return }
+        detectedAgents = []
+        updateAgentPresentation()
+        updateSettingsPresentation()
+        requestAgentScan()
+#endif
     }
 
     @objc private func toggleActivateOnLaunch() {

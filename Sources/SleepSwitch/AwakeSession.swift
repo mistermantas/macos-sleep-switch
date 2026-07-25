@@ -24,6 +24,17 @@ struct AwakeSession: Equatable {
     }
 }
 
+enum AwakePolicy {
+    static func shouldKeepAwake(
+        manualSession: AwakeSession?,
+        automaticAgentAwakeEnabled: Bool,
+        detectedAgents: [DetectedAgent]
+    ) -> Bool {
+        manualSession != nil
+            || (automaticAgentAwakeEnabled && !detectedAgents.isEmpty)
+    }
+}
+
 enum AwakeTimeText {
     static let presetSeconds = [
         5 * 60,

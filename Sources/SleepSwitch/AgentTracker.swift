@@ -14,17 +14,43 @@ struct AgentDefinition: Hashable {
             return false
         }
 
-        if let executable = commandLine.split(whereSeparator: \.isWhitespace).first {
-            let executableName = URL(fileURLWithPath: String(executable))
-                .lastPathComponent
-                .lowercased()
+        guard let executableName = executableName(in: commandLine) else {
+            return false
+        }
 
-            if executableNames.contains(executableName) {
-                return true
-            }
+        if executableNames.contains(executableName) {
+            return true
+        }
+
+        let markerLaunchers: Set<String> = [
+            "agent",
+            "bun",
+            "deno",
+            "node",
+            "python",
+            "python3"
+        ]
+        guard markerLaunchers.contains(executableName.lowercased()) else {
+            return false
         }
 
         return commandMarkers.contains(where: normalizedCommand.contains)
+    }
+
+    private func executableName(in commandLine: String) -> String? {
+        if let marker = commandLine.range(
+            of: "/Contents/MacOS/",
+            options: [.backwards, .caseInsensitive]
+        ) {
+            let executable = commandLine[marker.upperBound...]
+                .prefix(while: { !$0.isWhitespace })
+            return executable.isEmpty ? nil : String(executable)
+        }
+
+        guard let executable = commandLine.split(whereSeparator: \.isWhitespace).first else {
+            return nil
+        }
+        return URL(fileURLWithPath: String(executable)).lastPathComponent
     }
 }
 
@@ -44,9 +70,9 @@ struct AgentTracker {
                 "/.codex/packages/standalone/"
             ],
             excludedMarkers: [
-                "/applications/chatgpt.app/",
                 "/.codex/computer-use/",
-                " app-server",
+                "/frameworks/codex framework.framework/",
+                "features.code_mode_host=true app-server",
                 "codex-code-mode-host",
                 " mcp-server",
                 " completion "
@@ -134,7 +160,64 @@ struct AgentTracker {
             name: "Cursor Agent",
             executableNames: ["cursor-agent"],
             commandMarkers: [
-                "/cursor-agent"
+                "/cursor-agent/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "grok-cli",
+            name: "Grok CLI",
+            executableNames: ["grok"],
+            commandMarkers: [
+                "/grok-cli/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "amp",
+            name: "Amp",
+            executableNames: ["amp"],
+            commandMarkers: [
+                "/@sourcegraph/amp/",
+                "/amp-cli/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "factory-droid",
+            name: "Factory Droid",
+            executableNames: ["droid"],
+            commandMarkers: [
+                "/@factory-ai/droid/",
+                "/factory-droid/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "augment-code",
+            name: "Augment Code",
+            executableNames: ["auggie"],
+            commandMarkers: [
+                "/@augmentcode/auggie/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "qwen-code",
+            name: "Qwen Code",
+            executableNames: ["qwen"],
+            commandMarkers: [
+                "/@qwen-code/qwen-code/",
+                "/qwen-code/"
+            ],
+            excludedMarkers: []
+        ),
+        AgentDefinition(
+            id: "pi-coding-agent",
+            name: "Pi",
+            executableNames: ["pi"],
+            commandMarkers: [
+                "/@mariozechner/pi-coding-agent/"
             ],
             excludedMarkers: []
         )
@@ -146,11 +229,11 @@ struct AgentTracker {
         self.definitions = definitions
     }
 
-    func scan() -> [DetectedAgent] {
+    func scan() -> [DetectedAgent]? {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-axo", "pid=,command="]
+        process.arguments = ["-axww", "-o", "pid=,command="]
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
 
@@ -158,13 +241,15 @@ struct AgentTracker {
             try process.run()
             let data = output.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-            guard let processList = String(data: data, encoding: .utf8) else {
-                return []
+            guard process.terminationStatus == 0,
+                  let processList = String(data: data, encoding: .utf8),
+                  !processList.isEmpty else {
+                return nil
             }
 
             return detect(in: processList, excludingPID: ProcessInfo.processInfo.processIdentifier)
         } catch {
-            return []
+            return nil
         }
     }
 

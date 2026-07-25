@@ -8,11 +8,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let stateItem = NSMenuItem(title: "Sleep follows macOS settings", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Keep Awake", action: #selector(toggleKeepAwake), keyEquivalent: "")
     private let durationMenu = NSMenu(title: "Keep Awake For")
+    private let automaticAgentAwakeItem = NSMenuItem(
+        title: "Keep Awake for Agents",
+        action: #selector(toggleAutomaticAgentAwake),
+        keyEquivalent: ""
+    )
     private let agentsHeaderItem = NSMenuItem(title: "Checking agents…", action: nil, keyEquivalent: "")
     private let agentsSeparator = NSMenuItem.separator()
     private let settingsMenu = NSMenu(title: "Settings")
     private let keepDisplayAwakeItem = NSMenuItem(
-        title: "Keep Display Awake",
+        title: "Manual Sessions Keep Display Awake",
         action: #selector(toggleKeepDisplayAwake),
         keyEquivalent: ""
     )
@@ -33,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let keepDisplayAwakeKey = "keepDisplayAwake"
     private let activateOnLaunchKey = "activateOnLaunch"
     private let defaultDurationSecondsKey = "defaultDurationSeconds"
-    private var awakeSession: AwakeSession?
+    private let automaticAgentAwakeKey = "automaticAgentAwake"
+    private var manualAwakeSession: AwakeSession?
     private var detectedAgents: [DetectedAgent] = []
     private var agentItems: [NSMenuItem] = []
     private var refreshTimer: Timer?
@@ -63,7 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UserDefaults.standard.register(defaults: [
             keepDisplayAwakeKey: true,
             activateOnLaunchKey: false,
-            defaultDurationSecondsKey: 0
+            defaultDurationSecondsKey: 0,
+            automaticAgentAwakeKey: true
         ])
     }
 
@@ -79,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         stateItem.isEnabled = false
         agentsHeaderItem.isEnabled = false
         toggleItem.target = self
+        automaticAgentAwakeItem.target = self
 
         let durationItem = NSMenuItem(title: "Keep Awake For", action: nil, keyEquivalent: "")
         durationItem.submenu = durationMenu
@@ -105,6 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(toggleItem)
         menu.addItem(durationItem)
         menu.addItem(.separator())
+        menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
         menu.addItem(settingsItem)
@@ -212,11 +221,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func refreshState() {
-        if awakeSession?.hasExpired() == true {
-            stopKeepingAwake()
+        if manualAwakeSession?.hasExpired() == true {
+            clearManualAwakeSession()
         }
 
-        detectedAgents = agentTracker.scan()
+        if let latestAgents = agentTracker.scan() {
+            detectedAgents = latestAgents
+        }
+        _ = reconcilePowerAssertion()
         updatePresentation()
         updateAgentPresentation()
         updateSettingsPresentation()
@@ -229,6 +241,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var shouldKeepDisplayAwake: Bool {
         UserDefaults.standard.bool(forKey: keepDisplayAwakeKey)
+    }
+
+    private var automaticAgentAwakeEnabled: Bool {
+        UserDefaults.standard.bool(forKey: automaticAgentAwakeKey)
+    }
+
+    private var shouldKeepDisplayAwakeNow: Bool {
+        manualAwakeSession != nil && shouldKeepDisplayAwake
+    }
+
+    private var agentAwakeRequested: Bool {
+        automaticAgentAwakeEnabled && !detectedAgents.isEmpty
+    }
+
+    private var shouldKeepAwake: Bool {
+        AwakePolicy.shouldKeepAwake(
+            manualSession: manualAwakeSession,
+            automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
+            detectedAgents: detectedAgents
+        )
     }
 
     private func updatePresentation() {
@@ -247,7 +279,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         stateItem.title = presentation.stateTitle
-        toggleItem.title = awakeSession == nil ? "Keep Awake" : "Stop Keeping Awake"
+        toggleItem.title = manualAwakeSession == nil
+            ? "Keep Awake Manually"
+            : "Stop Manual Session"
         updateDurationChecks()
     }
 
@@ -257,35 +291,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toolTip: String,
         stateTitle: String
     ) {
-        guard let awakeSession else {
+        if let manualAwakeSession {
+            guard let remainingSeconds = manualAwakeSession.remainingSeconds() else {
+                return (
+                    "cup.and.saucer.fill",
+                    "Sleep Switch keeping this Mac awake manually",
+                    "Awake manually · Click to stop the manual session",
+                    "Awake · Manual"
+                )
+            }
+
+            let remainingText = AwakeTimeText.remaining(seconds: remainingSeconds)
             return (
-                "cup.and.saucer",
-                "Sleep Switch inactive",
-                "Sleep follows macOS settings · Click to keep awake",
-                "Sleep follows macOS settings"
+                "timer",
+                "Sleep Switch keeping this Mac awake for \(remainingText)",
+                "\(remainingText) · Click to stop the manual session",
+                "Awake · \(remainingText)"
             )
         }
 
-        guard let remainingSeconds = awakeSession.remainingSeconds() else {
+        if agentAwakeRequested && powerAssertions.isActive {
+            let agentName = detectedAgents.count == 1
+                ? detectedAgents[0].definition.name
+                : "\(detectedAgents.count) agents"
             return (
-                "cup.and.saucer.fill",
-                "Sleep Switch keeping this Mac awake",
-                "Awake indefinitely · Click to stop",
-                "Awake indefinitely"
+                "terminal.fill",
+                "Sleep Switch keeping this Mac awake for \(agentName)",
+                "Awake for \(agentName) · Click for a manual session",
+                "Awake · \(agentName)"
             )
         }
 
-        let remainingText = AwakeTimeText.remaining(seconds: remainingSeconds)
+        if agentAwakeRequested {
+            return (
+                "exclamationmark.triangle",
+                "Sleep Switch could not keep this Mac awake",
+                "An agent is running, but the awake assertion is unavailable",
+                "Agent detected · Awake unavailable"
+            )
+        }
+
         return (
-            "timer",
-            "Sleep Switch keeping this Mac awake for \(remainingText)",
-            "\(remainingText) · Click to stop",
-            "Awake · \(remainingText)"
+            "cup.and.saucer",
+            "Sleep Switch inactive",
+            "Sleep follows macOS settings · Click for a manual session",
+            "Sleep follows macOS settings"
         )
     }
 
     private func updateDurationChecks() {
-        let activeDuration = awakeSession.map { $0.durationSeconds ?? 0 }
+        let activeDuration = manualAwakeSession.map { $0.durationSeconds ?? 0 }
         for item in durationMenu.items {
             guard let seconds = item.representedObject as? Int else { continue }
             item.state = activeDuration == seconds ? .on : .off
@@ -298,30 +353,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
         if sessionCount == 0 {
-            agentsHeaderItem.title = "No agent sessions running"
+            agentsHeaderItem.title = "No supported agents running"
             agentsHeaderItem.image = NSImage(
                 systemSymbolName: "terminal",
-                accessibilityDescription: "No agent sessions running"
+                accessibilityDescription: "No supported agents running"
             )
             return
         }
 
-        agentsHeaderItem.title = sessionCount == 1
-            ? "1 agent session running"
-            : "\(sessionCount) agent sessions running"
+        if detectedAgents.count == 1, let agent = detectedAgents.first {
+            let sessionText = agent.processCount == 1 ? "1 session" : "\(agent.processCount) sessions"
+            agentsHeaderItem.title = "\(agent.definition.name) · \(sessionText)"
+        } else {
+            agentsHeaderItem.title = "\(detectedAgents.count) agents · \(sessionCount) sessions"
+        }
         agentsHeaderItem.image = NSImage(
             systemSymbolName: "terminal.fill",
             accessibilityDescription: "\(sessionCount) agent sessions running"
         )
+
+        guard detectedAgents.count > 1 else {
+            return
+        }
 
         guard let separatorIndex = menu.items.firstIndex(of: agentsSeparator) else {
             return
         }
 
         for (offset, agent) in detectedAgents.enumerated() {
-            let suffix = agent.processCount == 1 ? "" : " · \(agent.processCount)"
+            let sessionText = agent.processCount == 1 ? "1 session" : "\(agent.processCount) sessions"
             let item = NSMenuItem(
-                title: "\(agent.definition.name)\(suffix)",
+                title: "\(agent.definition.name) · \(sessionText)",
                 action: nil,
                 keyEquivalent: ""
             )
@@ -338,6 +400,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updateSettingsPresentation() {
         let defaults = UserDefaults.standard
+        automaticAgentAwakeItem.state = automaticAgentAwakeEnabled ? .on : .off
         keepDisplayAwakeItem.state = shouldKeepDisplayAwake ? .on : .off
         activateOnLaunchItem.state = defaults.bool(forKey: activateOnLaunchKey) ? .on : .off
 
@@ -363,7 +426,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggleKeepAwake() {
-        if awakeSession == nil {
+        if manualAwakeSession == nil {
             startKeepingAwake(durationSeconds: defaultDurationSeconds)
         } else {
             stopKeepingAwake()
@@ -384,42 +447,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func startKeepingAwake(durationSeconds: Int?) {
         expiryTimer?.invalidate()
 
-        do {
-            try powerAssertions.start(keepDisplayAwake: shouldKeepDisplayAwake)
-            let session = AwakeSession(startedAt: Date(), durationSeconds: durationSeconds)
-            awakeSession = session
+        let session = AwakeSession(startedAt: Date(), durationSeconds: durationSeconds)
+        manualAwakeSession = session
 
-            if let endDate = session.endDate {
-                let timer = Timer(
-                    fireAt: endDate,
-                    interval: 0,
-                    target: self,
-                    selector: #selector(awakeSessionExpired),
-                    userInfo: nil,
-                    repeats: false
-                )
-                RunLoop.main.add(timer, forMode: .common)
-                expiryTimer = timer
-            }
-
-            updatePresentation()
-        } catch {
-            awakeSession = nil
+        if let error = reconcilePowerAssertion() {
+            manualAwakeSession = nil
             presentAssertionError(error)
             updatePresentation()
+            return
         }
+
+        if let endDate = session.endDate {
+            let timer = Timer(
+                fireAt: endDate,
+                interval: 0,
+                target: self,
+                selector: #selector(awakeSessionExpired),
+                userInfo: nil,
+                repeats: false
+            )
+            RunLoop.main.add(timer, forMode: .common)
+            expiryTimer = timer
+        }
+
+        updatePresentation()
     }
 
     private func stopKeepingAwake() {
+        clearManualAwakeSession()
+        _ = reconcilePowerAssertion()
+        updatePresentation()
+    }
+
+    private func clearManualAwakeSession() {
         expiryTimer?.invalidate()
         expiryTimer = nil
-        powerAssertions.stop()
-        awakeSession = nil
-        updatePresentation()
+        manualAwakeSession = nil
     }
 
     @objc private func awakeSessionExpired() {
         stopKeepingAwake()
+    }
+
+    @discardableResult
+    private func reconcilePowerAssertion(forceRestart: Bool = false) -> Error? {
+        guard shouldKeepAwake else {
+            powerAssertions.stop()
+            return nil
+        }
+
+        if powerAssertions.isActive,
+           powerAssertions.isKeepingDisplayAwake == shouldKeepDisplayAwakeNow,
+           !forceRestart {
+            return nil
+        }
+
+        do {
+            try powerAssertions.start(keepDisplayAwake: shouldKeepDisplayAwakeNow)
+            return nil
+        } catch {
+            powerAssertions.stop()
+            return error
+        }
+    }
+
+    @objc private func toggleAutomaticAgentAwake() {
+        let defaults = UserDefaults.standard
+        let previousValue = automaticAgentAwakeEnabled
+        defaults.set(!previousValue, forKey: automaticAgentAwakeKey)
+
+        if let error = reconcilePowerAssertion() {
+            defaults.set(previousValue, forKey: automaticAgentAwakeKey)
+            _ = reconcilePowerAssertion()
+            presentAssertionError(error)
+        }
+
+        updatePresentation()
+        updateSettingsPresentation()
     }
 
     private func requestCustomDuration() -> Int? {
@@ -474,28 +578,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleKeepDisplayAwake() {
         let defaults = UserDefaults.standard
+        let previousValue = shouldKeepDisplayAwake
         let newValue = !shouldKeepDisplayAwake
 
-        if let awakeSession {
-            let previousValue = shouldKeepDisplayAwake
-            do {
-                try powerAssertions.start(keepDisplayAwake: newValue)
-                defaults.set(newValue, forKey: keepDisplayAwakeKey)
-                self.awakeSession = awakeSession
-            } catch {
-                do {
-                    try powerAssertions.start(keepDisplayAwake: previousValue)
-                } catch {
-                    expiryTimer?.invalidate()
-                    expiryTimer = nil
-                    self.awakeSession = nil
-                }
-                presentAssertionError(error)
-            }
-        } else {
-            defaults.set(newValue, forKey: keepDisplayAwakeKey)
+        defaults.set(newValue, forKey: keepDisplayAwakeKey)
+        if shouldKeepAwake, let error = reconcilePowerAssertion(forceRestart: true) {
+            defaults.set(previousValue, forKey: keepDisplayAwakeKey)
+            _ = reconcilePowerAssertion(forceRestart: true)
+            presentAssertionError(error)
         }
 
+        updatePresentation()
         updateSettingsPresentation()
     }
 

@@ -13,6 +13,30 @@ xcodebuild \
 
 After changing `project.yml`, regenerate the project with `xcodegen generate`.
 
+For a signed upload, archive outside a cloud-synced directory and export with
+`AppStore/ExportOptions.plist`:
+
+```sh
+xcodebuild \
+  -project SleepSwitch.xcodeproj \
+  -scheme SleepSwitch \
+  -configuration Release \
+  -destination 'generic/platform=macOS' \
+  -archivePath /tmp/SleepSwitch.xcarchive \
+  -derivedDataPath /tmp/SleepSwitch-DerivedData \
+  DEVELOPMENT_TEAM=C43F5MKJF2 \
+  CODE_SIGN_STYLE=Automatic \
+  -allowProvisioningUpdates \
+  archive
+
+xcodebuild \
+  -exportArchive \
+  -archivePath /tmp/SleepSwitch.xcarchive \
+  -exportOptionsPlist AppStore/ExportOptions.plist \
+  -exportPath /tmp/SleepSwitch-Export \
+  -allowProvisioningUpdates
+```
+
 ## Distribution differences
 
 | Capability | GitHub download | Mac App Store |
@@ -27,12 +51,14 @@ After changing `project.yml`, regenerate the project with `xcodegen generate`.
 
 The Mac App Store requires App Sandbox. A sandboxed app can use Apple’s public power assertion APIs, but it cannot execute `/bin/ps` or `/usr/bin/pmset`. The store target therefore removes global command-line process inspection and forced display sleep. It uses a read-only, security-scoped bookmark for Codex task files and never weakens the full direct-download build.
 
-## App Store Connect draft
+## App Store Connect record
 
-- **Name:** Sleep Switch
-- **Subtitle:** Stay awake while work runs
-- **Primary category:** Utilities
-- **Price:** Free
+- **Apple ID:** `6794709246`
+- **Name:** Sleep Switch for Mac AI Agents
+- **Subtitle:** Keep long-running work awake
+- **Primary category:** Developer Tools
+- **Secondary category:** Utilities
+- **Price:** Free (`$0.00`)
 - **Bundle ID:** `lt.mantas.sleepswitch`
 - **SKU:** `sleep-switch-macos`
 - **Support URL:** `https://github.com/mistermantas/macos-sleep-switch/issues`
@@ -67,22 +93,25 @@ The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sle
 
 ## Assets
 
-Mac submissions require one to ten screenshots. Use 1440 × 900 or another accepted 16:10 Mac size. A practical first set is:
+The three 1440 × 900 screenshots uploaded to App Store Connect are:
 
-1. Automatic Codex task awake state.
-2. Manual duration controls.
-3. Display behavior and About & Support links.
+1. `AppStore/Screenshots/Final/01-codex-automatic-awake.png`
+2. `AppStore/Screenshots/Final/02-manual-awake-timer.png`
+3. `AppStore/Screenshots/Final/03-support-and-creator.png`
 
-## Account handoff
+`AppStore/Screenshots/studio.html` is the deterministic source used to render
+them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
-The account holder needs to:
+## Submission status
 
-1. Sign the latest Apple Developer agreement.
-2. Sign into Xcode and create or install an Apple Development and Apple Distribution identity.
-3. register `lt.mantas.sleepswitch` and select the developer team in the Xcode target.
-4. Create the macOS app record in App Store Connect using the values above.
-5. Confirm the app name, seller/developer name, countries, free pricing, age rating, privacy answers, and export-compliance answers.
-6. Provide the final screenshots and support/privacy URLs.
-7. Choose the uploaded build, add it for review, and make the final **Submit for Review** decision.
+- Version 1.5.2 (build 8) archives successfully as a universal sandboxed app.
+- Screenshots, listing copy, URLs, review notes, categories, and the free price
+  are configured.
+- The privacy policy URL and **Data Not Collected** disclosure are published.
+- App Store Connect still requires the reviewer contact phone number before the
+  version metadata can be saved.
+- Xcode's stored Apple account credentials must be refreshed before automatic
+  distribution signing and upload can finish.
 
-Once signing exists locally, the archive can be built, validated, and uploaded from Xcode. App Store Connect metadata and uploads can also be automated with an App Store Connect API key granted by the account holder.
+After those two items, export the archive, select build 8, add the version for
+review, and submit.

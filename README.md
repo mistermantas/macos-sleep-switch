@@ -22,7 +22,7 @@ Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu
 - **Sleep Display** turns off the display without sleeping or logging out of the Mac.
 - **Sleep Until Agents Finish** turns off the display and wakes it once every detected agent session has ended. This is a one-shot action and is never enabled by default.
 - **Keep Awake Manually** starts or stops an independent Caffeine-style session. Use **Manual Duration** for a preset or custom time.
-- **About & Support** links to Uncascade, the Uncascade YouTube channel, the source code, and GitHub Sponsors.
+- **Support & Creator** links to Uncascade, the Uncascade YouTube channel, the source code, and GitHub Sponsors.
 
 Agent sessions allow the display to sleep. Manual sessions can optionally keep it lit. Settings cover manual display behavior, activation on launch, the default manual duration, and launch at login.
 
@@ -69,7 +69,7 @@ The repository includes a sandboxed Mac App Store target. Apple’s sandbox allo
 
 See [APP_STORE.md](APP_STORE.md) for the Xcode target, submission metadata, and account handoff.
 
-## About & support
+## Support & creator
 
 - [Uncascade](https://www.uncascade.com/)
 - [Uncascade on YouTube](https://www.youtube.com/@uncascade)

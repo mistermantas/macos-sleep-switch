@@ -421,6 +421,14 @@ struct AgentTrackerTests {
 
     private static func testAppLinks() {
         let links = AppLinks.groups.flatMap { $0 }
+        expect(
+            AppLinks.menuTitle == "Support & Creator",
+            "uses the creator-focused support menu title"
+        )
+        expect(
+            AppLinks.menuSymbolName == "heart",
+            "uses a heart for the support menu"
+        )
         expect(links.count == 4, "keeps the support menu concise")
         expect(
             links.allSatisfy { $0.url.scheme == "https" },
@@ -472,7 +480,6 @@ struct AgentTrackerTests {
             "stop.circle",
             "gearshape",
             "arrow.clockwise",
-            "info.circle",
             "globe",
             "play.rectangle",
             "chevron.left.forwardslash.chevron.right",

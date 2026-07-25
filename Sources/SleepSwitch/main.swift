@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keyEquivalent: ""
     )
     private let settingsMenu = NSMenu(title: "Settings")
-    private let aboutMenu = NSMenu(title: "About & Support")
+    private let supportMenu = NSMenu(title: AppLinks.menuTitle)
     private let keepDisplayAwakeItem = NSMenuItem(
         title: "Manual Sessions Keep Display Awake",
         action: #selector(toggleKeepDisplayAwake),
@@ -195,13 +195,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             accessibilityDescription: "Refresh agent status"
         )
 
-        let aboutItem = NSMenuItem(title: "About & Support", action: nil, keyEquivalent: "")
-        aboutItem.submenu = aboutMenu
-        aboutItem.image = NSImage(
-            systemSymbolName: "info.circle",
-            accessibilityDescription: "About and support links"
+        let supportItem = NSMenuItem(
+            title: AppLinks.menuTitle,
+            action: nil,
+            keyEquivalent: ""
         )
-        configureAboutMenu()
+        supportItem.submenu = supportMenu
+        supportItem.image = NSImage(
+            systemSymbolName: AppLinks.menuSymbolName,
+            accessibilityDescription: "Support and creator links"
+        )
+        configureSupportMenu()
 
         let quitItem = NSMenuItem(
             title: "Quit Sleep Switch",
@@ -225,7 +229,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(settingsItem)
         menu.addItem(refreshItem)
-        menu.addItem(aboutItem)
+        menu.addItem(supportItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
         statusItem.menu = menu
@@ -288,10 +292,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsMenu.addItem(launchAtLoginItem)
     }
 
-    private func configureAboutMenu() {
+    private func configureSupportMenu() {
         for (groupIndex, group) in AppLinks.groups.enumerated() {
             if groupIndex > 0 {
-                aboutMenu.addItem(.separator())
+                supportMenu.addItem(.separator())
             }
 
             for link in group {
@@ -306,7 +310,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     systemSymbolName: link.symbolName,
                     accessibilityDescription: link.title
                 )
-                aboutMenu.addItem(item)
+                supportMenu.addItem(item)
             }
         }
     }

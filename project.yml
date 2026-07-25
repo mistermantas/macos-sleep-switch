@@ -25,12 +25,12 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AppStore/SleepSwitch.entitlements
         CODE_SIGN_STYLE: Automatic
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 7
+        CURRENT_PROJECT_VERSION: 8
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: AppStore/Info.plist
-        MARKETING_VERSION: 1.5.1
+        MARKETING_VERSION: 1.5.2
         OTHER_SWIFT_FLAGS: "$(inherited) -parse-as-library"
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch
         PRODUCT_NAME: Sleep Switch

@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sleep Switch — App Store Screenshots</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      background: #08090d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    body::before {
+      position: fixed;
+      inset: -36px;
+      content: "";
+      background:
+        linear-gradient(112deg, rgba(20, 10, 68, 0.76), rgba(5, 7, 13, 0.92) 54%, rgba(13, 20, 42, 0.82)),
+        url("./Source/current-menu.png") center / cover;
+      filter: blur(24px) saturate(0.7);
+      transform: scale(1.08);
+    }
+
+    body::after {
+      position: fixed;
+      inset: 0;
+      content: "";
+      background:
+        radial-gradient(circle at 78% 25%, rgba(96, 78, 235, 0.2), transparent 30%),
+        linear-gradient(180deg, rgba(5, 6, 12, 0.08), rgba(5, 6, 12, 0.58));
+    }
+
+    .slide {
+      position: relative;
+      z-index: 1;
+      display: none;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    .menu-bar {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      color: rgba(255, 255, 255, 0.86);
+      background: rgba(17, 16, 29, 0.72);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(22px);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .menu-bar__left,
+    .menu-bar__right {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+    }
+
+    .menu-bar__right {
+      gap: 16px;
+      color: rgba(255, 255, 255, 0.74);
+    }
+
+    .coffee {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      color: white;
+      background: #5b4fe8;
+      border-radius: 7px;
+      font-size: 15px;
+    }
+
+    .workspace {
+      position: absolute;
+      left: 62px;
+      top: 388px;
+      width: 810px;
+      height: 424px;
+      overflow: hidden;
+      background: rgba(14, 15, 21, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      box-shadow: 0 32px 90px rgba(0, 0, 0, 0.44);
+    }
+
+    .workspace__bar {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 20px;
+      color: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.045);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #494a52;
+    }
+
+    .workspace__title {
+      margin-left: 10px;
+    }
+
+    .workspace__body {
+      display: grid;
+      grid-template-columns: 212px 1fr;
+      height: calc(100% - 54px);
+    }
+
+    .sidebar {
+      padding: 26px 18px;
+      background: rgba(255, 255, 255, 0.025);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .sidebar__label {
+      margin: 0 10px 18px;
+      color: rgba(255, 255, 255, 0.35);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .sidebar__label,
+    .editor__kicker,
+    .editor__title,
+    .message,
+    .task > span:not(.task__status) {
+      display: none;
+    }
+
+    .task {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      padding: 0 12px;
+      color: rgba(255, 255, 255, 0.54);
+      border-radius: 10px;
+      font-size: 13px;
+    }
+
+    .task.active {
+      color: white;
+      background: rgba(107, 91, 230, 0.18);
+    }
+
+    .task__status {
+      width: 8px;
+      height: 8px;
+      background: #8277ff;
+      border-radius: 50%;
+      box-shadow: 0 0 14px rgba(130, 119, 255, 0.86);
+    }
+
+    .task::after {
+      width: 112px;
+      height: 9px;
+      content: "";
+      background: rgba(255, 255, 255, 0.13);
+      border-radius: 999px;
+    }
+
+    .task:nth-of-type(2)::after {
+      width: 88px;
+    }
+
+    .task:nth-of-type(3)::after {
+      width: 126px;
+    }
+
+    .editor {
+      padding: 34px 48px;
+    }
+
+    .editor__kicker {
+      margin-bottom: 18px;
+      color: #8d84ff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .editor__title {
+      max-width: 540px;
+      margin: 0 0 26px;
+      color: rgba(255, 255, 255, 0.93);
+      font-size: 29px;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+    }
+
+    .code-line {
+      height: 12px;
+      margin-bottom: 14px;
+      background: rgba(255, 255, 255, 0.095);
+      border-radius: 20px;
+    }
+
+    .code-line:nth-child(2n) {
+      width: 84%;
+    }
+
+    .code-line:nth-child(3n) {
+      width: 62%;
+    }
+
+    .code-line.accent {
+      width: 72%;
+      background: rgba(105, 92, 232, 0.38);
+    }
+
+    .message {
+      margin-top: 28px;
+      padding: 20px 22px;
+      color: rgba(255, 255, 255, 0.58);
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.065);
+      border-radius: 13px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .copy {
+      position: absolute;
+      left: 104px;
+      top: 144px;
+      z-index: 3;
+      width: 620px;
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      height: 30px;
+      margin-bottom: 20px;
+      padding: 0 12px;
+      color: #c6c1ff;
+      background: rgba(102, 88, 232, 0.2);
+      border: 1px solid rgba(141, 130, 255, 0.25);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 620px;
+      margin: 0;
+      color: #fff;
+      font-size: 72px;
+      font-weight: 720;
+      letter-spacing: -0.052em;
+      line-height: 0.98;
+      text-wrap: balance;
+      text-shadow: 0 3px 24px rgba(0, 0, 0, 0.42);
+    }
+
+    .menu {
+      position: absolute;
+      z-index: 4;
+      width: 376px;
+      padding: 8px 0;
+      overflow: hidden;
+      color: rgba(255, 255, 255, 0.93);
+      background: rgba(31, 29, 47, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 13px;
+      box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.52),
+        inset 0 1px rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(32px);
+      font-size: 15px;
+      font-weight: 520;
+    }
+
+    .menu.main {
+      right: 92px;
+      top: 94px;
+    }
+
+    .menu.centered {
+      right: 108px;
+      top: 118px;
+    }
+
+    .menu.with-submenu {
+      right: 454px;
+      top: 94px;
+    }
+
+    .row {
+      min-height: 38px;
+      display: grid;
+      grid-template-columns: 18px 24px minmax(0, 1fr) 34px;
+      align-items: center;
+      padding: 0 13px 0 11px;
+      white-space: nowrap;
+    }
+
+    .row.muted {
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .row.strong {
+      font-weight: 660;
+    }
+
+    .row.selected {
+      background: #5c4fd9;
+    }
+
+    .check {
+      color: white;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .icon {
+      width: 19px;
+      color: rgba(255, 255, 255, 0.77);
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .row.muted .icon {
+      color: rgba(255, 255, 255, 0.28);
+    }
+
+    .key {
+      color: rgba(255, 255, 255, 0.34);
+      text-align: right;
+      font-size: 12px;
+    }
+
+    .chevron {
+      color: rgba(255, 255, 255, 0.78);
+      text-align: right;
+      font-size: 21px;
+      font-weight: 300;
+    }
+
+    .separator {
+      height: 1px;
+      margin: 7px 14px 7px 44px;
+      background: rgba(255, 255, 255, 0.13);
+    }
+
+    .submenu {
+      right: 74px;
+      top: 348px;
+      width: 302px;
+    }
+
+    .duration-submenu {
+      right: 72px;
+      top: 354px;
+      width: 240px;
+    }
+
+    .brand-lockup {
+      position: absolute;
+      left: 104px;
+      bottom: 36px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 16px;
+      font-weight: 620;
+    }
+
+    .brand-lockup img {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      box-shadow: 0 8px 26px rgba(0, 0, 0, 0.34);
+    }
+
+    .slide-2 h1,
+    .slide-3 h1 {
+      max-width: 470px;
+      font-size: 64px;
+      line-height: 1;
+    }
+
+    .slide-2 .copy,
+    .slide-3 .copy {
+      width: 430px;
+    }
+
+    .slide-2 .workspace,
+    .slide-3 .workspace {
+      opacity: 0.62;
+    }
+  </style>
+</head>
+<body>
+  <section class="slide slide-1">
+    <div class="menu-bar">
+      <div class="menu-bar__left"><span>Sleep Switch</span><span>File</span><span>Edit</span></div>
+      <div class="menu-bar__right"><span>⌁</span><span>◉</span><span class="coffee">☕</span><span>Fri 10:42 PM</span></div>
+    </div>
+    <div class="workspace">
+      <div class="workspace__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="workspace__title">Codex</span></div>
+      <div class="workspace__body">
+        <aside class="sidebar">
+          <div class="sidebar__label">Active tasks</div>
+          <div class="task active"><span class="task__status"></span><span>Ship Mac release</span></div>
+          <div class="task"><span class="task__status"></span><span>Run full test suite</span></div>
+          <div class="task"><span class="task__status"></span><span>Review changes</span></div>
+        </aside>
+        <main class="editor">
+          <div class="editor__kicker">Working</div>
+          <h2 class="editor__title">Preparing the release while you’re away</h2>
+          <div class="code-line accent"></div><div class="code-line"></div><div class="code-line"></div><div class="code-line"></div><div class="code-line"></div><div class="code-line"></div>
+          <div class="message">Tasks keep running locally. Sleep Switch releases the awake assertion when the last task finishes.</div>
+        </main>
+      </div>
+    </div>
+    <div class="copy"><h1>Agents awake.</h1></div>
+    <div class="menu main">
+      <div class="row muted"><span></span><span class="icon">▣</span><span>Awake · Codex</span><span></span></div>
+      <div class="row strong"><span class="check">✓</span><span class="icon">▣</span><span>Keep Awake for Codex</span><span></span></div>
+      <div class="row muted"><span></span><span class="icon">▣</span><span>Codex · 5 sessions</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">☀</span><span>Wake Display When Codex Finishes</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">☕</span><span>Keep Awake Manually</span><span></span></div>
+      <div class="row"><span></span><span class="icon">◷</span><span>Manual Duration</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">⚙</span><span>Settings</span><span class="chevron">›</span></div>
+      <div class="row"><span></span><span class="icon">↻</span><span>Refresh Codex</span><span class="key">⌘ R</span></div>
+      <div class="row"><span></span><span class="icon">♡</span><span>Support &amp; Creator</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">▣</span><span>Quit Sleep Switch</span><span class="key">⌘ Q</span></div>
+    </div>
+    <div class="brand-lockup"><img src="../../Assets/AppIcon.png" alt=""><span>Sleep Switch · Free for macOS</span></div>
+  </section>
+
+  <section class="slide slide-2">
+    <div class="menu-bar">
+      <div class="menu-bar__left"><span>Sleep Switch</span><span>File</span><span>Edit</span></div>
+      <div class="menu-bar__right"><span>⌁</span><span>◉</span><span class="coffee">☕</span><span>Fri 10:42 PM</span></div>
+    </div>
+    <div class="workspace">
+      <div class="workspace__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="workspace__title">Codex</span></div>
+      <div class="workspace__body">
+        <aside class="sidebar">
+          <div class="sidebar__label">Recent tasks</div>
+          <div class="task active"><span class="task__status"></span><span>Release complete</span></div>
+          <div class="task"><span class="task__status"></span><span>Checks passed</span></div>
+        </aside>
+        <main class="editor">
+          <div class="editor__kicker">Complete</div>
+          <h2 class="editor__title">Everything finished. macOS can sleep normally.</h2>
+          <div class="code-line accent"></div><div class="code-line"></div><div class="code-line"></div><div class="code-line"></div>
+        </main>
+      </div>
+    </div>
+    <div class="copy"><h1>Set a timer.</h1></div>
+    <div class="menu with-submenu">
+      <div class="row muted"><span></span><span class="icon">◷</span><span>Awake · 24m left</span><span></span></div>
+      <div class="row strong"><span class="check">✓</span><span class="icon">▣</span><span>Keep Awake for Codex</span><span></span></div>
+      <div class="row muted"><span></span><span class="icon">▣</span><span>No Codex tasks running</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row muted"><span></span><span class="icon">☀</span><span>Wake Display When Codex Finishes</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row strong"><span></span><span class="icon">◉</span><span>Stop Manual Session</span><span></span></div>
+      <div class="row selected"><span></span><span class="icon">◷</span><span>Manual Duration</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">⚙</span><span>Settings</span><span class="chevron">›</span></div>
+      <div class="row"><span></span><span class="icon">↻</span><span>Refresh Codex</span><span class="key">⌘ R</span></div>
+      <div class="row"><span></span><span class="icon">♡</span><span>Support &amp; Creator</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">▣</span><span>Quit Sleep Switch</span><span class="key">⌘ Q</span></div>
+    </div>
+    <div class="menu duration-submenu">
+      <div class="row"><span></span><span></span><span>Indefinitely</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span></span><span>5 Minutes</span><span></span></div>
+      <div class="row"><span></span><span></span><span>15 Minutes</span><span></span></div>
+      <div class="row strong"><span class="check">✓</span><span></span><span>30 Minutes</span><span></span></div>
+      <div class="row"><span></span><span></span><span>1 Hour</span><span></span></div>
+      <div class="row"><span></span><span></span><span>2 Hours</span><span></span></div>
+      <div class="row"><span></span><span></span><span>4 Hours</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span></span><span>Custom…</span><span></span></div>
+    </div>
+    <div class="brand-lockup"><img src="../../Assets/AppIcon.png" alt=""><span>Sleep Switch · Free for macOS</span></div>
+  </section>
+
+  <section class="slide slide-3">
+    <div class="menu-bar">
+      <div class="menu-bar__left"><span>Sleep Switch</span><span>File</span><span>Edit</span></div>
+      <div class="menu-bar__right"><span>⌁</span><span>◉</span><span class="coffee">☕</span><span>Fri 10:42 PM</span></div>
+    </div>
+    <div class="workspace">
+      <div class="workspace__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="workspace__title">Codex</span></div>
+      <div class="workspace__body">
+        <aside class="sidebar">
+          <div class="sidebar__label">Sleep Switch</div>
+          <div class="task active"><span class="task__status"></span><span>Open source</span></div>
+          <div class="task"><span class="task__status"></span><span>Local only</span></div>
+          <div class="task"><span class="task__status"></span><span>No tracking</span></div>
+        </aside>
+        <main class="editor">
+          <div class="editor__kicker">Uncascade</div>
+          <h2 class="editor__title">A small utility made for people who leave agents running.</h2>
+          <div class="code-line accent"></div><div class="code-line"></div><div class="code-line"></div><div class="code-line"></div>
+        </main>
+      </div>
+    </div>
+    <div class="copy"><h1>Meet the creator.</h1></div>
+    <div class="menu with-submenu">
+      <div class="row muted"><span></span><span class="icon">☕</span><span>Sleep follows macOS settings</span><span></span></div>
+      <div class="row strong"><span class="check">✓</span><span class="icon">▣</span><span>Keep Awake for Codex</span><span></span></div>
+      <div class="row muted"><span></span><span class="icon">▣</span><span>No Codex tasks running</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row muted"><span></span><span class="icon">☀</span><span>Wake Display When Codex Finishes</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">☕</span><span>Keep Awake Manually</span><span></span></div>
+      <div class="row"><span></span><span class="icon">◷</span><span>Manual Duration</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">⚙</span><span>Settings</span><span class="chevron">›</span></div>
+      <div class="row"><span></span><span class="icon">↻</span><span>Refresh Codex</span><span class="key">⌘ R</span></div>
+      <div class="row selected strong"><span></span><span class="icon">♡</span><span>Support &amp; Creator</span><span class="chevron">›</span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">▣</span><span>Quit Sleep Switch</span><span class="key">⌘ Q</span></div>
+    </div>
+    <div class="menu submenu">
+      <div class="row"><span></span><span class="icon">◎</span><span>Uncascade Website</span><span></span></div>
+      <div class="row"><span></span><span class="icon">▶</span><span>Uncascade on YouTube</span><span></span></div>
+      <div class="separator"></div>
+      <div class="row"><span></span><span class="icon">⌘</span><span>Sleep Switch on GitHub</span><span></span></div>
+      <div class="row"><span></span><span class="icon">♡</span><span>Sponsor on GitHub</span><span></span></div>
+    </div>
+    <div class="brand-lockup"><img src="../../Assets/AppIcon.png" alt=""><span>Sleep Switch · Free for macOS</span></div>
+  </section>
+
+  <script>
+    const slide = new URLSearchParams(window.location.search).get("slide") || "1";
+    document.querySelector(`.slide-${slide}`)?.classList.add("active");
+  </script>
+</body>
+</html>

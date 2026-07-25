@@ -7,6 +7,9 @@ struct AppLink: Equatable {
 }
 
 enum AppLinks {
+    static let menuTitle = "Support & Creator"
+    static let menuSymbolName = "heart"
+
     static let uncascadeWebsite = AppLink(
         title: "Uncascade Website",
         url: URL(string: "https://www.uncascade.com/")!,

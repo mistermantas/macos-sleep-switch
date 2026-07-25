@@ -1,8 +1,10 @@
 # Sleep Switch
 
-A tiny macOS menu-bar switch for one system setting: whether the Mac is allowed to sleep.
+Keep local coding agents running when your MacBook lid is closed.
 
 [Download Sleep Switch](https://github.com/mistermantas/macos-sleep-switch/releases/latest/download/Sleep-Switch.zip)
+
+Sleep Switch shows the agent sessions running on your Mac, alongside the system sleep setting they depend on. It is free, open source, and stays out of the way in the menu bar.
 
 ## Install
 
@@ -17,17 +19,32 @@ Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu
 
 - A moon with `zzz` means sleep is allowed.
 - A filled moon means sleep prevention is on.
+- Open the menu to see detected local agent sessions.
 - Choose **Prevent sleep** or **Allow sleep** to change the setting.
 - macOS asks for administrator approval before each change.
 
 Opening, quitting, installing, or refreshing the app never changes the sleep setting. Only choosing the toggle does.
+
+## Supported agents
+
+- Codex
+- Claude Code
+- OpenCode
+- Gemini CLI
+- Antigravity CLI
+- GitHub Copilot CLI
+- Aider
+- Goose
+- Cursor Agent
+
+Sleep Switch checks the local process list every five seconds. Tracking is local-only: no process information leaves your Mac.
 
 ## What it runs
 
 Sleep Switch reads the current state with:
 
 ```sh
-/usr/bin/pmset -g custom
+/usr/bin/pmset -g
 ```
 
 After an explicit menu click and administrator approval, it runs one of:
@@ -37,7 +54,11 @@ After an explicit menu click and administrator approval, it runs one of:
 /usr/bin/pmset -a disablesleep 0
 ```
 
-There are no analytics, network requests, background services, or bundled dependencies.
+There are no analytics, network requests, privileged background services, or bundled dependencies.
+
+## A note on heat
+
+Keeping a MacBook awake with its lid closed uses normal active power and can create heat during builds or other heavy work. Keep it on a hard, ventilated surface. Do not leave an active MacBook in a bag or under bedding.
 
 ## Requirements
 
@@ -59,6 +80,12 @@ The universal app is written to `build/Sleep Switch.app`. To create the release 
 
 ```sh
 ./package.sh
+```
+
+Run the agent detection tests with:
+
+```sh
+./test.sh
 ```
 
 ## License

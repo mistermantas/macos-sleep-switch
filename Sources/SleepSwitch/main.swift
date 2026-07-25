@@ -7,19 +7,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let stateItem = NSMenuItem(title: "Checking sleep setting…", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Toggle", action: #selector(toggleSleepPrevention), keyEquivalent: "")
+    private let agentsHeaderItem = NSMenuItem(title: "Checking agents…", action: nil, keyEquivalent: "")
+    private let agentsSeparator = NSMenuItem.separator()
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+    private let agentTracker = AgentTracker()
     private let launchAtLoginConfiguredKey = "launchAtLoginConfigured"
     private var sleepPreventionEnabled = false
+    private var detectedAgents: [DetectedAgent] = []
+    private var agentItems: [NSMenuItem] = []
+    private var refreshTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureMenu()
         enableLaunchAtLoginByDefault()
         refreshState()
+        startRefreshTimer()
     }
 
     private func configureMenu() {
         menu.delegate = self
         stateItem.isEnabled = false
+        agentsHeaderItem.isEnabled = false
         toggleItem.target = self
         launchAtLoginItem.target = self
 
@@ -32,6 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(toggleItem)
         menu.addItem(.separator())
+        menu.addItem(agentsHeaderItem)
+        menu.addItem(agentsSeparator)
         menu.addItem(launchAtLoginItem)
         menu.addItem(refreshItem)
         menu.addItem(.separator())
@@ -45,7 +55,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func refreshState() {
         sleepPreventionEnabled = readSleepPreventionState()
+        detectedAgents = agentTracker.scan()
         updatePresentation()
+        updateAgentPresentation()
         updateLaunchAtLoginPresentation()
     }
 
@@ -53,7 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let process = Process()
         let output = Pipe()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-        process.arguments = ["-g", "custom"]
+        process.arguments = ["-g"]
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
 
@@ -67,11 +79,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 .split(separator: "\n")
                 .compactMap { line -> Int? in
                     let parts = line.split(whereSeparator: \.isWhitespace)
-                    guard parts.count == 2, parts[0] == "disablesleep" else { return nil }
-                    return Int(parts[1])
+                    guard parts.count >= 2 else { return nil }
+                    let key = parts[0].lowercased()
+                    guard key == "sleepdisabled" || key == "disablesleep" else {
+                        return nil
+                    }
+                    guard let value = parts.last else { return nil }
+                    return Int(value)
                 }
 
-            return !values.isEmpty && values.allSatisfy { $0 == 1 }
+            return values.contains(1)
         } catch {
             return false
         }
@@ -79,13 +96,88 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func updatePresentation() {
         let symbolName = sleepPreventionEnabled ? "moon.fill" : "moon.zzz"
+        let agentNames = detectedAgents.map(\.definition.name)
+        let agentSummary = agentNames.isEmpty ? nil : agentNames.joined(separator: ", ")
+
         statusItem.button?.image = NSImage(
             systemSymbolName: symbolName,
             accessibilityDescription: sleepPreventionEnabled ? "Sleep prevention on" : "Sleep allowed"
         )
-        statusItem.button?.toolTip = sleepPreventionEnabled ? "Sleep Switch: sleep prevention on" : "Sleep Switch: sleep allowed"
-        stateItem.title = sleepPreventionEnabled ? "Sleep prevention is on" : "Sleep is allowed"
+        statusItem.button?.toolTip = if let agentSummary {
+            sleepPreventionEnabled
+                ? "Sleep Switch: staying awake · \(agentSummary)"
+                : "Sleep Switch: sleep allowed · \(agentSummary)"
+        } else {
+            sleepPreventionEnabled ? "Sleep Switch: staying awake" : "Sleep Switch: sleep allowed"
+        }
+
+        if sleepPreventionEnabled {
+            stateItem.title = "Mac will stay awake"
+        } else if let firstAgent = agentNames.first {
+            stateItem.title = agentNames.count == 1
+                ? "Sleep allowed · \(firstAgent) running"
+                : "Sleep allowed · \(agentNames.count) agents running"
+        } else {
+            stateItem.title = "Sleep is allowed"
+        }
+
         toggleItem.title = sleepPreventionEnabled ? "Allow sleep" : "Prevent sleep"
+    }
+
+    private func updateAgentPresentation() {
+        agentItems.forEach(menu.removeItem)
+        agentItems.removeAll()
+
+        let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
+        if sessionCount == 0 {
+            agentsHeaderItem.title = "No agent sessions running"
+            agentsHeaderItem.image = NSImage(
+                systemSymbolName: "terminal",
+                accessibilityDescription: "No agent sessions running"
+            )
+            return
+        }
+
+        agentsHeaderItem.title = sessionCount == 1
+            ? "1 agent session running"
+            : "\(sessionCount) agent sessions running"
+        agentsHeaderItem.image = NSImage(
+            systemSymbolName: "terminal.fill",
+            accessibilityDescription: "\(sessionCount) agent sessions running"
+        )
+
+        guard let separatorIndex = menu.items.firstIndex(of: agentsSeparator) else {
+            return
+        }
+
+        for (offset, agent) in detectedAgents.enumerated() {
+            let suffix = agent.processCount == 1 ? "" : " · \(agent.processCount)"
+            let item = NSMenuItem(
+                title: "\(agent.definition.name)\(suffix)",
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            item.indentationLevel = 1
+            item.image = NSImage(
+                systemSymbolName: "circle.fill",
+                accessibilityDescription: "\(agent.definition.name) running"
+            )
+            agentItems.append(item)
+            menu.insertItem(item, at: separatorIndex + offset)
+        }
+    }
+
+    private func startRefreshTimer() {
+        let timer = Timer.scheduledTimer(
+            timeInterval: 5,
+            target: self,
+            selector: #selector(refreshState),
+            userInfo: nil,
+            repeats: true
+        )
+        timer.tolerance = 1
+        refreshTimer = timer
     }
 
     @objc private func toggleSleepPrevention() {

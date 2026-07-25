@@ -18,7 +18,7 @@ for arch in arm64 x86_64; do
     -target "$arch-apple-macos13.0" \
     -framework AppKit \
     -framework ServiceManagement \
-    "$script_dir/Sources/SleepSwitch/main.swift" \
+    "$script_dir/Sources/SleepSwitch/"*.swift \
     -o "$arch_dir/SleepSwitch-$arch"
 done
 

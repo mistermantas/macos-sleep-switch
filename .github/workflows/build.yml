@@ -12,6 +12,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
+      - name: Test
+        run: |
+          chmod +x test.sh
+          ./test.sh
       - name: Build and package
         run: |
           chmod +x build.sh package.sh

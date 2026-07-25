@@ -28,10 +28,21 @@ enum AwakePolicy {
     static func shouldKeepAwake(
         manualSession: AwakeSession?,
         automaticAgentAwakeEnabled: Bool,
+        wakeWhenAgentsFinishArmed: Bool,
         detectedAgents: [DetectedAgent]
     ) -> Bool {
         manualSession != nil
             || (automaticAgentAwakeEnabled && !detectedAgents.isEmpty)
+            || wakeWhenAgentsFinishArmed
+    }
+}
+
+enum DisplayWakePolicy {
+    static func shouldAttemptWake(
+        isArmed: Bool,
+        detectedAgents: [DetectedAgent]
+    ) -> Bool {
+        isArmed && detectedAgents.isEmpty
     }
 }
 

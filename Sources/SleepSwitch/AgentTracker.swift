@@ -8,13 +8,17 @@ struct AgentDefinition: Hashable {
     let excludedMarkers: [String]
 
     func matches(commandLine: String) -> Bool {
-        let normalizedCommand = commandLine.lowercased()
-
-        guard !excludedMarkers.contains(where: normalizedCommand.contains) else {
+        guard let executableName = Self.executableName(in: commandLine) else {
             return false
         }
+        return matches(
+            executableName: executableName,
+            normalizedCommand: commandLine.lowercased()
+        )
+    }
 
-        guard let executableName = executableName(in: commandLine) else {
+    func matches(executableName: String, normalizedCommand: String) -> Bool {
+        guard !excludedMarkers.contains(where: normalizedCommand.contains) else {
             return false
         }
 
@@ -37,20 +41,22 @@ struct AgentDefinition: Hashable {
         return commandMarkers.contains(where: normalizedCommand.contains)
     }
 
-    private func executableName(in commandLine: String) -> String? {
+    static func executableName(in commandLine: String) -> String? {
         if let marker = commandLine.range(
             of: "/Contents/MacOS/",
             options: [.backwards, .caseInsensitive]
         ) {
             let executable = commandLine[marker.upperBound...]
                 .prefix(while: { !$0.isWhitespace })
-            return executable.isEmpty ? nil : String(executable)
+            return executable.isEmpty ? nil : String(executable).lowercased()
         }
 
         guard let executable = commandLine.split(whereSeparator: \.isWhitespace).first else {
             return nil
         }
-        return URL(fileURLWithPath: String(executable)).lastPathComponent
+        return URL(fileURLWithPath: String(executable))
+            .lastPathComponent
+            .lowercased()
     }
 }
 
@@ -224,9 +230,14 @@ struct AgentTracker {
     ]
 
     let definitions: [AgentDefinition]
+    let codexSessionTracker: CodexSessionTracker
 
-    init(definitions: [AgentDefinition] = AgentTracker.supportedAgents) {
+    init(
+        definitions: [AgentDefinition] = AgentTracker.supportedAgents,
+        codexSessionTracker: CodexSessionTracker = CodexSessionTracker()
+    ) {
         self.definitions = definitions
+        self.codexSessionTracker = codexSessionTracker
     }
 
     func scan() -> [DetectedAgent]? {
@@ -247,7 +258,11 @@ struct AgentTracker {
                 return nil
             }
 
-            return detect(in: processList, excludingPID: ProcessInfo.processInfo.processIdentifier)
+            let processAgents = detect(
+                in: processList,
+                excludingPID: ProcessInfo.processInfo.processIdentifier
+            )
+            return applyingCodexSessionActivity(to: processAgents)
         } catch {
             return nil
         }
@@ -259,8 +274,17 @@ struct AgentTracker {
         for line in processList.split(separator: "\n") {
             guard let process = parse(line: String(line)) else { continue }
             guard process.pid != excludingPID else { continue }
+            let normalizedCommand = process.commandLine.lowercased()
+            guard let executableName = AgentDefinition.executableName(
+                in: process.commandLine
+            ) else {
+                continue
+            }
 
-            for definition in definitions where definition.matches(commandLine: process.commandLine) {
+            for definition in definitions where definition.matches(
+                executableName: executableName,
+                normalizedCommand: normalizedCommand
+            ) {
                 counts[definition, default: 0] += 1
                 break
             }
@@ -269,6 +293,29 @@ struct AgentTracker {
         return definitions.compactMap { definition in
             guard let processCount = counts[definition] else { return nil }
             return DetectedAgent(definition: definition, processCount: processCount)
+        }
+    }
+
+    func applyingCodexSessionActivity(
+        to processAgents: [DetectedAgent]
+    ) -> [DetectedAgent] {
+        guard processAgents.contains(where: { $0.definition.id == "codex" }),
+              let activeSessionCount = codexSessionTracker.scan() else {
+            return processAgents
+        }
+
+        return definitions.compactMap { definition in
+            if definition.id == "codex" {
+                guard activeSessionCount > 0 else { return nil }
+                return DetectedAgent(
+                    definition: definition,
+                    processCount: activeSessionCount
+                )
+            }
+
+            return processAgents.first {
+                $0.definition.id == definition.id
+            }
         }
     }
 

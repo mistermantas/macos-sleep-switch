@@ -7,7 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let menu = NSMenu()
     private let stateItem = NSMenuItem(title: "Sleep follows macOS settings", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Keep Awake", action: #selector(toggleKeepAwake), keyEquivalent: "")
-    private let durationMenu = NSMenu(title: "Keep Awake For")
+    private let durationMenu = NSMenu(title: "Manual Duration")
     private let automaticAgentAwakeItem = NSMenuItem(
         title: "Keep Awake for Agents",
         action: #selector(toggleAutomaticAgentAwake),
@@ -15,6 +15,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let agentsHeaderItem = NSMenuItem(title: "Checking agents…", action: nil, keyEquivalent: "")
     private let agentsSeparator = NSMenuItem.separator()
+    private let sleepDisplayItem = NSMenuItem(
+        title: "Sleep Display",
+        action: #selector(sleepDisplayNow),
+        keyEquivalent: ""
+    )
+    private let sleepUntilAgentsFinishItem = NSMenuItem(
+        title: "Sleep Until Agents Finish",
+        action: #selector(sleepUntilAgentsFinish),
+        keyEquivalent: ""
+    )
     private let settingsMenu = NSMenu(title: "Settings")
     private let keepDisplayAwakeItem = NSMenuItem(
         title: "Manual Sessions Keep Display Awake",
@@ -34,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let agentTracker = AgentTracker()
     private let powerAssertions = PowerAssertionController()
+    private let displayPower = DisplayPowerController()
+    private let agentScanQueue = DispatchQueue(
+        label: "lt.mantas.sleepswitch.agent-scan",
+        qos: .utility
+    )
     private let launchAtLoginConfiguredKey = "launchAtLoginConfigured"
     private let keepDisplayAwakeKey = "keepDisplayAwake"
     private let activateOnLaunchKey = "activateOnLaunch"
@@ -42,13 +57,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var manualAwakeSession: AwakeSession?
     private var detectedAgents: [DetectedAgent] = []
     private var agentItems: [NSMenuItem] = []
+    private var wakeDisplayWhenAgentsFinish = false
+    private var displaySleepOverride = false
+    private var agentScanInFlight = false
     private var refreshTimer: Timer?
     private var expiryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         registerDefaults()
-        configureStatusItem()
         configureMenu()
+        observeDisplayWake()
         enableLaunchAtLoginByDefault()
 
         if UserDefaults.standard.bool(forKey: activateOnLaunchKey) {
@@ -62,6 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         expiryTimer?.invalidate()
         refreshTimer?.invalidate()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
     }
 
@@ -74,11 +93,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ])
     }
 
-    private func configureStatusItem() {
-        guard let button = statusItem.button else { return }
-        button.target = self
-        button.action = #selector(statusItemClicked)
-        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    private func observeDisplayWake() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(displayDidWake(_:)),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func displayDidWake(_ notification: Notification) {
+        guard displaySleepOverride else { return }
+        displaySleepOverride = false
+        reconcileAndUpdatePresentation()
     }
 
     private func configureMenu() {
@@ -87,13 +114,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         agentsHeaderItem.isEnabled = false
         toggleItem.target = self
         automaticAgentAwakeItem.target = self
+        sleepDisplayItem.target = self
+        sleepUntilAgentsFinishItem.target = self
 
-        let durationItem = NSMenuItem(title: "Keep Awake For", action: nil, keyEquivalent: "")
+        automaticAgentAwakeItem.image = NSImage(
+            systemSymbolName: "terminal.fill",
+            accessibilityDescription: "Agent awake controls"
+        )
+        sleepDisplayItem.image = NSImage(
+            systemSymbolName: "display",
+            accessibilityDescription: "Sleep the display"
+        )
+        sleepUntilAgentsFinishItem.image = NSImage(
+            systemSymbolName: "moon.zzz",
+            accessibilityDescription: "Sleep until agents finish"
+        )
+        toggleItem.image = NSImage(
+            systemSymbolName: "cup.and.saucer.fill",
+            accessibilityDescription: "Manual awake controls"
+        )
+
+        let durationItem = NSMenuItem(title: "Manual Duration", action: nil, keyEquivalent: "")
         durationItem.submenu = durationMenu
+        durationItem.image = NSImage(
+            systemSymbolName: "timer",
+            accessibilityDescription: "Manual awake duration"
+        )
         configureDurationMenu()
 
         let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         settingsItem.submenu = settingsMenu
+        settingsItem.image = NSImage(
+            systemSymbolName: "gearshape",
+            accessibilityDescription: "Sleep Switch settings"
+        )
         configureSettingsMenu()
 
         let refreshItem = NSMenuItem(
@@ -102,6 +156,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             keyEquivalent: "r"
         )
         refreshItem.target = self
+        refreshItem.image = NSImage(
+            systemSymbolName: "arrow.clockwise",
+            accessibilityDescription: "Refresh agent status"
+        )
 
         let quitItem = NSMenuItem(
             title: "Quit Sleep Switch",
@@ -110,16 +168,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         menu.addItem(stateItem)
-        menu.addItem(toggleItem)
-        menu.addItem(durationItem)
-        menu.addItem(.separator())
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
+        menu.addItem(sleepDisplayItem)
+        menu.addItem(sleepUntilAgentsFinishItem)
+        menu.addItem(.separator())
+        menu.addItem(toggleItem)
+        menu.addItem(durationItem)
+        menu.addItem(.separator())
         menu.addItem(settingsItem)
         menu.addItem(refreshItem)
         menu.addItem(.separator())
         menu.addItem(quitItem)
+        statusItem.menu = menu
     }
 
     private func configureDurationMenu() {
@@ -189,34 +251,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    @objc private func statusItemClicked() {
-        guard let event = NSApp.currentEvent else {
-            toggleKeepAwake()
-            return
-        }
-
-        let shouldShowMenu = event.type == .rightMouseUp
-            || event.modifierFlags.contains(.command)
-            || event.modifierFlags.contains(.control)
-
-        if shouldShowMenu {
-            showMenu()
-        } else {
-            toggleKeepAwake()
-        }
-    }
-
-    private func showMenu() {
-        refreshState()
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-    }
-
-    func menuDidClose(_ menu: NSMenu) {
-        statusItem.menu = nil
-    }
-
     func menuWillOpen(_ menu: NSMenu) {
+        if displaySleepOverride {
+            displaySleepOverride = false
+            _ = reconcilePowerAssertion()
+        }
         refreshState()
     }
 
@@ -225,12 +264,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             clearManualAwakeSession()
         }
 
-        if let latestAgents = agentTracker.scan() {
-            detectedAgents = latestAgents
+        reconcileAndUpdatePresentation()
+        requestAgentScan()
+    }
+
+    private func requestAgentScan() {
+        guard !agentScanInFlight else { return }
+        agentScanInFlight = true
+        let tracker = agentTracker
+
+        agentScanQueue.async { [weak self] in
+            let latestAgents = tracker.scan()
+            DispatchQueue.main.async { [weak self] in
+                self?.completeAgentScan(latestAgents)
+            }
         }
+    }
+
+    private func completeAgentScan(_ latestAgents: [DetectedAgent]?) {
+        agentScanInFlight = false
+        guard let latestAgents else { return }
+
+        detectedAgents = latestAgents
+        attemptQueuedDisplayWakeIfNeeded()
+        reconcileAndUpdatePresentation()
+    }
+
+    private func reconcileAndUpdatePresentation() {
         _ = reconcilePowerAssertion()
         updatePresentation()
         updateAgentPresentation()
+        updateDisplayPresentation()
         updateSettingsPresentation()
     }
 
@@ -248,17 +312,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var shouldKeepDisplayAwakeNow: Bool {
-        manualAwakeSession != nil && shouldKeepDisplayAwake
+        manualAwakeSession != nil && shouldKeepDisplayAwake && !displaySleepOverride
     }
 
     private var agentAwakeRequested: Bool {
-        automaticAgentAwakeEnabled && !detectedAgents.isEmpty
+        (automaticAgentAwakeEnabled || wakeDisplayWhenAgentsFinish)
+            && !detectedAgents.isEmpty
     }
 
     private var shouldKeepAwake: Bool {
         AwakePolicy.shouldKeepAwake(
             manualSession: manualAwakeSession,
             automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
+            wakeWhenAgentsFinishArmed: wakeDisplayWhenAgentsFinish,
             detectedAgents: detectedAgents
         )
     }
@@ -279,9 +345,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         stateItem.title = presentation.stateTitle
+        stateItem.image = NSImage(
+            systemSymbolName: presentation.symbolName,
+            accessibilityDescription: presentation.accessibilityDescription
+        )
         toggleItem.title = manualAwakeSession == nil
             ? "Keep Awake Manually"
             : "Stop Manual Session"
+        toggleItem.image = NSImage(
+            systemSymbolName: manualAwakeSession == nil
+                ? "cup.and.saucer.fill"
+                : "stop.circle",
+            accessibilityDescription: toggleItem.title
+        )
         updateDurationChecks()
     }
 
@@ -291,12 +367,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toolTip: String,
         stateTitle: String
     ) {
+        if wakeDisplayWhenAgentsFinish {
+            if detectedAgents.isEmpty {
+                return (
+                    "exclamationmark.triangle",
+                    "Sleep Switch is still trying to wake the display",
+                    "Display wake pending · Click for controls",
+                    "Display wake pending"
+                )
+            }
+
+            let agentName = detectedAgents.count == 1
+                ? detectedAgents[0].definition.name
+                : "\(detectedAgents.count) agents"
+            return (
+                "moon.zzz.fill",
+                "Sleep Switch will wake the display when \(agentName) finishes",
+                "Wake queued for \(agentName) · Click for controls",
+                "Wake queued · \(agentName)"
+            )
+        }
+
         if let manualAwakeSession {
             guard let remainingSeconds = manualAwakeSession.remainingSeconds() else {
                 return (
                     "cup.and.saucer.fill",
                     "Sleep Switch keeping this Mac awake manually",
-                    "Awake manually · Click to stop the manual session",
+                    "Awake manually · Click for controls",
                     "Awake · Manual"
                 )
             }
@@ -305,7 +402,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return (
                 "timer",
                 "Sleep Switch keeping this Mac awake for \(remainingText)",
-                "\(remainingText) · Click to stop the manual session",
+                "\(remainingText) · Click for controls",
                 "Awake · \(remainingText)"
             )
         }
@@ -317,7 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return (
                 "terminal.fill",
                 "Sleep Switch keeping this Mac awake for \(agentName)",
-                "Awake for \(agentName) · Click for a manual session",
+                "Awake for \(agentName) · Click for controls",
                 "Awake · \(agentName)"
             )
         }
@@ -334,7 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return (
             "cup.and.saucer",
             "Sleep Switch inactive",
-            "Sleep follows macOS settings · Click for a manual session",
+            "Sleep follows macOS settings · Click for controls",
             "Sleep follows macOS settings"
         )
     }
@@ -398,6 +495,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private func updateDisplayPresentation() {
+        sleepDisplayItem.state = .off
+        sleepDisplayItem.toolTip = "Turn off the display without sleeping or logging out of the Mac"
+
+        if wakeDisplayWhenAgentsFinish {
+            sleepUntilAgentsFinishItem.title = "Cancel Wake When Agents Finish"
+            sleepUntilAgentsFinishItem.state = .on
+            sleepUntilAgentsFinishItem.isEnabled = true
+            sleepUntilAgentsFinishItem.image = NSImage(
+                systemSymbolName: "moon.zzz.fill",
+                accessibilityDescription: "Wake queued"
+            )
+            sleepUntilAgentsFinishItem.toolTip = "The display will wake after every detected agent session ends"
+            return
+        }
+
+        sleepUntilAgentsFinishItem.title = "Sleep Until Agents Finish"
+        sleepUntilAgentsFinishItem.state = .off
+        sleepUntilAgentsFinishItem.isEnabled = !detectedAgents.isEmpty
+        sleepUntilAgentsFinishItem.image = NSImage(
+            systemSymbolName: "moon.zzz",
+            accessibilityDescription: "Sleep until agents finish"
+        )
+        sleepUntilAgentsFinishItem.toolTip = detectedAgents.isEmpty
+            ? "Available while a supported agent is running"
+            : "Turn off the display, then wake it after every detected agent session ends"
+    }
+
     private func updateSettingsPresentation() {
         let defaults = UserDefaults.standard
         automaticAgentAwakeItem.state = automaticAgentAwakeEnabled ? .on : .off
@@ -415,14 +540,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func startRefreshTimer() {
         let timer = Timer.scheduledTimer(
-            timeInterval: 5,
+            timeInterval: 10,
             target: self,
             selector: #selector(refreshState),
             userInfo: nil,
             repeats: true
         )
-        timer.tolerance = 1
+        timer.tolerance = 2
         refreshTimer = timer
+    }
+
+    private func attemptQueuedDisplayWakeIfNeeded() {
+        guard DisplayWakePolicy.shouldAttemptWake(
+            isArmed: wakeDisplayWhenAgentsFinish,
+            detectedAgents: detectedAgents
+        ) else {
+            return
+        }
+
+        do {
+            try displayPower.wakeDisplay()
+            wakeDisplayWhenAgentsFinish = false
+            displaySleepOverride = false
+        } catch {
+            // Keep the one-shot mode armed so the next agent refresh can retry.
+        }
+    }
+
+    @objc private func sleepDisplayNow() {
+        sleepDisplay(wakeWhenAgentsFinish: false)
+    }
+
+    @objc private func sleepUntilAgentsFinish() {
+        if wakeDisplayWhenAgentsFinish {
+            wakeDisplayWhenAgentsFinish = false
+            displaySleepOverride = false
+            _ = reconcilePowerAssertion()
+            updatePresentation()
+            updateDisplayPresentation()
+            return
+        }
+
+        guard !detectedAgents.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        sleepDisplay(wakeWhenAgentsFinish: true)
+    }
+
+    private func sleepDisplay(wakeWhenAgentsFinish: Bool) {
+        let previousWakeState = wakeDisplayWhenAgentsFinish
+        let previousDisplaySleepOverride = displaySleepOverride
+
+        wakeDisplayWhenAgentsFinish = wakeWhenAgentsFinish
+        displaySleepOverride = true
+
+        if let error = reconcilePowerAssertion(forceRestart: true) {
+            wakeDisplayWhenAgentsFinish = previousWakeState
+            displaySleepOverride = previousDisplaySleepOverride
+            _ = reconcilePowerAssertion(forceRestart: true)
+            presentAssertionError(error)
+            updatePresentation()
+            updateDisplayPresentation()
+            return
+        }
+
+        do {
+            try displayPower.sleepDisplay()
+        } catch {
+            wakeDisplayWhenAgentsFinish = previousWakeState
+            displaySleepOverride = previousDisplaySleepOverride
+            _ = reconcilePowerAssertion(forceRestart: true)
+            presentAssertionError(error)
+        }
+
+        updatePresentation()
+        updateDisplayPresentation()
     }
 
     @objc private func toggleKeepAwake() {

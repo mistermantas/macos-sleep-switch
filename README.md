@@ -17,15 +17,13 @@ Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu
 
 ## Use
 
-- Click the icon to start or stop a manual awake session.
-- An empty cup means sleep follows macOS settings.
-- A filled cup means Sleep Switch is active indefinitely.
-- A timer means a timed session is active.
-- A filled terminal means an agent is keeping the Mac awake.
-- Right-click or Command-click the cup for durations, agent sessions, and settings.
-- Choose **Custom…** for any duration from 1 minute to 23 hours 59 minutes.
+- Click the menu-bar icon to open the controls.
+- **Keep Awake for Agents** is on by default. A filled terminal means an agent is keeping the Mac awake.
+- **Sleep Display** turns off the display without sleeping or logging out of the Mac.
+- **Sleep Until Agents Finish** turns off the display and wakes it once every detected agent session has ended. This is a one-shot action and is never enabled by default.
+- **Keep Awake Manually** starts or stops an independent Caffeine-style session. Use **Manual Duration** for a preset or custom time.
 
-**Keep Awake for Agents** is enabled by default and can be paused directly from the menu. Agent sessions keep the Mac awake while allowing its display to sleep. Manual sessions remain independent and can optionally keep the display awake. Under **Settings**, choose the manual display behavior, whether Sleep Switch activates when launched, and the duration used by a regular click. Launch at login remains optional.
+Agent sessions allow the display to sleep. Manual sessions can optionally keep it lit. Settings cover manual display behavior, activation on launch, the default manual duration, and launch at login.
 
 Sleep Switch prevents automatic idle sleep. Closing a MacBook lid still follows macOS clamshell behavior.
 
@@ -47,9 +45,9 @@ Sleep Switch prevents automatic idle sleep. Closing a MacBook lid still follows 
 - Qwen Code
 - Pi
 
-Sleep Switch checks the local process list every five seconds. It recognizes exact executable names, supported runtime launchers, and Codex desktop’s per-task `app-server` processes. A recognized process holds the awake assertion until it exits; this also covers quiet network waits where CPU-based detection can fail.
+Sleep Switch checks local activity every ten seconds. Most harnesses are recognized by exact process and runtime-launcher signatures. Codex uses its local `task_started` and `task_complete` markers instead, so open but idle desktop tasks do not count as running sessions. Quiet network waits remain covered without relying on CPU usage.
 
-Tracking is local-only. No process information leaves your Mac, and Sleep Switch does not install hooks or edit any agent’s configuration.
+Tracking is local-only. No process or session information leaves your Mac, and Sleep Switch does not install hooks or edit any agent’s configuration.
 
 ## How it works
 
@@ -59,6 +57,8 @@ Sleep Switch uses Apple’s native power-management assertions:
 - `PreventUserIdleDisplaySleep` optionally keeps the display awake.
 
 The assertions belong to the app process and are released when the manual or agent session ends, automatic agent awake is paused, or the app quits. Sleep Switch never runs `sudo`, never changes `pmset`, and does not need administrator approval.
+
+When you choose a display action, Sleep Switch calls macOS’s built-in `pmset displaysleepnow`. This turns off only the display and does not alter any power setting. A queued agent-completion wake uses Apple’s `IOPMAssertionDeclareUserActivity` API.
 
 There are no analytics, network requests, privileged background services, or bundled dependencies.
 

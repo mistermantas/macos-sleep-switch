@@ -92,15 +92,38 @@ struct AgentTrackerTests {
 
         testAwakeSession()
         testAwakePolicy(detectedAgent: detected[0])
+        testDisplayWakePolicy(detectedAgent: detected[0])
+        testCodexSessionTracker(
+            codexAgent: detected[0],
+            anotherAgent: detected[1]
+        )
         testPowerAssertions()
+        testDisplayPowerCommand()
         testStatusSymbols()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
+            let codexScanStartedAt = Date()
+            let liveCodexSessions = CodexSessionTracker().scan()
+            let codexScanMilliseconds = Int(
+                Date().timeIntervalSince(codexScanStartedAt) * 1_000
+            )
+            let scanStartedAt = Date()
             let liveAgents = AgentTracker().scan() ?? []
             let summary = liveAgents
                 .map { "\($0.definition.name)=\($0.processCount)" }
                 .joined(separator: ", ")
+            print(
+                "Live Codex sessions: \(liveCodexSessions.map(String.init) ?? "unavailable")"
+                    + " (\(codexScanMilliseconds)ms)"
+            )
             print("Live agents: \(summary.isEmpty ? "none" : summary)")
+            print(
+                "Live scan: \(Int(Date().timeIntervalSince(scanStartedAt) * 1_000))ms"
+            )
+        }
+
+        if ProcessInfo.processInfo.environment["SLEEP_SWITCH_DISPLAY_CHECK"] == "1" {
+            testLiveDisplaySleepAndWake()
         }
 
         print("SleepSwitchTests passed")
@@ -141,6 +164,7 @@ struct AgentTrackerTests {
             AwakePolicy.shouldKeepAwake(
                 manualSession: manualSession,
                 automaticAgentAwakeEnabled: false,
+                wakeWhenAgentsFinishArmed: false,
                 detectedAgents: []
             ),
             "keeps manual sessions independent from agent tracking"
@@ -149,6 +173,7 @@ struct AgentTrackerTests {
             AwakePolicy.shouldKeepAwake(
                 manualSession: nil,
                 automaticAgentAwakeEnabled: true,
+                wakeWhenAgentsFinishArmed: false,
                 detectedAgents: [detectedAgent]
             ),
             "keeps awake automatically while a supported agent runs"
@@ -157,10 +182,173 @@ struct AgentTrackerTests {
             !AwakePolicy.shouldKeepAwake(
                 manualSession: nil,
                 automaticAgentAwakeEnabled: false,
+                wakeWhenAgentsFinishArmed: false,
                 detectedAgents: [detectedAgent]
             ),
             "lets users pause automatic agent awake"
         )
+        expect(
+            AwakePolicy.shouldKeepAwake(
+                manualSession: nil,
+                automaticAgentAwakeEnabled: false,
+                wakeWhenAgentsFinishArmed: true,
+                detectedAgents: []
+            ),
+            "keeps the Mac awake while a display wake is queued"
+        )
+    }
+
+    private static func testDisplayWakePolicy(detectedAgent: DetectedAgent) {
+        expect(
+            !DisplayWakePolicy.shouldAttemptWake(
+                isArmed: true,
+                detectedAgents: [detectedAgent]
+            ),
+            "waits while an agent session is still running"
+        )
+        expect(
+            DisplayWakePolicy.shouldAttemptWake(
+                isArmed: true,
+                detectedAgents: []
+            ),
+            "wakes after every detected agent session ends"
+        )
+        expect(
+            !DisplayWakePolicy.shouldAttemptWake(
+                isArmed: false,
+                detectedAgents: []
+            ),
+            "does not wake the display unless the one-shot mode is armed"
+        )
+    }
+
+    private static func testCodexSessionTracker(
+        codexAgent: DetectedAgent,
+        anotherAgent: DetectedAgent
+    ) {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(
+            "sleep-switch-codex-tracker-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let sessions = root.appendingPathComponent("sessions", isDirectory: true)
+        let day = sessions.appendingPathComponent("2026/07/25", isDirectory: true)
+        let completedOnlySessions = root.appendingPathComponent(
+            "completed-sessions",
+            isDirectory: true
+        )
+        let fixedNow = Date(timeIntervalSince1970: 10_000)
+
+        do {
+            try fileManager.createDirectory(
+                at: day,
+                withIntermediateDirectories: true
+            )
+            try fileManager.createDirectory(
+                at: completedOnlySessions,
+                withIntermediateDirectories: true
+            )
+
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                {"type":"response_item","payload":{"type":"reasoning"}}
+                """,
+                to: day.appendingPathComponent("rollout-active.jsonl")
+            )
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                {"type":"event_msg","payload":{"type":"task_complete"}}
+                """,
+                to: day.appendingPathComponent("rollout-complete.jsonl")
+            )
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                \(String(repeating: "x", count: 1_024))
+                """,
+                to: day.appendingPathComponent("rollout-large-active.jsonl")
+            )
+
+            let staleFile = day.appendingPathComponent("rollout-stale.jsonl")
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                """,
+                to: staleFile
+            )
+            try fileManager.setAttributes(
+                [.modificationDate: fixedNow.addingTimeInterval(-7_200)],
+                ofItemAtPath: staleFile.path
+            )
+
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                {"type":"event_msg","payload":{"type":"task_complete"}}
+                """,
+                to: completedOnlySessions.appendingPathComponent(
+                    "rollout-complete.jsonl"
+                )
+            )
+        } catch {
+            fatalError("Test failed: could not create Codex session fixtures: \(error)")
+        }
+        defer {
+            try? fileManager.removeItem(at: root)
+        }
+
+        let tracker = CodexSessionTracker(
+            sessionsDirectory: sessions,
+            activeFileWindow: 3_600,
+            tailByteCount: 96,
+            now: { fixedNow }
+        )
+        expect(
+            tracker.scan() == 2,
+            "counts active Codex turns instead of persistent task servers"
+        )
+
+        let resolvedAgents = AgentTracker(
+            codexSessionTracker: tracker
+        ).applyingCodexSessionActivity(
+            to: [
+                DetectedAgent(
+                    definition: codexAgent.definition,
+                    processCount: 17
+                ),
+                anotherAgent
+            ]
+        )
+        expect(
+            resolvedAgents.first?.definition.id == "codex"
+                && resolvedAgents.first?.processCount == 2,
+            "replaces persistent Codex process counts with live turn counts"
+        )
+        expect(
+            resolvedAgents.dropFirst().first == anotherAgent,
+            "keeps other agent detections unchanged"
+        )
+
+        let completedTracker = CodexSessionTracker(
+            sessionsDirectory: completedOnlySessions,
+            activeFileWindow: 3_600,
+            now: { fixedNow }
+        )
+        let idleAgents = AgentTracker(
+            codexSessionTracker: completedTracker
+        ).applyingCodexSessionActivity(
+            to: [codexAgent, anotherAgent]
+        )
+        expect(
+            idleAgents == [anotherAgent],
+            "does not treat idle Codex task servers as running sessions"
+        )
+    }
+
+    private static func write(_ text: String, to fileURL: URL) throws {
+        try Data(text.utf8).write(to: fileURL)
     }
 
     private static func testPowerAssertions() {
@@ -205,12 +393,42 @@ struct AgentTrackerTests {
         }
     }
 
+    private static func testDisplayPowerCommand() {
+        expect(
+            DisplayPowerController.sleepCommand.path == "/usr/bin/pmset",
+            "uses the macOS power-management command"
+        )
+        expect(
+            DisplayPowerController.sleepArguments == ["displaysleepnow"],
+            "requests display sleep without sleeping the Mac"
+        )
+    }
+
+    private static func testLiveDisplaySleepAndWake() {
+        let controller = DisplayPowerController()
+
+        do {
+            try controller.sleepDisplay()
+            Thread.sleep(forTimeInterval: 2)
+            try controller.wakeDisplay()
+            print("Live display sleep/wake: passed")
+        } catch {
+            fatalError("Test failed: live display sleep/wake returned \(error)")
+        }
+    }
+
     private static func testStatusSymbols() {
         for symbolName in [
             "cup.and.saucer",
             "cup.and.saucer.fill",
             "timer",
             "terminal.fill",
+            "moon.zzz",
+            "moon.zzz.fill",
+            "display",
+            "stop.circle",
+            "gearshape",
+            "arrow.clockwise",
             "exclamationmark.triangle"
         ] {
             expect(

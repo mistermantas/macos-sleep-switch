@@ -2,7 +2,7 @@
 set -euo pipefail
 
 script_dir="${0:A:h}"
-build_dir="$script_dir/build"
+build_dir="${SLEEP_SWITCH_BUILD_DIR:-$script_dir/build}"
 app_dir="$build_dir/Sleep Switch.app"
 arch_dir="$build_dir/arch"
 iconset_dir="$build_dir/AppIcon.iconset"
@@ -39,5 +39,6 @@ for spec in "16:icon_16x16.png" "32:icon_16x16@2x.png" "32:icon_32x32.png" \
 done
 iconutil -c icns "$iconset_dir" -o "$app_dir/Contents/Resources/AppIcon.icns"
 
+xattr -cr "$app_dir"
 codesign --force --sign - "$app_dir"
 echo "$app_dir"

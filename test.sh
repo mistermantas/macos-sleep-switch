@@ -9,7 +9,11 @@ mkdir -p "$test_dir"
 
 xcrun swiftc \
   -parse-as-library \
+  -framework AppKit \
+  -framework IOKit \
   "$script_dir/Sources/SleepSwitch/AgentTracker.swift" \
+  "$script_dir/Sources/SleepSwitch/AwakeSession.swift" \
+  "$script_dir/Sources/SleepSwitch/PowerAssertionController.swift" \
   "$script_dir/Tests/AgentTrackerTests.swift" \
   -o "$test_binary"
 

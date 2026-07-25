@@ -1,29 +1,32 @@
 # Sleep Switch
 
-Keep local coding agents running when your MacBook lid is closed.
+Keep long-running work awake without changing macOS sleep settings.
 
 [Download Sleep Switch](https://github.com/mistermantas/macos-sleep-switch/releases/latest/download/Sleep-Switch.zip)
 
-Sleep Switch shows the agent sessions running on your Mac, alongside the system sleep setting they depend on. It is free, open source, and stays out of the way in the menu bar.
+Sleep Switch holds a temporary macOS power assertion while it is active. Turn it off or quit and normal sleep behavior returns immediately. It is free, open source, and also shows which local coding-agent sessions are running.
 
 ## Install
 
 1. Download and unzip `Sleep-Switch.zip`.
 2. Move **Sleep Switch.app** to `/Applications`.
 3. Right-click the app and choose **Open** the first time.
-4. Look for the moon icon in the menu bar.
+4. Look for the coffee cup in the menu bar.
 
 Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu whenever you want to disable that.
 
 ## Use
 
-- A moon with `zzz` means sleep is allowed.
-- A filled moon means sleep prevention is on.
-- Open the menu to see detected local agent sessions.
-- Choose **Prevent sleep** or **Allow sleep** to change the setting.
-- macOS asks for administrator approval before each change.
+- Click the cup to start or stop keeping the Mac awake.
+- An empty cup means sleep follows macOS settings.
+- A filled cup means Sleep Switch is active indefinitely.
+- A timer means a timed session is active.
+- Right-click or Command-click the cup for durations, agent sessions, and settings.
+- Choose **Custom…** for any duration from 1 minute to 23 hours 59 minutes.
 
-Opening, quitting, installing, or refreshing the app never changes the sleep setting. Only choosing the toggle does.
+Under **Settings**, choose whether the display should also stay awake, whether Sleep Switch activates when launched, and the duration used by a regular click. Launch at login remains optional.
+
+Sleep Switch prevents automatic idle sleep. Closing a MacBook lid still follows macOS clamshell behavior.
 
 ## Supported agents
 
@@ -39,32 +42,25 @@ Opening, quitting, installing, or refreshing the app never changes the sleep set
 
 Sleep Switch checks the local process list every five seconds. Tracking is local-only: no process information leaves your Mac.
 
-## What it runs
+## How it works
 
-Sleep Switch reads the current state with:
+Sleep Switch uses Apple’s native power-management assertions:
 
-```sh
-/usr/bin/pmset -g
-```
+- `PreventUserIdleSystemSleep` keeps macOS from automatically sleeping.
+- `PreventUserIdleDisplaySleep` optionally keeps the display awake.
 
-After an explicit menu click and administrator approval, it runs one of:
-
-```sh
-/usr/bin/pmset -a disablesleep 1
-/usr/bin/pmset -a disablesleep 0
-```
+The assertions belong to the app process and are released when the session ends or the app quits. Sleep Switch never runs `sudo`, never changes `pmset`, and does not need administrator approval.
 
 There are no analytics, network requests, privileged background services, or bundled dependencies.
 
 ## A note on heat
 
-Keeping a MacBook awake with its lid closed uses normal active power and can create heat during builds or other heavy work. Keep it on a hard, ventilated surface. Do not leave an active MacBook in a bag or under bedding.
+Keeping a Mac active uses power and can create heat during builds or other heavy work. Keep it on a hard, ventilated surface. Do not leave an active MacBook in a bag or under bedding.
 
 ## Requirements
 
 - macOS 13 Ventura or newer
 - Apple silicon or Intel Mac
-- An administrator account to change the sleep setting
 
 The downloadable build is ad-hoc signed because this project is not distributed through the App Store. macOS may ask you to confirm the first launch with **Right-click → Open**.
 
@@ -82,7 +78,7 @@ The universal app is written to `build/Sleep Switch.app`. To create the release 
 ./package.sh
 ```
 
-Run the agent detection tests with:
+Run the test suite with:
 
 ```sh
 ./test.sh

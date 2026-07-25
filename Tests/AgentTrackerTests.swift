@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @main
@@ -59,6 +60,10 @@ struct AgentTrackerTests {
         )
         expect(excludedPIDResult.isEmpty, "can exclude the current process")
 
+        testAwakeSession()
+        testPowerAssertions()
+        testStatusSymbols()
+
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
             let liveAgents = AgentTracker().scan()
             let summary = liveAgents
@@ -67,7 +72,86 @@ struct AgentTrackerTests {
             print("Live agents: \(summary.isEmpty ? "none" : summary)")
         }
 
-        print("AgentTrackerTests passed")
+        print("SleepSwitchTests passed")
+    }
+
+    private static func testAwakeSession() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let timedSession = AwakeSession(startedAt: start, durationSeconds: 15 * 60)
+
+        expect(
+            timedSession.remainingSeconds(at: start.addingTimeInterval(60)) == 14 * 60,
+            "calculates timed-session progress"
+        )
+        expect(
+            timedSession.hasExpired(at: start.addingTimeInterval(15 * 60)),
+            "expires timed sessions at their deadline"
+        )
+
+        let indefiniteSession = AwakeSession(startedAt: start, durationSeconds: nil)
+        expect(
+            indefiniteSession.remainingSeconds(at: start.addingTimeInterval(99_999)) == nil,
+            "keeps indefinite sessions active"
+        )
+        expect(
+            AwakeTimeText.duration(seconds: 90 * 60) == "1h 30m",
+            "formats custom durations"
+        )
+        expect(
+            AwakeTimeText.remaining(seconds: 61) == "2m left",
+            "rounds the visible countdown up"
+        )
+    }
+
+    private static func testPowerAssertions() {
+        let controller = PowerAssertionController()
+
+        do {
+            try controller.start(keepDisplayAwake: true)
+            expect(controller.isActive, "creates a system idle-sleep assertion")
+            expect(controller.isKeepingDisplayAwake, "creates an optional display assertion")
+            let assertionSnapshot = currentPowerAssertions()
+            expect(
+                assertionSnapshot.contains("Sleep Switch is keeping this Mac awake"),
+                "registers the system assertion with macOS"
+            )
+            expect(
+                assertionSnapshot.contains("Sleep Switch is keeping the display awake"),
+                "registers the display assertion with macOS"
+            )
+            controller.stop()
+            expect(!controller.isActive, "releases the system assertion")
+            expect(!controller.isKeepingDisplayAwake, "releases the display assertion")
+        } catch {
+            fatalError("Test failed: power assertion creation returned \(error)")
+        }
+    }
+
+    private static func currentPowerAssertions() -> String {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g", "assertions"]
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch {
+            return ""
+        }
+    }
+
+    private static func testStatusSymbols() {
+        for symbolName in ["cup.and.saucer", "cup.and.saucer.fill", "timer"] {
+            expect(
+                NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) != nil,
+                "provides the \(symbolName) menu-bar symbol"
+            )
+        }
     }
 
     private static func expect(

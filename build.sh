@@ -17,6 +17,7 @@ for arch in arm64 x86_64; do
     -parse-as-library \
     -target "$arch-apple-macos13.0" \
     -framework AppKit \
+    -framework IOKit \
     -framework ServiceManagement \
     "$script_dir/Sources/SleepSwitch/"*.swift \
     -o "$arch_dir/SleepSwitch-$arch"

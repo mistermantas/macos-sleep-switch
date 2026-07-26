@@ -1,6 +1,6 @@
 # Sleep Switch
 
-Keep long-running work awake without changing macOS sleep settings.
+Keep long-running work awake, with or without the lid open.
 
 [Download Sleep Switch](https://github.com/mistermantas/macos-sleep-switch/releases/latest/download/Sleep-Switch.zip)
 
@@ -15,18 +15,40 @@ Sleep Switch holds a temporary macOS power assertion while it is active. It auto
 
 Sleep Switch starts at login by default. Uncheck **Launch at Login** in its menu whenever you want to disable that.
 
-## Use
+## Menu guide
 
-- Click the menu-bar icon to open the controls.
-- **Keep Awake for Agents** is on by default. A filled terminal means an agent is keeping the Mac awake.
-- **Sleep Display** turns off the display without sleeping or logging out of the Mac.
-- **Sleep Until Agents Finish** turns off the display and wakes it once every detected agent session has ended. This is a one-shot action and is never enabled by default.
-- **Keep Awake Manually** starts or stops an independent Caffeine-style session. Use **Manual Duration** for a preset or custom time.
-- **Support & Creator** links to Uncascade, the Uncascade YouTube channel, the source code, and GitHub Sponsors.
+Click the menu-bar icon once to open Sleep Switch. A checkmark means that an option is enabled.
 
-Agent sessions allow the display to sleep. Manual sessions can optionally keep it lit. Settings cover manual display behavior, activation on launch, the default manual duration, and launch at login.
+| Menu item | What it does |
+| --- | --- |
+| **Status** | Shows whether the Mac can sleep, what is keeping it awake, and how much time remains. |
+| **Awake Mode** | Chooses how automatic and manual sessions prevent sleep. |
+| **Prevent Sleep** | Stops idle system sleep while a session is active. Closing the lid still follows normal macOS behavior. |
+| **Prevent Sleep Even With Lid Closed** | Keeps the Mac running after the lid closes. Available in the GitHub download and asks for administrator approval when it becomes active. |
+| **Keep Awake for Agents** | Automatically prevents sleep while any supported coding agent is working. It is enabled by default. |
+| **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
+| **Agent status** | Shows the detected agent and session count. In the App Store build, **Connect Codex…** or **Change Codex Folder…** selects the local folder to watch. |
+| **Sleep Display** | Turns off only the screen. The Mac stays signed in and active work continues. Available in the GitHub download. |
+| **Sleep Until Agents Finish** | Turns off the screen now, keeps the Mac working, then wakes the screen once all detected sessions finish. Available in the GitHub download. |
+| **Wake Display When Codex Finishes** | Arms the same one-time wake in the App Store build. It does not turn off the screen for you. |
+| **Start Manual Session / Stop Manual Session** | Starts or stops a keep-awake session that is independent of agent activity. |
+| **Manual Duration** | Starts a manual session indefinitely, for a preset time, or for a custom time. |
+| **Settings** | Opens the behavior and startup preferences described below. |
+| **Refresh Agents / Refresh Codex** | Checks for session changes immediately instead of waiting for the next automatic refresh. |
+| **Support & Creator** | Opens the Uncascade website and YouTube channel, this repository, or GitHub Sponsors. |
+| **Quit Sleep Switch** | Stops Sleep Switch, releases its power assertions, and restores normal lid sleep if the lid-closed mode was active. |
 
-Sleep Switch prevents automatic idle sleep. Closing a MacBook lid still follows macOS clamshell behavior.
+### Settings
+
+| Setting | What it does |
+| --- | --- |
+| **Connect Codex… / Change Codex Folder…** | Gives the App Store build read-only access to your local Codex session folder. |
+| **Manual Sessions Keep Display Awake** | Keeps the screen lit during manual sessions. Agent sessions still allow the screen to turn off. |
+| **Activate on Launch** | Starts a manual session whenever Sleep Switch opens, using the selected default duration. |
+| **Default Duration** | Sets the duration used by **Start Manual Session** and **Activate on Launch**. |
+| **Launch at Login** | Opens Sleep Switch automatically after you sign in to the Mac. |
+
+The default **Prevent Sleep** mode stops automatic idle sleep while leaving normal lid behavior unchanged. The direct GitHub build can also keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
 
 ## Supported agents
 
@@ -52,20 +74,22 @@ Tracking is local-only. No process or session information leaves your Mac, and S
 
 ## How it works
 
-Sleep Switch uses Apple’s native power-management assertions:
+In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-management assertions:
 
 - `PreventUserIdleSystemSleep` keeps macOS from automatically sleeping.
 - `PreventUserIdleDisplaySleep` optionally keeps the display awake.
 
-The assertions belong to the app process and are released when the manual or agent session ends, automatic agent awake is paused, or the app quits. Sleep Switch never runs `sudo`, never changes `pmset`, and does not need administrator approval.
+The assertions belong to the app process and are released when the manual or agent session ends, automatic agent awake is paused, or the app quits.
+
+The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Sleep Switch does not install a privileged helper or retain administrator credentials.
 
 When you choose a display action, Sleep Switch calls macOS’s built-in `pmset displaysleepnow`. This turns off only the display and does not alter any power setting. A queued agent-completion wake uses Apple’s `IOPMAssertionDeclareUserActivity` API.
 
-There are no analytics, network requests, privileged background services, or bundled dependencies.
+There are no analytics, network requests, installed privileged services, or bundled dependencies.
 
 ## Mac App Store
 
-The repository includes a sandboxed Mac App Store target. Apple’s sandbox allows the native keep-awake and display-wake APIs, but blocks the global process scan and `pmset displaysleepnow` used by the full download. The store build therefore supports manual Caffeine-style sessions, opt-in Codex tracking through a user-selected folder, and wake-on-completion. The GitHub download keeps all supported agents and display controls.
+The repository includes a sandboxed Mac App Store target. Apple’s sandbox allows the native keep-awake and display-wake APIs, but blocks the global process scan and `pmset displaysleepnow` used by the full download. The store build therefore supports manual sleep-prevention sessions, opt-in Codex tracking through a user-selected folder, and wake-on-completion. The GitHub download keeps all supported agents and display controls.
 
 See [APP_STORE.md](APP_STORE.md) for the Xcode target, submission metadata, and account handoff.
 

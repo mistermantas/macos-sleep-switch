@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let stateItem = NSMenuItem(title: "Sleep follows macOS settings", action: nil, keyEquivalent: "")
     private let toggleItem = NSMenuItem(title: "Keep Awake", action: #selector(toggleKeepAwake), keyEquivalent: "")
     private let durationMenu = NSMenu(title: "Manual Duration")
+    private let awakeModeMenu = NSMenu(title: "Awake Mode")
+    private let awakeModeItem = NSMenuItem(title: "Awake Mode", action: nil, keyEquivalent: "")
     private let automaticAgentAwakeItem = NSMenuItem(
         title: "Keep Awake for Agents",
         action: #selector(toggleAutomaticAgentAwake),
@@ -58,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
     }()
     private let powerAssertions = PowerAssertionController()
+    private let lidClosedSleep = LidClosedSleepController()
     private let displayPower = DisplayPowerController()
     private let agentScanQueue = DispatchQueue(
         label: "lt.mantas.sleepswitch.agent-scan",
@@ -68,9 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let activateOnLaunchKey = "activateOnLaunch"
     private let defaultDurationSecondsKey = "defaultDurationSeconds"
     private let automaticAgentAwakeKey = "automaticAgentAwake"
+    private let awakeModeKey = "awakeMode"
     private var manualAwakeSession: AwakeSession?
     private var detectedAgents: [DetectedAgent] = []
     private var agentItems: [NSMenuItem] = []
+    private var awakeModeItems: [NSMenuItem] = []
     private var wakeDisplayWhenAgentsFinish = false
     private var displaySleepOverride = false
     private var agentScanInFlight = false
@@ -96,11 +101,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startRefreshTimer()
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        do {
+            try lidClosedSleep.stop()
+            return .terminateNow
+        } catch {
+            presentAssertionError(error)
+            return .terminateCancel
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         expiryTimer?.invalidate()
         refreshTimer?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
+        try? lidClosedSleep.stop()
     }
 
     private func registerDefaults() {
@@ -108,7 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             keepDisplayAwakeKey: true,
             activateOnLaunchKey: false,
             defaultDurationSecondsKey: 0,
-            automaticAgentAwakeKey: true
+            automaticAgentAwakeKey: true,
+            awakeModeKey: KeepAwakeMode.preventSleep.rawValue
         ])
     }
 
@@ -171,6 +188,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         configureDurationMenu()
 
+        awakeModeItem.submenu = awakeModeMenu
+        awakeModeItem.image = NSImage(
+            systemSymbolName: "laptopcomputer",
+            accessibilityDescription: "Choose how Sleep Switch prevents sleep"
+        )
+        configureAwakeModeMenu()
+
         let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         settingsItem.submenu = settingsMenu
         settingsItem.image = NSImage(
@@ -214,6 +238,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         menu.addItem(stateItem)
+        menu.addItem(awakeModeItem)
+        menu.addItem(.separator())
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
@@ -265,6 +291,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         customItem.target = self
         durationMenu.addItem(customItem)
+    }
+
+    private func configureAwakeModeMenu() {
+        let modes: [KeepAwakeMode] = AppDistribution.supportsLidClosedAwake
+            ? KeepAwakeMode.allCases
+            : [.preventSleep]
+
+        for mode in modes {
+            let item = NSMenuItem(
+                title: mode.menuTitle,
+                action: #selector(selectAwakeMode(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.toolTip = mode.toolTip
+            item.image = NSImage(
+                systemSymbolName: mode == .preventSleep
+                    ? "cup.and.saucer"
+                    : "laptopcomputer",
+                accessibilityDescription: mode.menuTitle
+            )
+            awakeModeItems.append(item)
+            awakeModeMenu.addItem(item)
+        }
     }
 
     private func configureSettingsMenu() {
@@ -370,7 +421,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func reconcileAndUpdatePresentation() {
-        _ = reconcilePowerAssertion()
+        let attemptedMode = selectedAwakeMode
+        if let error = reconcilePowerAssertion(),
+           attemptedMode == .lidClosed {
+            UserDefaults.standard.set(
+                KeepAwakeMode.preventSleep.rawValue,
+                forKey: awakeModeKey
+            )
+            _ = reconcilePowerAssertion(forceRestart: true)
+            presentAssertionError(error)
+        }
         updatePresentation()
         updateAgentPresentation()
         updateDisplayPresentation()
@@ -388,6 +448,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var automaticAgentAwakeEnabled: Bool {
         UserDefaults.standard.bool(forKey: automaticAgentAwakeKey)
+    }
+
+    private var selectedAwakeMode: KeepAwakeMode {
+        guard AppDistribution.supportsLidClosedAwake else {
+            return .preventSleep
+        }
+        let storedValue = UserDefaults.standard.string(forKey: awakeModeKey)
+        return KeepAwakeMode.persistedMode(from: storedValue)
     }
 
     private var shouldKeepDisplayAwakeNow: Bool {
@@ -429,14 +497,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             accessibilityDescription: presentation.accessibilityDescription
         )
         toggleItem.title = manualAwakeSession == nil
-            ? "Keep Awake Manually"
+            ? "Start Manual Session"
             : "Stop Manual Session"
+        toggleItem.toolTip = "Uses \(selectedAwakeMode.menuTitle)"
         toggleItem.image = NSImage(
             systemSymbolName: manualAwakeSession == nil
                 ? "cup.and.saucer.fill"
                 : "stop.circle",
             accessibilityDescription: toggleItem.title
         )
+        awakeModeItem.title = "Awake Mode · \(selectedAwakeMode.shortTitle)"
+        awakeModeItem.toolTip = selectedAwakeMode.toolTip
+        updateAwakeModeChecks()
         updateDurationChecks()
     }
 
@@ -452,7 +524,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     "exclamationmark.triangle",
                     "Sleep Switch is still trying to wake the display",
                     "Display wake pending · Click for controls",
-                    "Display wake pending"
+                    "Display wake pending · \(selectedAwakeMode.stateTitle)"
                 )
             }
 
@@ -463,7 +535,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "moon.zzz.fill",
                 "Sleep Switch will wake the display when \(agentName) finishes",
                 "Wake queued for \(agentName) · Click for controls",
-                "Wake queued · \(agentName)"
+                "Wake queued · \(agentName) · \(selectedAwakeMode.stateTitle)"
             )
         }
 
@@ -471,18 +543,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let remainingSeconds = manualAwakeSession.remainingSeconds() else {
                 return (
                     "cup.and.saucer.fill",
-                    "Sleep Switch keeping this Mac awake manually",
-                    "Awake manually · Click for controls",
-                    "Awake · Manual"
+                    "Sleep Switch keeping this Mac awake manually in \(selectedAwakeMode.menuTitle) mode",
+                    "Awake manually · \(selectedAwakeMode.stateTitle) · Click for controls",
+                    "Awake · Manual · \(selectedAwakeMode.stateTitle)"
                 )
             }
 
             let remainingText = AwakeTimeText.remaining(seconds: remainingSeconds)
             return (
                 "timer",
-                "Sleep Switch keeping this Mac awake for \(remainingText)",
-                "\(remainingText) · Click for controls",
-                "Awake · \(remainingText)"
+                "Sleep Switch keeping this Mac awake for \(remainingText) in \(selectedAwakeMode.menuTitle) mode",
+                "\(remainingText) · \(selectedAwakeMode.stateTitle) · Click for controls",
+                "Awake · \(remainingText) · \(selectedAwakeMode.stateTitle)"
             )
         }
 
@@ -492,9 +564,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 : "\(detectedAgents.count) agents"
             return (
                 "terminal.fill",
-                "Sleep Switch keeping this Mac awake for \(agentName)",
-                "Awake for \(agentName) · Click for controls",
-                "Awake · \(agentName)"
+                "Sleep Switch keeping this Mac awake for \(agentName) in \(selectedAwakeMode.menuTitle) mode",
+                "Awake for \(agentName) · \(selectedAwakeMode.stateTitle) · Click for controls",
+                "Awake · \(agentName) · \(selectedAwakeMode.stateTitle)"
             )
         }
 
@@ -520,6 +592,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for item in durationMenu.items {
             guard let seconds = item.representedObject as? Int else { continue }
             item.state = activeDuration == seconds ? .on : .off
+        }
+    }
+
+    private func updateAwakeModeChecks() {
+        for item in awakeModeItems {
+            guard let rawValue = item.representedObject as? String else { continue }
+            item.state = rawValue == selectedAwakeMode.rawValue ? .on : .off
         }
     }
 
@@ -817,7 +896,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func stopKeepingAwake() {
         clearManualAwakeSession()
-        _ = reconcilePowerAssertion()
+        if let error = reconcilePowerAssertion() {
+            presentAssertionError(error)
+        }
         updatePresentation()
     }
 
@@ -835,7 +916,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func reconcilePowerAssertion(forceRestart: Bool = false) -> Error? {
         guard shouldKeepAwake else {
             powerAssertions.stop()
-            return nil
+            do {
+                try lidClosedSleep.stop()
+                return nil
+            } catch {
+                return error
+            }
+        }
+
+        do {
+            switch selectedAwakeMode {
+            case .preventSleep:
+                try lidClosedSleep.stop()
+            case .lidClosed:
+                try lidClosedSleep.start()
+            }
+        } catch {
+            return error
         }
 
         if powerAssertions.isActive,
@@ -849,8 +946,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return nil
         } catch {
             powerAssertions.stop()
+            if selectedAwakeMode == .lidClosed {
+                try? lidClosedSleep.stop()
+            }
             return error
         }
+    }
+
+    @objc private func selectAwakeMode(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let mode = KeepAwakeMode(rawValue: rawValue),
+              mode != selectedAwakeMode else {
+            return
+        }
+        guard mode != .lidClosed || AppDistribution.supportsLidClosedAwake else {
+            NSSound.beep()
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        let previousMode = selectedAwakeMode
+        defaults.set(mode.rawValue, forKey: awakeModeKey)
+
+        if shouldKeepAwake,
+           let error = reconcilePowerAssertion(forceRestart: true) {
+            defaults.set(previousMode.rawValue, forKey: awakeModeKey)
+            _ = reconcilePowerAssertion(forceRestart: true)
+            presentAssertionError(error)
+        }
+
+        updatePresentation()
+        updateSettingsPresentation()
     }
 
     @objc private func toggleAutomaticAgentAwake() {

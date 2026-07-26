@@ -41,7 +41,8 @@ xcodebuild \
 
 | Capability | GitHub download | Mac App Store |
 | --- | --- | --- |
-| Manual Caffeine-style sessions | Yes | Yes |
+| Manual sleep-prevention sessions | Yes | Yes |
+| Keep running with the lid closed | Yes, with administrator approval | No |
 | Keep the display awake manually | Yes | Yes |
 | Automatic Codex tracking | Yes | Yes, after choosing `.codex` |
 | Other supported agent harnesses | Yes | No |
@@ -81,7 +82,7 @@ Free and open source.
 
 ### Keywords
 
-`awake,caffeine,sleep,codex,developer,menu bar,productivity,agent,timer`
+`awake,sleep,prevent sleep,codex,developer,menu bar,productivity,agent,timer`
 
 ### Review notes
 
@@ -104,7 +105,7 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 ## Submission status
 
-- Version 1.5.2 (build 8) archives successfully as a universal sandboxed app.
+- Version 1.6.0 (build 9) is configured as a universal sandboxed app.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
 - The privacy policy URL and **Data Not Collected** disclosure are published.
@@ -113,5 +114,5 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 - Xcode's stored Apple account credentials must be refreshed before automatic
   distribution signing and upload can finish.
 
-After those two items, export the archive, select build 8, add the version for
+After those two items, export the archive, select build 9, add the version for
 review, and submit.

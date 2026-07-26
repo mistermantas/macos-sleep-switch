@@ -3,9 +3,11 @@ enum AppDistribution {
     static let isAppStoreBuild = true
     static let supportsGlobalAgentTracking = false
     static let supportsDisplaySleep = false
+    static let supportsLidClosedAwake = false
 #else
     static let isAppStoreBuild = false
     static let supportsGlobalAgentTracking = true
     static let supportsDisplaySleep = true
+    static let supportsLidClosedAwake = true
 #endif
 }

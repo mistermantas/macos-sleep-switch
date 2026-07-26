@@ -98,6 +98,8 @@ struct AgentTrackerTests {
             anotherAgent: detected[1]
         )
         testPowerAssertions()
+        testKeepAwakeModes()
+        testLidClosedSleepControllerHelpers()
         testDisplayPowerCommand()
         testAppLinks()
         testDistribution()
@@ -377,6 +379,66 @@ struct AgentTrackerTests {
         }
     }
 
+    private static func testKeepAwakeModes() {
+        expect(
+            KeepAwakeMode.allCases == [.preventSleep, .lidClosed],
+            "offers normal and lid-closed awake modes"
+        )
+        expect(
+            KeepAwakeMode.preventSleep.menuTitle == "Prevent Sleep"
+                && KeepAwakeMode.preventSleep.toolTip.contains("lid"),
+            "names and explains standard sleep prevention literally"
+        )
+        expect(
+            KeepAwakeMode.lidClosed.menuTitle
+                == "Prevent Sleep Even With Lid Closed"
+                && KeepAwakeMode.lidClosed.toolTip.contains("Administrator"),
+            "makes lid-closed behavior and authorization explicit"
+        )
+        expect(
+            KeepAwakeMode.persistedMode(from: "caffeine") == .preventSleep,
+            "migrates the previous mode name without changing behavior"
+        )
+    }
+
+    private static func testLidClosedSleepControllerHelpers() {
+        expect(
+            LidClosedSleepController.sleepDisabled(
+                from: "System-wide power settings:\n SleepDisabled 1\n"
+            ) == true,
+            "reads an enabled system sleep override"
+        )
+        expect(
+            LidClosedSleepController.sleepDisabled(
+                from: "System-wide power settings:\n SleepDisabled 0\n"
+            ) == false,
+            "reads a disabled system sleep override"
+        )
+        expect(
+            LidClosedSleepController.sleepDisabled(from: "No custom settings") == nil,
+            "rejects a missing system sleep override"
+        )
+
+        let marker = URL(fileURLWithPath: "/private/tmp/sleep-switch-test-marker")
+        let command = LidClosedSleepController.enableCommand(
+            markerURL: marker,
+            processIdentifier: 4_242
+        )
+        for fragment in [
+            "/usr/bin/pmset disablesleep 1",
+            "/usr/bin/pmset disablesleep 0",
+            "/bin/kill -0 4242",
+            "/bin/test -e",
+            marker.path,
+            "/usr/bin/nohup"
+        ] {
+            expect(
+                command.contains(fragment),
+                "keeps the lid-closed safety command complete: \(fragment)"
+            )
+        }
+    }
+
     private static func currentPowerAssertions() -> String {
         let process = Process()
         let output = Pipe()
@@ -466,6 +528,10 @@ struct AgentTrackerTests {
             AppDistribution.supportsDisplaySleep,
             "keeps display sleep in the direct build"
         )
+        expect(
+            AppDistribution.supportsLidClosedAwake,
+            "keeps the opt-in lid-closed mode in the direct build"
+        )
     }
 
     private static func testStatusSymbols() {
@@ -477,6 +543,7 @@ struct AgentTrackerTests {
             "moon.zzz",
             "moon.zzz.fill",
             "display",
+            "laptopcomputer",
             "stop.circle",
             "gearshape",
             "arrow.clockwise",

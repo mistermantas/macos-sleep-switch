@@ -105,14 +105,13 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 ## Submission status
 
-- Version 1.6.0 (build 9) is configured as a universal sandboxed app.
+- Version 1.7.0 (build 10) was uploaded to App Store Connect on July 27, 2026,
+  and accepted for processing as a universal sandboxed app.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
 - The privacy policy URL and **Data Not Collected** disclosure are published.
 - App Store Connect still requires the reviewer contact phone number before the
   version metadata can be saved.
-- Xcode's stored Apple account credentials must be refreshed before automatic
-  distribution signing and upload can finish.
 
-After those two items, export the archive, select build 9, add the version for
-review, and submit.
+After processing finishes, create or select macOS version 1.7.0, choose build
+10, complete any remaining reviewer contact fields, and submit it for review.

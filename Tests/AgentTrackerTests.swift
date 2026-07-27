@@ -100,10 +100,19 @@ struct AgentTrackerTests {
         testPowerAssertions()
         testKeepAwakeModes()
         testLidClosedSleepControllerHelpers()
+        testNonBlockingLidRestoration()
         testDisplayPowerCommand()
+        testUnsignedCoolingHelperGate()
         testAppLinks()
         testDistribution()
         testStatusSymbols()
+        CoolingPolicyTests.run()
+        FanHardwareFixtureTests.run()
+        FanLeaseManagerTests.run()
+        FanHardwareControllerTests.run()
+        FanHelperSecurityTests.run()
+        CoolingCoordinatorTests.run()
+        CoolingDiagnosticsTests.run()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
             let codexScanStartedAt = Date()
@@ -128,6 +137,10 @@ struct AgentTrackerTests {
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_DISPLAY_CHECK"] == "1" {
             testLiveDisplaySleepAndWake()
+        }
+
+        if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LID_CHECK"] == "1" {
+            testLiveLidClosedEnableAndRestore()
         }
 
         print("SleepSwitchTests passed")
@@ -420,21 +433,135 @@ struct AgentTrackerTests {
         )
 
         let marker = URL(fileURLWithPath: "/private/tmp/sleep-switch-test-marker")
+        let watcherLabel =
+            "lt.mantas.sleepswitch.lidwatcher.test"
         let command = LidClosedSleepController.enableCommand(
             markerURL: marker,
-            processIdentifier: 4_242
+            watcherLabel: watcherLabel
         )
         for fragment in [
             "/usr/bin/pmset disablesleep 1",
             "/usr/bin/pmset disablesleep 0",
-            "/bin/kill -0 4242",
             "/bin/test -e",
+            "/usr/bin/stat -f %m",
+            "/bin/date +%s",
+            "/bin/launchctl submit -l",
+            "/bin/launchctl print",
+            "/bin/launchctl remove",
+            "system/\(watcherLabel)",
             marker.path,
-            "/usr/bin/nohup"
+            watcherLabel
         ] {
             expect(
                 command.contains(fragment),
                 "keeps the lid-closed safety command complete: \(fragment)"
+            )
+        }
+        expect(
+            !command.contains("/usr/bin/nohup")
+                && !command.contains("/bin/kill -0"),
+            "uses a launchd-owned heartbeat watcher instead of a detached child process"
+        )
+        let watcher = LidClosedSleepController.restoreWatcherCommand(
+            markerURL: marker,
+            watcherLabel: watcherLabel
+        )
+        expect(
+            watcher.contains(
+                "while ! { /usr/bin/pmset disablesleep 0"
+            )
+                && watcher.contains(
+                    "$1 == \"SleepDisabled\" && $2 == \"0\""
+                )
+                && watcher.contains("/bin/sleep 2")
+                && watcher.hasSuffix("exit 0"),
+            "retries and verifies restoration before unloading the launchd watcher"
+        )
+        expect(
+            shellSyntaxIsValid(command)
+                && shellSyntaxIsValid(watcher),
+            "keeps the privileged launch and restore scripts valid POSIX shell"
+        )
+
+        let rawFailure =
+            "0:616: execution error: The command exited with a non-zero status. (1)"
+        let commandError = LidClosedSleepError.commandFailed(1, rawFailure)
+        expect(
+            commandError.localizedDescription
+                == "Sleep Switch couldn’t enable lid-closed mode.",
+            "presents a concise lid-closed error"
+        )
+        expect(
+            !(commandError.errorDescription ?? "").contains(rawFailure),
+            "does not expose raw AppleScript diagnostics in the alert"
+        )
+        expect(
+            (commandError.recoverySuggestion ?? "").contains("Normal sleep remains enabled"),
+            "explains the safe fallback after a lid-closed failure"
+        )
+    }
+
+    private static func testNonBlockingLidRestoration() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "sleep-switch-lid-transition-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let restorationStarted = DispatchSemaphore(value: 0)
+        let allowRestoration = DispatchSemaphore(value: 0)
+        let controller = LidClosedSleepController(
+            markerDirectory: root,
+            readSleepDisabled: { false },
+            waitForSleepDisabled: { expected in
+                if expected {
+                    return true
+                }
+                restorationStarted.signal()
+                return allowRestoration.wait(timeout: .now() + 2)
+                    == .success
+            },
+            runAdministratorCommand: { _ in }
+        )
+
+        do {
+            try controller.start()
+            let startedAt = Date()
+            try controller.stop(waitForRestoration: false)
+            let elapsed = Date().timeIntervalSince(startedAt)
+
+            expect(
+                elapsed < 0.25,
+                "does not block the menu while normal lid sleep is restored"
+            )
+            expect(
+                !controller.isActive && controller.isRestoring,
+                "moves immediately into an explicit restoration state"
+            )
+            expect(
+                restorationStarted.wait(timeout: .now() + 1) == .success,
+                "verifies normal sleep on a background queue"
+            )
+
+            allowRestoration.signal()
+            let deadline = Date().addingTimeInterval(1)
+            while controller.isRestoring, Date() < deadline {
+                RunLoop.current.run(
+                    until: Date().addingTimeInterval(0.01)
+                )
+            }
+            expect(
+                !controller.isRestoring,
+                "finishes the background restoration without freezing AppKit"
+            )
+        } catch {
+            fatalError(
+                "Test failed: non-blocking lid transition returned \(error)"
             )
         }
     }
@@ -457,6 +584,22 @@ struct AgentTrackerTests {
         }
     }
 
+    private static func shellSyntaxIsValid(_ command: String) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-n", "-c", command]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
     private static func testDisplayPowerCommand() {
         expect(
             DisplayPowerController.sleepCommand.path == "/usr/bin/pmset",
@@ -465,6 +608,14 @@ struct AgentTrackerTests {
         expect(
             DisplayPowerController.sleepArguments == ["displaysleepnow"],
             "requests display sleep without sleeping the Mac"
+        )
+    }
+
+    private static func testUnsignedCoolingHelperGate() {
+        expect(
+            FanHelperClient().registrationState
+                == .requiresSignedBuild,
+            "does not offer privileged helper registration from an unsigned test build"
         )
     }
 
@@ -478,6 +629,58 @@ struct AgentTrackerTests {
             print("Live display sleep/wake: passed")
         } catch {
             fatalError("Test failed: live display sleep/wake returned \(error)")
+        }
+    }
+
+    private static func testLiveLidClosedEnableAndRestore() {
+        guard currentSleepDisabled() == false else {
+            fatalError(
+                "Test failed: SleepDisabled was already enabled before the live check"
+            )
+        }
+
+        let controller = LidClosedSleepController()
+        do {
+            try controller.start()
+            expect(
+                currentSleepDisabled() == true,
+                "verifies the live lid-closed enable transition"
+            )
+            try controller.stop()
+            expect(
+                currentSleepDisabled() == false,
+                "verifies the live lid-closed restore transition"
+            )
+            print("Live lid enable/restore: passed")
+        } catch {
+            try? controller.stop()
+            guard currentSleepDisabled() != true else {
+                fatalError(
+                    "Test failed: live lid check did not restore SleepDisabled 0"
+                )
+            }
+            fatalError("Test failed: live lid enable/restore returned \(error)")
+        }
+    }
+
+    private static func currentSleepDisabled() -> Bool? {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g"]
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            return LidClosedSleepController.sleepDisabled(
+                from: String(data: data, encoding: .utf8) ?? ""
+            )
+        } catch {
+            return nil
         }
     }
 
@@ -532,6 +735,10 @@ struct AgentTrackerTests {
             AppDistribution.supportsLidClosedAwake,
             "keeps the opt-in lid-closed mode in the direct build"
         )
+        expect(
+            AppDistribution.supportsFanControl,
+            "keeps fan control in the direct build only"
+        )
     }
 
     private static func testStatusSymbols() {
@@ -551,7 +758,13 @@ struct AgentTrackerTests {
             "play.rectangle",
             "chevron.left.forwardslash.chevron.right",
             "heart",
-            "exclamationmark.triangle"
+            "exclamationmark.triangle",
+            "fan",
+            "fan.fill",
+            "wrench.and.screwdriver",
+            "gauge.with.dots.needle.50percent",
+            "exclamationmark.circle",
+            "apple.logo"
         ] {
             expect(
                 NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) != nil,

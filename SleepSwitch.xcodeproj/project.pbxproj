@@ -10,12 +10,20 @@
 		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
 		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
 		213204C2ADD3B76D7DE8742F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6B98ED0F17BA35EEE482C2 /* main.swift */; };
+		2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */; };
 		454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */; };
+		4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */; };
 		5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C543EF1E4134BFDE371CDA /* AppDistribution.swift */; };
 		606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */; };
 		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
+		75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */; };
+		7F5038F0F50B74DDEA53576C /* CoolingDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */; };
+		8844ABF61756CBAFD0666878 /* CoolingDetailsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D49B9470119D7821941D59F0 /* CoolingDetailsWindowController.swift */; };
+		88F8BF9E74992CFE3275EF6D /* CoolingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */; };
 		A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */; };
+		A3492B708CAD0FB57A0702EB /* FanHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A571FED9A9C619EEF25422 /* FanHelperClient.swift */; };
 		B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */; };
+		C24E65C8BC13D90C4597D682 /* CoolingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */; };
 		C6C5580CEE420A00E5F4BD47 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */; };
 		F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */; };
 /* End PBXBuildFile section */
@@ -24,13 +32,21 @@
 		04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDirectoryAccess.swift; sourceTree = "<group>"; };
 		09C8FEC6CC81B7403F577C86 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
+		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
+		3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDiagnostics.swift; sourceTree = "<group>"; };
 		434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwakeSession.swift; sourceTree = "<group>"; };
+		4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingPolicy.swift; sourceTree = "<group>"; };
 		5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTracker.swift; sourceTree = "<group>"; };
 		674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerAssertionController.swift; sourceTree = "<group>"; };
+		6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingTelemetry.swift; sourceTree = "<group>"; };
 		7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionTracker.swift; sourceTree = "<group>"; };
+		93A571FED9A9C619EEF25422 /* FanHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanHelperClient.swift; sourceTree = "<group>"; };
+		94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessInfoThermalMonitor.swift; sourceTree = "<group>"; };
 		9E6B98ED0F17BA35EEE482C2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingProfile.swift; sourceTree = "<group>"; };
 		CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayPowerController.swift; sourceTree = "<group>"; };
+		D49B9470119D7821941D59F0 /* CoolingDetailsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDetailsWindowController.swift; sourceTree = "<group>"; };
 		D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SleepSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -54,9 +70,17 @@
 				434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */,
 				04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */,
 				7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */,
+				27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */,
+				D49B9470119D7821941D59F0 /* CoolingDetailsWindowController.swift */,
+				3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */,
+				4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */,
+				B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */,
+				6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */,
 				CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */,
+				93A571FED9A9C619EEF25422 /* FanHelperClient.swift */,
 				9E6B98ED0F17BA35EEE482C2 /* main.swift */,
 				674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */,
+				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
 			);
 			name = SleepSwitch;
 			path = Sources/SleepSwitch;
@@ -156,8 +180,16 @@
 				A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */,
 				7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */,
 				454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */,
+				C24E65C8BC13D90C4597D682 /* CoolingCoordinator.swift in Sources */,
+				8844ABF61756CBAFD0666878 /* CoolingDetailsWindowController.swift in Sources */,
+				7F5038F0F50B74DDEA53576C /* CoolingDiagnostics.swift in Sources */,
+				88F8BF9E74992CFE3275EF6D /* CoolingPolicy.swift in Sources */,
+				4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */,
+				2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */,
 				F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */,
+				A3492B708CAD0FB57A0702EB /* FanHelperClient.swift in Sources */,
 				606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */,
+				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
 				213204C2ADD3B76D7DE8742F /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -172,7 +204,7 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -181,7 +213,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.7.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
 				PRODUCT_NAME = "Sleep Switch";
@@ -316,7 +348,7 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -325,7 +357,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.6.0;
+				MARKETING_VERSION = 1.7.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
 				PRODUCT_NAME = "Sleep Switch";

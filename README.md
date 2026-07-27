@@ -25,6 +25,8 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Awake Mode** | Chooses how automatic and manual sessions prevent sleep. |
 | **Prevent Sleep** | Stops idle system sleep while a session is active. Closing the lid still follows normal macOS behavior. |
 | **Prevent Sleep Even With Lid Closed** | Keeps the Mac running after the lid closes. Available in the GitHub download and asks for administrator approval when it becomes active. |
+| **Cooling** | Chooses macOS fan control, early aggressive cooling, or maximum cooling on a specifically qualified Mac. Cooling is available only in a signed direct build. |
+| **Cooling Details…** | Shows verified helper, fan, temperature, and qualification state. Its **Copy Diagnostics** button creates an anonymized local hardware report. |
 | **Keep Awake for Agents** | Automatically prevents sleep while any supported coding agent is working. It is enabled by default. |
 | **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
 | **Agent status** | Shows the detected agent and session count. In the App Store build, **Connect Codex…** or **Change Codex Folder…** selects the local folder to watch. |
@@ -81,11 +83,31 @@ In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-mana
 
 The assertions belong to the app process and are released when the manual or agent session ends, automatic agent awake is paused, or the app quits.
 
-The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Sleep Switch does not install a privileged helper or retain administrator credentials.
+The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Lid mode does not install a persistent helper or retain administrator credentials.
+
+The direct build’s optional cooling feature uses a separately signed macOS
+background helper because current macOS versions restrict AppleSMC access. The
+helper accepts only the matching Sleep Switch signing identity, exposes only a
+typed cooling lease, and restores macOS fan control on session end, disconnect,
+sleep, wake, timeout, or failed verification. Unknown and unqualified Mac models
+remain monitoring-only.
+
+Cooling also ends the Sleep Switch awake session if macOS reports critical
+thermal pressure, temperature feedback is lost, or the vetted temperature
+aggregate remains at or above 80 °C for 30 seconds while maximum fan demand is
+verified. That conservative cutoff is a fail-safe for Sleep Switch—not an Apple
+safety limit or a promise that an enclosed MacBook is safe.
+
+Cooling diagnostics contain the Mac model, macOS version, fixed vetted sensor
+keys and readings, and fan telemetry. They omit usernames, paths, serial
+numbers, agent content, and lease credentials, and are copied only when you
+press **Copy Diagnostics**.
 
 When you choose a display action, Sleep Switch calls macOS’s built-in `pmset displaysleepnow`. This turns off only the display and does not alter any power setting. A queued agent-completion wake uses Apple’s `IOPMAssertionDeclareUserActivity` API.
 
-There are no analytics, network requests, installed privileged services, or bundled dependencies.
+There are no analytics or network requests. The Mac App Store build contains no
+privileged service. The signed direct build installs the cooling helper only
+after the user selects cooling and approves it in macOS settings.
 
 ## Mac App Store
 
@@ -98,7 +120,7 @@ See [APP_STORE.md](APP_STORE.md) for the Xcode target, submission metadata, and 
 - [Uncascade](https://www.uncascade.com/)
 - [Uncascade on YouTube](https://www.youtube.com/@uncascade)
 - [Sleep Switch on GitHub](https://github.com/mistermantas/macos-sleep-switch)
-- [Sponsor on GitHub](https://github.com/sponsors/mistermantas)
+- [sponsors/mistermantas](https://github.com/sponsors/mistermantas)
 
 ## A note on heat
 
@@ -109,7 +131,11 @@ Keeping a Mac active uses power and can create heat during builds or other heavy
 - macOS 13 Ventura or newer
 - Apple silicon or Intel Mac
 
-The downloadable build is ad-hoc signed because this project is not distributed through the App Store. macOS may ask you to confirm the first launch with **Right-click → Open**.
+Lid-closed mode is available in ordinary direct builds. Cooling additionally
+requires an Apple-issued certificate so macOS can authenticate the app and its
+privileged helper. Local builds can use an Apple Development certificate from
+the Uncascade team. Public direct-download builds use Developer ID signing and
+notarization.
 
 ## Build from source
 
@@ -125,10 +151,43 @@ The universal app is written to `build/Sleep Switch.app`. To create the release 
 ./package.sh
 ```
 
+To test cooling locally, sign in to the Uncascade developer team in Xcode and
+build with its Apple Development identity:
+
+```sh
+SLEEP_SWITCH_SIGNING_IDENTITY="Apple Development: … (C43F5MKJF2)" \
+SLEEP_SWITCH_ALLOW_DEVELOPMENT_SIGNING=1 \
+  ./build.sh
+```
+
+For a cooling-capable release, use the Uncascade Developer ID identity and a
+`notarytool` keychain profile. The package script submits, staples, recreates
+the archive with its ticket, and runs the strict direct-distribution check:
+
+```sh
+SLEEP_SWITCH_SIGNING_IDENTITY="Developer ID Application: … (C43F5MKJF2)" \
+SLEEP_SWITCH_NOTARY_PROFILE="sleep-switch-notary" \
+  ./package.sh
+```
+
+Before a local cooling-capable installation, run the non-mutating preflight:
+
+```sh
+SLEEP_SWITCH_INSTALL_APP="build/Sleep Switch.app" \
+  ./install-local.sh --check
+```
+
+The installer accepts only a notarized Developer ID build, requires
+`SleepDisabled 0`, and refuses a running app or cooling helper. It never invokes
+`sudo` or launches the app. `--install` refuses an existing copy;
+`--replace` preserves that copy as a timestamped backup.
+
 Run the test suite with:
 
 ```sh
 ./test.sh
+./test-app-store.sh
+./test-direct.sh
 ```
 
 ## License

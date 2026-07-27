@@ -10,6 +10,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let durationMenu = NSMenu(title: "Manual Duration")
     private let awakeModeMenu = NSMenu(title: "Awake Mode")
     private let awakeModeItem = NSMenuItem(title: "Awake Mode", action: nil, keyEquivalent: "")
+#if !APP_STORE
+    private let coolingMenu = NSMenu(title: "Cooling")
+    private let coolingItem = NSMenuItem(
+        title: "Cooling · System Control",
+        action: nil,
+        keyEquivalent: ""
+    )
+    private let coolingStatusItem = NSMenuItem(
+        title: "System Control",
+        action: nil,
+        keyEquivalent: ""
+    )
+    private let coolingHelperItem = NSMenuItem(
+        title: "Install Cooling Helper…",
+        action: #selector(manageCoolingHelper),
+        keyEquivalent: ""
+    )
+    private let coolingDetailsItem = NSMenuItem(
+        title: "Cooling Details…",
+        action: #selector(showCoolingDetails),
+        keyEquivalent: ""
+    )
+#endif
     private let automaticAgentAwakeItem = NSMenuItem(
         title: "Keep Awake for Agents",
         action: #selector(toggleAutomaticAgentAwake),
@@ -62,6 +85,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let powerAssertions = PowerAssertionController()
     private let lidClosedSleep = LidClosedSleepController()
     private let displayPower = DisplayPowerController()
+#if !APP_STORE
+    private let fanHelperClient = FanHelperClient()
+    private lazy var coolingCoordinator = CoolingCoordinator(
+        client: fanHelperClient
+    )
+    private var coolingProfileItems: [NSMenuItem] = []
+    private var coolingDetailsWindow: CoolingDetailsWindowController?
+    private let coolingWarningShownKey = "coolingWarningShown"
+    private var coolingThermalAbortSuppressesAwake = false
+#endif
     private let agentScanQueue = DispatchQueue(
         label: "lt.mantas.sleepswitch.agent-scan",
         qos: .utility
@@ -90,7 +123,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configureMenu()
         observeDisplayWake()
 #if !APP_STORE
+        lidClosedSleep.onRestorationFailure = { [weak self] error in
+            self?.presentAssertionError(error)
+        }
+        lidClosedSleep.onRestorationFinished = { [weak self] in
+            self?.updatePresentation()
+        }
+#endif
+#if !APP_STORE
         enableLaunchAtLoginByDefault()
+        configureCoolingCoordinator()
+        coolingCoordinator.start()
 #endif
 
         if UserDefaults.standard.bool(forKey: activateOnLaunchKey) {
@@ -104,6 +147,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         do {
             try lidClosedSleep.stop()
+#if !APP_STORE
+            coolingCoordinator.stop()
+#endif
             return .terminateNow
         } catch {
             presentAssertionError(error)
@@ -117,6 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
         try? lidClosedSleep.stop()
+#if !APP_STORE
+        coolingCoordinator.stop()
+#endif
     }
 
     private func registerDefaults() {
@@ -195,6 +244,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         configureAwakeModeMenu()
 
+#if !APP_STORE
+        coolingItem.submenu = coolingMenu
+        coolingItem.image = NSImage(
+            systemSymbolName: "fan",
+            accessibilityDescription: "Cooling controls"
+        )
+        configureCoolingMenu()
+#endif
+
         let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
         settingsItem.submenu = settingsMenu
         settingsItem.image = NSImage(
@@ -239,6 +297,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(stateItem)
         menu.addItem(awakeModeItem)
+#if !APP_STORE
+        menu.addItem(coolingItem)
+#endif
         menu.addItem(.separator())
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
@@ -317,6 +378,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             awakeModeMenu.addItem(item)
         }
     }
+
+#if !APP_STORE
+    private func configureCoolingMenu() {
+        coolingStatusItem.isEnabled = false
+        coolingStatusItem.image = NSImage(
+            systemSymbolName: "fan",
+            accessibilityDescription: "Verified cooling state"
+        )
+        coolingMenu.addItem(coolingStatusItem)
+        coolingMenu.addItem(.separator())
+
+        for profile in CoolingProfile.allCases {
+            let item = NSMenuItem(
+                title: profile.menuTitle,
+                action: #selector(selectCoolingProfile(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = profile.rawValue
+            item.image = NSImage(
+                systemSymbolName: coolingSymbol(for: profile),
+                accessibilityDescription: profile.menuTitle
+            )
+            coolingProfileItems.append(item)
+            coolingMenu.addItem(item)
+        }
+
+        coolingMenu.addItem(.separator())
+        coolingHelperItem.target = self
+        coolingHelperItem.image = NSImage(
+            systemSymbolName: "wrench.and.screwdriver",
+            accessibilityDescription: "Cooling helper settings"
+        )
+        coolingMenu.addItem(coolingHelperItem)
+
+        coolingDetailsItem.target = self
+        coolingDetailsItem.image = NSImage(
+            systemSymbolName: "gauge.with.dots.needle.50percent",
+            accessibilityDescription: "Cooling details"
+        )
+        coolingMenu.addItem(coolingDetailsItem)
+    }
+#endif
 
     private func configureSettingsMenu() {
         keepDisplayAwakeItem.target = self
@@ -416,6 +520,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let latestAgents else { return }
 
         detectedAgents = latestAgents
+#if !APP_STORE
+        if detectedAgents.isEmpty,
+           ProcessInfoThermalMonitor().currentLevel != .critical {
+            coolingThermalAbortSuppressesAwake = false
+        }
+#endif
         attemptQueuedDisplayWakeIfNeeded()
         reconcileAndUpdatePresentation()
     }
@@ -435,6 +545,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateAgentPresentation()
         updateDisplayPresentation()
         updateSettingsPresentation()
+#if !APP_STORE
+        synchronizeCoolingOwnership()
+        updateCoolingPresentation()
+#endif
     }
 
     private var defaultDurationSeconds: Int? {
@@ -468,7 +582,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var shouldKeepAwake: Bool {
-        AwakePolicy.shouldKeepAwake(
+#if !APP_STORE
+        guard !coolingThermalAbortSuppressesAwake else {
+            return false
+        }
+#endif
+        return AwakePolicy.shouldKeepAwake(
             manualSession: manualAwakeSession,
             automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
             wakeWhenAgentsFinishArmed: wakeDisplayWhenAgentsFinish,
@@ -518,6 +637,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toolTip: String,
         stateTitle: String
     ) {
+        if lidClosedSleep.isRestoring {
+            return (
+                "arrow.clockwise",
+                "Sleep Switch is restoring normal lid sleep",
+                "Restoring normal lid sleep…",
+                "Restoring normal lid sleep…"
+            )
+        }
+
         if wakeDisplayWhenAgentsFinish {
             if detectedAgents.isEmpty {
                 return (
@@ -866,6 +994,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func startKeepingAwake(durationSeconds: Int?) {
+#if !APP_STORE
+        coolingThermalAbortSuppressesAwake = false
+#endif
         expiryTimer?.invalidate()
 
         let session = AwakeSession(startedAt: Date(), durationSeconds: durationSeconds)
@@ -875,6 +1006,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             manualAwakeSession = nil
             presentAssertionError(error)
             updatePresentation()
+#if !APP_STORE
+            synchronizeCoolingOwnership()
+#endif
             return
         }
 
@@ -892,6 +1026,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         updatePresentation()
+#if !APP_STORE
+        synchronizeCoolingOwnership()
+#endif
     }
 
     private func stopKeepingAwake() {
@@ -900,6 +1037,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             presentAssertionError(error)
         }
         updatePresentation()
+#if !APP_STORE
+        synchronizeCoolingOwnership()
+#endif
     }
 
     private func clearManualAwakeSession() {
@@ -917,7 +1057,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard shouldKeepAwake else {
             powerAssertions.stop()
             do {
-                try lidClosedSleep.stop()
+                try lidClosedSleep.stop(waitForRestoration: false)
                 return nil
             } catch {
                 return error
@@ -927,7 +1067,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             switch selectedAwakeMode {
             case .preventSleep:
-                try lidClosedSleep.stop()
+                try lidClosedSleep.stop(waitForRestoration: false)
             case .lidClosed:
                 try lidClosedSleep.start()
             }
@@ -947,7 +1087,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             powerAssertions.stop()
             if selectedAwakeMode == .lidClosed {
-                try? lidClosedSleep.stop()
+                try? lidClosedSleep.stop(waitForRestoration: false)
             }
             return error
         }
@@ -983,6 +1123,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let defaults = UserDefaults.standard
         let previousValue = automaticAgentAwakeEnabled
         defaults.set(!previousValue, forKey: automaticAgentAwakeKey)
+#if !APP_STORE
+        if !previousValue {
+            coolingThermalAbortSuppressesAwake = false
+        }
+#endif
 
         if let error = reconcilePowerAssertion() {
             defaults.set(previousValue, forKey: automaticAgentAwakeKey)
@@ -992,7 +1137,309 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         updatePresentation()
         updateSettingsPresentation()
+#if !APP_STORE
+        synchronizeCoolingOwnership()
+#endif
     }
+
+#if !APP_STORE
+    private func synchronizeCoolingOwnership() {
+        coolingCoordinator.updateAwakeOwnership(
+            shouldKeepAwake && powerAssertions.isActive
+        )
+    }
+
+    private func configureCoolingCoordinator() {
+        coolingCoordinator.onChange = { [weak self] presentation in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.updateCoolingPresentation()
+                self.coolingDetailsWindow?.update(presentation)
+            }
+        }
+        coolingCoordinator.onThermalAbort = { [weak self] reason in
+            DispatchQueue.main.async {
+                self?.handleCoolingThermalAbort(reason)
+            }
+        }
+    }
+
+    private func updateCoolingPresentation() {
+        let presentation = coolingCoordinator.presentation
+        let profile = presentation.selectedProfile
+        let snapshot = presentation.helperSnapshot
+
+        coolingItem.title = "Cooling · \(presentation.effectiveTitle)"
+        coolingItem.image = NSImage(
+            systemSymbolName: presentation.hasActiveLease
+                ? "fan.fill"
+                : "fan",
+            accessibilityDescription: "Cooling controls"
+        )
+        coolingStatusItem.title = coolingStatusTitle(presentation)
+        coolingStatusItem.image = NSImage(
+            systemSymbolName: coolingStatusSymbol(presentation),
+            accessibilityDescription: coolingStatusItem.title
+        )
+
+        for item in coolingProfileItems {
+            guard let rawValue = item.representedObject as? String,
+                  let itemProfile = CoolingProfile(rawValue: rawValue)
+            else {
+                continue
+            }
+            item.state = itemProfile == profile ? .on : .off
+
+            if itemProfile == .systemControl {
+                item.isEnabled = true
+            } else if presentation.registrationState
+                        == .requiresSignedBuild {
+                item.isEnabled = false
+            } else if presentation.registrationState != .enabled {
+                item.isEnabled = true
+            } else if let qualification = snapshot?.qualification {
+                item.isEnabled = itemProfile == .maximum
+                    ? qualification.permitsMaximumControl
+                    : qualification.permitsAggressiveControl
+            } else {
+                item.isEnabled = true
+            }
+        }
+
+        coolingHelperItem.title = switch presentation.registrationState {
+        case .requiresSignedBuild:
+            "Signed Build Required…"
+        case .notRegistered:
+            "Install Cooling Helper…"
+        case .requiresApproval:
+            "Approve Cooling Helper…"
+        case .notFound:
+            "Repair Cooling Helper…"
+        case .enabled:
+            "Cooling Helper Settings…"
+        }
+        coolingDetailsItem.isEnabled = snapshot != nil
+            || ![
+                FanHelperRegistrationState.notFound,
+                .requiresSignedBuild
+            ].contains(presentation.registrationState)
+        coolingDetailsWindow?.update(presentation)
+    }
+
+    private func coolingStatusTitle(
+        _ presentation: CoolingPresentationSnapshot
+    ) -> String {
+        guard let snapshot = presentation.helperSnapshot else {
+            return switch presentation.registrationState {
+            case .requiresSignedBuild:
+                "Signed Build Required"
+            case .notRegistered:
+                "Helper Not Installed"
+            case .requiresApproval:
+                "Approval Needed"
+            case .notFound:
+                "Helper Unavailable"
+            case .enabled:
+                "Connecting…"
+            }
+        }
+
+        let temperature = snapshot.optionalAggregateTemperatureCelsius.map {
+            " · \(Int($0.rounded()))°"
+        } ?? ""
+        return switch snapshot.state {
+        case .systemControl:
+            "System Control\(temperature)"
+        case .cooling:
+            "\(presentation.selectedProfile.menuTitle)\(temperature)"
+        case .monitoringOnly:
+            "Monitoring Only\(temperature)"
+        case .unsupported:
+            "No Supported Fans"
+        case .externalControllerConflict:
+            "Macs Fan Control Is Open"
+        case .unavailable:
+            "Cooling Unavailable"
+        case .restoreFailed:
+            "Restoration Needs Attention"
+        }
+    }
+
+    private func coolingStatusSymbol(
+        _ presentation: CoolingPresentationSnapshot
+    ) -> String {
+        guard let state = presentation.helperSnapshot?.state else {
+            return switch presentation.registrationState {
+            case .requiresSignedBuild:
+                "lock"
+            case .requiresApproval:
+                "exclamationmark.triangle"
+            case .notRegistered, .enabled, .notFound:
+                "fan"
+            }
+        }
+        return switch state {
+        case .cooling:
+            "fan.fill"
+        case .restoreFailed:
+            "exclamationmark.triangle"
+        case .externalControllerConflict:
+            "exclamationmark.circle"
+        case .systemControl, .monitoringOnly, .unsupported, .unavailable:
+            "fan"
+        }
+    }
+
+    private func coolingSymbol(for profile: CoolingProfile) -> String {
+        switch profile {
+        case .systemControl:
+            return "apple.logo"
+        case .aggressive:
+            return "fan"
+        case .maximum:
+            return "fan.fill"
+        }
+    }
+
+    @objc private func selectCoolingProfile(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let profile = CoolingProfile(rawValue: rawValue)
+        else {
+            return
+        }
+
+        if profile != .systemControl,
+           fanHelperClient.registrationState == .requiresSignedBuild {
+            presentAssertionError(
+                FanHelperClientError.requiresSignedBuild
+            )
+            return
+        }
+
+        if profile != .systemControl,
+           !UserDefaults.standard.bool(forKey: coolingWarningShownKey) {
+            let alert = NSAlert()
+            alert.messageText = "Cooling needs open airflow"
+            alert.informativeText =
+                "Use Sleep Switch on a hard, ventilated surface. "
+                + "Never rely on fan control to make a closed bag or sleeve safe."
+            alert.addButton(withTitle: "Continue")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                return
+            }
+            UserDefaults.standard.set(true, forKey: coolingWarningShownKey)
+        }
+
+        coolingCoordinator.selectProfile(profile)
+        guard profile != .systemControl else {
+            coolingThermalAbortSuppressesAwake = false
+            reconcileAndUpdatePresentation()
+            return
+        }
+
+        switch fanHelperClient.registrationState {
+        case .requiresSignedBuild:
+            presentAssertionError(
+                FanHelperClientError.requiresSignedBuild
+            )
+        case .notRegistered, .notFound:
+            installCoolingHelper()
+        case .requiresApproval:
+            fanHelperClient.openLoginItemsSettings()
+        case .enabled:
+            coolingCoordinator.refreshStatus()
+        }
+        updateCoolingPresentation()
+    }
+
+    @objc private func manageCoolingHelper() {
+        switch fanHelperClient.registrationState {
+        case .requiresSignedBuild:
+            presentAssertionError(
+                FanHelperClientError.requiresSignedBuild
+            )
+        case .notRegistered, .notFound:
+            installCoolingHelper()
+        case .requiresApproval:
+            fanHelperClient.openLoginItemsSettings()
+        case .enabled:
+            let alert = NSAlert()
+            alert.messageText = "Cooling Helper"
+            alert.informativeText =
+                "The helper is enabled and restores macOS control whenever "
+                + "its cooling lease ends."
+            alert.addButton(withTitle: "Open Settings")
+            alert.addButton(withTitle: "Remove Helper")
+            alert.addButton(withTitle: "Cancel")
+            NSApp.activate(ignoringOtherApps: true)
+            switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                fanHelperClient.openLoginItemsSettings()
+            case .alertSecondButtonReturn:
+                fanHelperClient.unregister { [weak self] error in
+                    DispatchQueue.main.async {
+                        if let error {
+                            self?.presentAssertionError(error)
+                        }
+                        self?.coolingCoordinator.refreshStatus()
+                    }
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    private func installCoolingHelper() {
+        do {
+            try fanHelperClient.register()
+            if fanHelperClient.registrationState == .requiresApproval {
+                fanHelperClient.openLoginItemsSettings()
+            }
+            coolingCoordinator.refreshStatus()
+        } catch {
+            presentAssertionError(error)
+        }
+    }
+
+    @objc private func showCoolingDetails() {
+        let controller = coolingDetailsWindow
+            ?? CoolingDetailsWindowController()
+        coolingDetailsWindow = controller
+        controller.show(coolingCoordinator.presentation)
+    }
+
+    private func handleCoolingThermalAbort(
+        _ reason: CoolingAbortReason
+    ) {
+        guard !coolingThermalAbortSuppressesAwake else { return }
+        coolingThermalAbortSuppressesAwake = true
+        clearManualAwakeSession()
+        wakeDisplayWhenAgentsFinish = false
+        displaySleepOverride = false
+        powerAssertions.stop()
+        try? lidClosedSleep.stop(waitForRestoration: false)
+        coolingCoordinator.updateAwakeOwnership(false)
+        reconcileAndUpdatePresentation()
+
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Cooling stopped the awake session"
+        alert.informativeText = switch reason {
+        case .criticalSystemThermalState:
+            "macOS reported critical thermal pressure. Sleep Switch restored system fan control and released its awake request."
+        case .invalidTemperature, .missingTemperature, .staleTemperature:
+            "Reliable temperature feedback was lost. Sleep Switch restored system fan control and released its awake request."
+        case .sustainedHighTemperature:
+            "The Mac stayed above 80° while maximum cooling was verified. Sleep Switch restored system fan control and released its awake request."
+        }
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+#endif
 
     private func requestCustomDuration() -> Int? {
         let alert = NSAlert()
@@ -1039,6 +1486,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func presentAssertionError(_ error: Error) {
+        if let lidError = error as? LidClosedSleepError,
+           case .authorizationCancelled = lidError {
+            return
+        }
         let alert = NSAlert(error: error)
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

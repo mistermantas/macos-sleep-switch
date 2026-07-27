@@ -5,6 +5,16 @@ script_dir="${0:A:h}"
 derived_data_dir="${SLEEP_SWITCH_APP_STORE_BUILD_DIR:-$script_dir/build/app-store}"
 app_dir="$derived_data_dir/Build/Products/Release/Sleep Switch.app"
 executable="$app_dir/Contents/MacOS/Sleep Switch"
+project_file="$script_dir/SleepSwitch.xcodeproj/project.pbxproj"
+
+for source_file in "$script_dir/Sources/SleepSwitch/"*.swift; do
+  source_name="${source_file:t}"
+  if ! grep -Fq "$source_name in Sources" "$project_file"; then
+    echo "The Xcode project is stale and does not compile $source_name."
+    echo "Run: xcodegen generate --spec project.yml"
+    exit 1
+  fi
+done
 
 xcodebuild \
   -quiet \
@@ -17,10 +27,16 @@ xcodebuild \
 
 test -x "$executable"
 
-if strings "$executable" | grep -Eq '/bin/ps|/usr/bin/pmset|displaysleepnow'; then
+executable_strings="$(strings -a "$executable")"
+if grep -Eq \
+  '/bin/ps|/usr/bin/pmset|displaysleepnow|AppleSMC|fanhelper|FNum|F0Tg|Ftst|Cooling helper|Cooling Diagnostics' \
+  <<<"$executable_strings"; then
   echo "App Store build contains a sandbox-incompatible command."
   exit 1
 fi
+
+test ! -e "$app_dir/Contents/Resources/SleepSwitchFanHelper"
+test ! -d "$app_dir/Contents/Library/LaunchDaemons"
 
 test "$(plutil -extract CFBundleIdentifier raw "$app_dir/Contents/Info.plist")" = \
   "lt.mantas.sleepswitch"

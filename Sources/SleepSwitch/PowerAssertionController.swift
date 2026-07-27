@@ -164,10 +164,15 @@ enum LidClosedSleepError: Error, LocalizedError {
         case .commandFailed:
             return "Normal sleep remains enabled. Try again, or quit and reopen Sleep Switch if this keeps happening."
         case .stateChangeTimedOut(let disabled):
+#if APP_STORE
+            _ = disabled
+            return nil
+#else
             if disabled {
                 return "Sleep Switch stopped the attempt and asked macOS to restore normal sleep."
             }
             return "Run “sudo pmset disablesleep 0” in Terminal to restore normal sleep."
+#endif
         case .restorationInProgress:
             return "Wait a moment before enabling lid-closed mode again."
         case .unavailable, .commandLaunch, .stateUnavailable, .markerCreationFailed:

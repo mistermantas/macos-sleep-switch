@@ -29,7 +29,7 @@ test -x "$executable"
 
 executable_strings="$(strings -a "$executable")"
 if grep -Eq \
-  '/bin/ps|/usr/bin/pmset|displaysleepnow|AppleSMC|fanhelper|FNum|F0Tg|Ftst|Cooling helper|Cooling Diagnostics' \
+  '/bin/ps|/usr/bin/pmset|pmset disablesleep|displaysleepnow|AppleSMC|fanhelper|FNum|F0Tg|Ftst|Cooling helper|Cooling Diagnostics' \
   <<<"$executable_strings"; then
   echo "App Store build contains a sandbox-incompatible command."
   exit 1

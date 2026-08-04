@@ -108,12 +108,12 @@ final class FanLeaseManager {
 
             let token = UUID()
             let demand = profile == .maximum ? 1 : 0.5
-            let expiresAt = now().addingTimeInterval(leaseDuration)
 
             do {
                 try backend.setRecoveryMarker(active: true)
                 restorationRequired = true
                 try backend.applyCoolingDemand(demand)
+                let expiresAt = now().addingTimeInterval(leaseDuration)
                 lease = Lease(
                     token: token,
                     connectionID: connectionID,

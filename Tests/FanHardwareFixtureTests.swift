@@ -9,8 +9,15 @@ enum FanHardwareFixtureTests {
             "expects both Mac16,7 fans"
         )
         expect(
-            fixture.qualification == .monitoringOnly,
-            "does not write fans before hardware qualification"
+            fixture.qualification == .adaptiveQualified,
+            "qualifies both cooling profiles on the verified Mac16,7 fixture"
+        )
+        expect(
+            fixture.qualifiedRPMBounds == [
+                .init(minimum: 1_350, maximum: 5_777),
+                .init(minimum: 1_350, maximum: 5_777)
+            ],
+            "pins writes to the measured Mac16,7 fan bounds"
         )
         expect(
             fixture.cpuTemperatureKeys.contains("Tp01")

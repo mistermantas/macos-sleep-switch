@@ -15,6 +15,7 @@
 		4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */; };
 		5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C543EF1E4134BFDE371CDA /* AppDistribution.swift */; };
 		606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */; };
+		657C4AB0D22BAB6F2DD23DF0 /* CoolingHelperMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */; };
 		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
 		75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */; };
 		7F5038F0F50B74DDEA53576C /* CoolingDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */; };
@@ -30,6 +31,7 @@
 
 /* Begin PBXFileReference section */
 		04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDirectoryAccess.swift; sourceTree = "<group>"; };
+		05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingHelperMaintenance.swift; sourceTree = "<group>"; };
 		09C8FEC6CC81B7403F577C86 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
 		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
@@ -73,6 +75,7 @@
 				27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */,
 				D49B9470119D7821941D59F0 /* CoolingDetailsWindowController.swift */,
 				3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */,
+				05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */,
 				4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */,
 				B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */,
 				6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */,
@@ -183,6 +186,7 @@
 				C24E65C8BC13D90C4597D682 /* CoolingCoordinator.swift in Sources */,
 				8844ABF61756CBAFD0666878 /* CoolingDetailsWindowController.swift in Sources */,
 				7F5038F0F50B74DDEA53576C /* CoolingDiagnostics.swift in Sources */,
+				657C4AB0D22BAB6F2DD23DF0 /* CoolingHelperMaintenance.swift in Sources */,
 				88F8BF9E74992CFE3275EF6D /* CoolingPolicy.swift in Sources */,
 				4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */,
 				2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */,
@@ -204,7 +208,7 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -213,7 +217,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.0;
+				MARKETING_VERSION = 1.9.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
 				PRODUCT_NAME = "Sleep Switch";
@@ -348,7 +352,7 @@
 				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -357,7 +361,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.7.0;
+				MARKETING_VERSION = 1.9.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library";
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch;
 				PRODUCT_NAME = "Sleep Switch";

@@ -468,6 +468,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 supportMenu.addItem(item)
             }
         }
+
+        supportMenu.addItem(.separator())
+        let versionItem = NSMenuItem(
+            title: AppLinks.currentVersionTitle,
+            action: nil,
+            keyEquivalent: ""
+        )
+        versionItem.isEnabled = false
+        versionItem.image = NSImage(
+            systemSymbolName: "info.circle",
+            accessibilityDescription: AppLinks.currentVersionTitle
+        )
+        supportMenu.addItem(versionItem)
     }
 
     private func configureDefaultDurationMenu() {
@@ -1583,6 +1596,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 @MainActor
 struct SleepSwitchApplication {
     static func main() {
+#if !APP_STORE
+        if CommandLine.arguments.contains(
+            CoolingHelperMaintenance.refreshArgument
+        ) {
+            let app = NSApplication.shared
+            let delegate = CoolingHelperMaintenance()
+            app.delegate = delegate
+            app.setActivationPolicy(.prohibited)
+            app.run()
+            exit(Int32(delegate.exitCode))
+        }
+#endif
+
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate

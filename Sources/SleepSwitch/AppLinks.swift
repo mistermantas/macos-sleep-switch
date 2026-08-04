@@ -10,6 +10,25 @@ enum AppLinks {
     static let menuTitle = "Support & Creator"
     static let menuSymbolName = "heart"
 
+    static var currentVersionTitle: String {
+        versionTitle(
+            version: Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleShortVersionString"
+            ) as? String,
+            build: Bundle.main.object(
+                forInfoDictionaryKey: "CFBundleVersion"
+            ) as? String
+        )
+    }
+
+    static func versionTitle(version: String?, build: String?) -> String {
+        let version = version.flatMap { $0.isEmpty ? nil : $0 } ?? "Unknown"
+        guard let build, !build.isEmpty else {
+            return "Version \(version)"
+        }
+        return "Version \(version) (\(build))"
+    }
+
     static let uncascadeWebsite = AppLink(
         title: "Uncascade Website",
         url: URL(string: "https://www.uncascade.com/")!,

@@ -4,6 +4,7 @@ enum FanLeaseManagerTests {
     static func run() {
         testUnqualifiedHardwareNeverWrites()
         testLeaseLifecycle()
+        testLeaseStartsAfterHardwareVerification()
         testExpiryRestores()
         testDisconnectSleepAndWakeRestore()
         testFailureRestores()
@@ -101,6 +102,44 @@ enum FanLeaseManagerTests {
         expect(
             manager.status().snapshot.state == .systemControl,
             "invalidates the expired lease"
+        )
+    }
+
+    private static func testLeaseStartsAfterHardwareVerification() {
+        var time = Date(timeIntervalSince1970: 1_500)
+        let backend = FakeFanHardware(qualification: .maximumQualified)
+        backend.onApply = {
+            time.addTimeInterval(9)
+        }
+        let manager = FanLeaseManager(
+            backend: backend,
+            leaseDuration: 10,
+            now: { time }
+        )
+        let begin = manager.beginLease(
+            connectionID: UUID(),
+            profileRawValue: FanHelperRequestedProfile.maximum.rawValue
+        )
+
+        expect(begin.succeeded, "starts cooling after a slow hardware ramp")
+        expect(
+            begin.snapshot.leaseExpiresAt
+                == Date(timeIntervalSince1970: 1_519),
+            "starts the watchdog lease after hardware verification completes"
+        )
+
+        time.addTimeInterval(9)
+        manager.expireIfNeeded()
+        expect(
+            manager.status().snapshot.state == .cooling,
+            "keeps the verified lease for its full duration"
+        )
+
+        time.addTimeInterval(2)
+        manager.expireIfNeeded()
+        expect(
+            manager.status().snapshot.state == .systemControl,
+            "restores after the post-verification lease duration"
         )
     }
 
@@ -427,6 +466,7 @@ private final class FakeFanHardware: FanHardwareControlling {
     var restoreError: FanHardwareError?
     var snapshotError: FanHardwareError?
     var systemControlVerifiedOverride: Bool?
+    var onApply: (() -> Void)?
 
     init(qualification: FanControlQualification) {
         self.qualification = qualification
@@ -483,6 +523,7 @@ private final class FakeFanHardware: FanHardwareControlling {
         if let applyError {
             throw applyError
         }
+        onApply?()
         appliedDemands.append(demand)
     }
 

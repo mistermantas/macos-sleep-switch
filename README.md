@@ -37,7 +37,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Manual Duration** | Starts a manual session indefinitely, for a preset time, or for a custom time. |
 | **Settings** | Opens the behavior and startup preferences described below. |
 | **Refresh Agents / Refresh Codex** | Checks for session changes immediately instead of waiting for the next automatic refresh. |
-| **Support & Creator** | Opens the Uncascade website and YouTube channel, this repository, or GitHub Sponsors. |
+| **Support & Creator** | Opens the Uncascade website and YouTube channel, this repository, or GitHub Sponsors, and shows the installed version and build. |
 | **Quit Sleep Switch** | Stops Sleep Switch, releases its power assertions, and restores normal lid sleep if the lid-closed mode was active. |
 
 ### Settings

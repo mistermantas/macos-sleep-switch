@@ -4,6 +4,9 @@ enum FanHardwareControllerTests {
     static func run() {
         testExternalControllerMatching()
         testQualifiedApplyAndRestore()
+        testModeKeyFallback()
+        testSystemTargetReboundRestores()
+        testDelayedSystemReclaimRestores()
         testOwnedFansRestoreEvenIfMarkerDisappears()
         testUnexpectedTargetChangeLosesOwnership()
         testMissingTemperatureNeverWrites()
@@ -84,9 +87,133 @@ enum FanHardwareControllerTests {
         }
     }
 
+    private static func testModeKeyFallback() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "sleep-switch-fan-mode-key-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let marker = root.appendingPathComponent("lease")
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let smc = FakeSMCController()
+        smc.useUppercaseModeKeys()
+        let controller = FanHardwareController(
+            smc: smc,
+            fixture: qualifiedFixture(),
+            recoveryMarkerURL: marker,
+            externalControllerDetector: { false },
+            sleep: { _ in }
+        )
+
+        do {
+            try controller.setRecoveryMarker(active: true)
+            try controller.applyCoolingDemand(1)
+            expect(
+                smc.writtenKeys.contains("F0Md")
+                    && smc.writtenKeys.contains("F1Md"),
+                "falls back to the writable uppercase M4 mode keys"
+            )
+            try controller.restoreSystemControl()
+            expect(
+                smc.value("F0Md") == 0
+                    && smc.value("F1Md") == 0,
+                "restores the discovered uppercase mode keys"
+            )
+        } catch {
+            fatalError("Test failed: mode-key fallback returned \(error)")
+        }
+    }
+
+    private static func testSystemTargetReboundRestores() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "sleep-switch-fan-target-rebound-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let marker = root.appendingPathComponent("lease")
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let smc = FakeSMCController()
+        let controller = FanHardwareController(
+            smc: smc,
+            fixture: qualifiedFixture(),
+            recoveryMarkerURL: marker,
+            externalControllerDetector: { false },
+            sleep: { _ in }
+        )
+
+        do {
+            try controller.setRecoveryMarker(active: true)
+            try controller.applyCoolingDemand(1)
+            smc.reboundsTargetAfterAutomaticRestore = true
+            try controller.restoreSystemControl()
+            expect(
+                smc.value("F0Tg") == smc.value("F0Mn")
+                    && smc.value("F1Tg") == smc.value("F1Mn"),
+                "accepts macOS replacing zero with its automatic idle targets"
+            )
+        } catch {
+            fatalError(
+                "Test failed: automatic target rebound returned \(error)"
+            )
+        }
+    }
+
+    private static func testDelayedSystemReclaimRestores() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "sleep-switch-fan-delayed-restore-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let marker = root.appendingPathComponent("lease")
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var time = Date(timeIntervalSince1970: 10_000)
+        let smc = FakeSMCController()
+        let controller = FanHardwareController(
+            smc: smc,
+            fixture: qualifiedFixture(),
+            recoveryMarkerURL: marker,
+            externalControllerDetector: { false },
+            sleep: { interval in
+                time.addTimeInterval(interval)
+                smc.completePendingAutomaticModes()
+            },
+            now: { time }
+        )
+
+        do {
+            try controller.setRecoveryMarker(active: true)
+            try controller.applyCoolingDemand(1)
+            smc.delaysAutomaticMode = true
+            smc.delaysFtstClear = true
+            smc.setFtst(1)
+            try controller.restoreSystemControl()
+            expect(
+                smc.value("F0md") == 0
+                    && smc.value("F1md") == 0,
+                "waits for macOS to reclaim both fan modes"
+            )
+        } catch {
+            fatalError(
+                "Test failed: delayed system reclaim returned \(error)"
+            )
+        }
+    }
+
     private static func testMonitoringOnlyNeverWrites() {
         let smc = FakeSMCController()
-        let fixture = FanHardwareFixture.fixture(for: "Mac16,7")
+        let fixture = FanHardwareFixture.fixture(for: "Mac99,99")
         let marker = FileManager.default.temporaryDirectory.appendingPathComponent(
             "sleep-switch-monitoring-only-\(UUID().uuidString)"
         )
@@ -298,6 +425,11 @@ enum FanHardwareControllerTests {
 private final class FakeSMCController: SMCControlling {
     private var values: [String: SMCReadValue] = [:]
     private(set) var writtenKeys: [String] = []
+    var reboundsTargetAfterAutomaticRestore = false
+    var delaysAutomaticMode = false
+    var delaysFtstClear = false
+    private var pendingAutomaticModeKeys: Set<String> = []
+    private var pendingFtstClear = false
 
     init() {
         values = [
@@ -328,6 +460,16 @@ private final class FakeSMCController: SMCControlling {
             throw FanHardwareError.writeFailed
         }
         writtenKeys.append(key)
+        if delaysAutomaticMode,
+           (key.hasSuffix("md") || key.hasSuffix("Md")),
+           bytes.first == 0 {
+            pendingAutomaticModeKeys.insert(key)
+            return
+        }
+        if delaysFtstClear, key == "Ftst", bytes.first == 0 {
+            pendingFtstClear = true
+            return
+        }
         values[key] = SMCReadValue(
             key: key,
             dataType: existing.dataType,
@@ -337,7 +479,20 @@ private final class FakeSMCController: SMCControlling {
         if key.hasSuffix("Tg"), let target = values[key]?.doubleValue {
             let fanIndex = String(key.dropFirst().prefix(1))
             let actualKey = "F\(fanIndex)Ac"
-            values[actualKey] = floatSMCValue(actualKey, Float(target))
+            if reboundsTargetAfterAutomaticRestore,
+               target == 0,
+               let minimum = values["F\(fanIndex)Mn"]?.doubleValue {
+                values[key] = floatSMCValue(key, Float(minimum))
+                values[actualKey] = floatSMCValue(
+                    actualKey,
+                    Float(minimum)
+                )
+            } else {
+                values[actualKey] = floatSMCValue(
+                    actualKey,
+                    Float(target)
+                )
+            }
         }
     }
 
@@ -356,6 +511,38 @@ private final class FakeSMCController: SMCControlling {
 
     func removeValue(_ key: String) {
         values.removeValue(forKey: key)
+    }
+
+    func useUppercaseModeKeys() {
+        for index in 0..<2 {
+            let lowercase = "F\(index)md"
+            let uppercase = "F\(index)Md"
+            values[uppercase] = values.removeValue(forKey: lowercase)
+        }
+    }
+
+    func setFtst(_ value: UInt8) {
+        values["Ftst"] = smcValue("Ftst", "ui8 ", [value])
+    }
+
+    func completePendingAutomaticModes() {
+        for key in pendingAutomaticModeKeys {
+            guard let existing = values[key], !existing.bytes.isEmpty else {
+                continue
+            }
+            var bytes = existing.bytes
+            bytes[0] = 0
+            values[key] = SMCReadValue(
+                key: key,
+                dataType: existing.dataType,
+                bytes: bytes
+            )
+        }
+        pendingAutomaticModeKeys.removeAll()
+        if pendingFtstClear {
+            setFtst(0)
+            pendingFtstClear = false
+        }
     }
 
     private func smcValue(

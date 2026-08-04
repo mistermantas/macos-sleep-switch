@@ -109,12 +109,18 @@ struct FanHardwareFixture: Equatable {
             auxiliaryTemperatureKeys: ["Tm0p", "Tm1p", "Tm2p"],
             expectedFanCount: 2,
             modeKeyStyle: .lowercase,
-            qualifiedRPMBounds: [],
+            // Qualified on physical Mac16,7 hardware running macOS 26.5.2.
+            // The controller still requires these exact bounds at runtime
+            // before it will write either fan.
+            qualifiedRPMBounds: [
+                .init(minimum: 1_350, maximum: 5_777),
+                .init(minimum: 1_350, maximum: 5_777)
+            ],
             requiresFtstUnlock: true,
             actualRPMTolerance: 250,
             spinUpTimeout: 30,
             minimumValidCPUReadings: 2,
-            qualification: .monitoringOnly
+            qualification: .adaptiveQualified
         )
     ]
 

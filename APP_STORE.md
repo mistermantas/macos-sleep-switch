@@ -105,13 +105,16 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 ## Submission status
 
-- Version 1.7.0 (build 10) was uploaded to App Store Connect on July 27, 2026,
+- Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
+- Build 11 is selected on the macOS version record, and the App Review Notes
+  answer Apple's seven Guideline 2.1 information requests.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
 - The privacy policy URL and **Data Not Collected** disclosure are published.
-- App Store Connect still requires the reviewer contact phone number before the
-  version metadata can be saved.
+- App Store Connect is ready for **Update Review** after the requested physical-
+  device screen recording is attached to the reviewer reply.
 
-After processing finishes, create or select macOS version 1.7.0, choose build
-10, complete any remaining reviewer contact fields, and submit it for review.
+Record the sandboxed TestFlight build, show **Support & Creator → Version
+1.8.0 (11)**, attach the recording in the review conversation, then choose
+**Update Review** to resubmit.

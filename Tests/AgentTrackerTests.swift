@@ -348,6 +348,18 @@ struct AgentTrackerTests {
             "keeps other agent detections unchanged"
         )
 
+        let desktopOnlyAgents = AgentTracker(
+            codexSessionTracker: tracker
+        ).applyingCodexSessionActivity(
+            to: [anotherAgent]
+        )
+        expect(
+            desktopOnlyAgents.first?.definition.id == "codex"
+                && desktopOnlyAgents.first?.processCount == 2
+                && desktopOnlyAgents.dropFirst().first == anotherAgent,
+            "detects active Codex Desktop sessions without a CLI process"
+        )
+
         let completedTracker = CodexSessionTracker(
             sessionsDirectory: completedOnlySessions,
             activeFileWindow: 3_600,
@@ -693,6 +705,11 @@ struct AgentTrackerTests {
         expect(
             AppLinks.menuSymbolName == "heart",
             "uses a heart for the support menu"
+        )
+        expect(
+            AppLinks.versionTitle(version: "1.9.0", build: "12")
+                == "Version 1.9.0 (12)",
+            "shows the reviewable app version and build"
         )
         expect(links.count == 4, "keeps the support menu concise")
         expect(

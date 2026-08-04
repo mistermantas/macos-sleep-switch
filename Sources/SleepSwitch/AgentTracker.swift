@@ -320,8 +320,12 @@ struct AgentTracker {
     func applyingCodexSessionActivity(
         to processAgents: [DetectedAgent]
     ) -> [DetectedAgent] {
-        guard processAgents.contains(where: { $0.definition.id == "codex" }),
-              let activeSessionCount = codexSessionTracker.scan() else {
+        // Codex Desktop keeps its task work in the session log while its
+        // long-lived `app-server` process is deliberately excluded from the
+        // generic process detector. Do not require a separate `codex` CLI
+        // process before consulting the session tracker, or Desktop tasks
+        // will always appear idle.
+        guard let activeSessionCount = codexSessionTracker.scan() else {
             return processAgents
         }
 

@@ -12,6 +12,7 @@ final class FanHardwareController: FanHardwareControlling {
     private let sleep: (TimeInterval) -> Void
     private let now: () -> Date
     private var lastAppliedDemand: Double?
+    private var activeModeKeys: [Int: String] = [:]
 
     init(
         smc: SMCControlling,
@@ -85,11 +86,9 @@ final class FanHardwareController: FanHardwareControlling {
             }
         }
 
-        let systemControlVerified = telemetry.fans.isEmpty
-            || telemetry.fans.allSatisfy {
-                guard let mode = $0.mode else { return false }
-                return mode == 0 || mode == 3
-            }
+        let systemControlVerified = systemControlIsVerified(
+            fanCount: telemetry.fans.count
+        )
 
         return FanHelperSnapshot(
             model: model,
@@ -106,7 +105,7 @@ final class FanHardwareController: FanHardwareControlling {
                     minimumRPM: $0.minimumRPM,
                     maximumRPM: $0.maximumRPM,
                     targetRPM: $0.targetRPM,
-                    mode: $0.mode
+                    mode: try? readMode(forFan: $0.index)
                 )
             },
             verifiedDemand: verifiedDemand,
@@ -182,26 +181,34 @@ final class FanHardwareController: FanHardwareControlling {
         var encounteredFailure = false
         for index in 0..<count {
             do {
-                try setMode(0, forFan: index)
+                try requestAutomaticMode(forFan: index)
             } catch {
                 encounteredFailure = true
             }
-            do {
-                try writeRPM(0, key: "F\(index)Tg")
-            } catch {
-                encounteredFailure = true
-            }
+            // Once the mode is automatic/system, macOS owns the target. Some
+            // Apple Silicon Macs immediately replace a zero target with their
+            // current idle target, so target equality is not a restoration
+            // invariant.
+            try? writeRPM(0, key: "F\(index)Tg")
         }
 
         if fixture.requiresFtstUnlock {
-            do {
-                try writeFirstByte(0, key: "Ftst")
-            } catch {
-                encounteredFailure = true
-            }
+            try? writeFirstByte(0, key: "Ftst")
         }
 
-        guard !encounteredFailure, systemControlIsVerified(fanCount: count) else {
+        // M3/M4 firmware can ignore the first automatic-mode request while
+        // Ftst is still active. Retry once after clearing Ftst, then keep
+        // retrying during the bounded verification window.
+        for index in 0..<count {
+            try? requestAutomaticMode(forFan: index)
+        }
+
+        guard !encounteredFailure,
+              waitForSystemControl(
+                  fanCount: count,
+                  timeout: min(12, fixture.spinUpTimeout)
+              )
+        else {
             throw FanHardwareError.restoreFailed
         }
         lastAppliedDemand = nil
@@ -254,14 +261,20 @@ final class FanHardwareController: FanHardwareControlling {
     }
 
     private func setManualMode(forFan index: Int) throws {
-        do {
-            try setMode(1, forFan: index)
-            if try readMode(forFan: index) == 1 {
-                return
-            }
-        } catch {
-            guard fixture.requiresFtstUnlock else {
-                throw FanHardwareError.writeFailed
+        let candidates = modeKeyCandidates(forFan: index)
+        guard !candidates.isEmpty else {
+            throw FanHardwareError.writeFailed
+        }
+
+        for key in candidates {
+            do {
+                try writeMode(1, key: key)
+                if try readMode(forKey: key) == 1 {
+                    activeModeKeys[index] = key
+                    return
+                }
+            } catch {
+                continue
             }
         }
 
@@ -275,14 +288,35 @@ final class FanHardwareController: FanHardwareControlling {
             min(30, fixture.spinUpTimeout)
         )
         repeat {
-            try? setMode(1, forFan: index)
-            if (try? readMode(forFan: index)) == 1 {
-                return
+            for key in candidates {
+                try? writeMode(1, key: key)
+                if (try? readMode(forKey: key)) == 1 {
+                    activeModeKeys[index] = key
+                    return
+                }
             }
             sleep(0.1)
         } while now() < deadline
 
         throw FanHardwareError.writeFailed
+    }
+
+    private func requestAutomaticMode(forFan index: Int) throws {
+        let candidates = modeKeyCandidates(forFan: index)
+        var foundModeKey = false
+
+        for key in candidates {
+            guard (try? readMode(forKey: key)) != nil else {
+                continue
+            }
+            foundModeKey = true
+            try? writeMode(0, key: key)
+        }
+
+        activeModeKeys.removeValue(forKey: index)
+        guard foundModeKey else {
+            throw FanHardwareError.restoreFailed
+        }
     }
 
     private func waitForAppliedDemand(
@@ -299,7 +333,7 @@ final class FanHardwareController: FanHardwareControlling {
                 fan, bounds in
                 let expected = bounds.minimum
                     + demand * (bounds.maximum - bounds.minimum)
-                guard fan.mode == 1,
+                guard (try? readMode(forFan: fan.index)) == 1,
                       let target = fan.targetRPM
                 else {
                     return false
@@ -318,7 +352,9 @@ final class FanHardwareController: FanHardwareControlling {
     private func ownershipIsIntact(_ fans: [FanTelemetry]) -> Bool {
         guard let previousDemand = lastAppliedDemand else {
             return fans.allSatisfy {
-                guard let mode = $0.mode else { return false }
+                guard let mode = try? readMode(forFan: $0.index) else {
+                    return false
+                }
                 return mode == 0 || mode == 3
             }
         }
@@ -327,7 +363,7 @@ final class FanHardwareController: FanHardwareControlling {
             fan, bounds in
             let expected = bounds.minimum
                 + previousDemand * (bounds.maximum - bounds.minimum)
-            guard fan.mode == 1,
+            guard (try? readMode(forFan: fan.index)) == 1,
                   let target = fan.targetRPM
             else {
                 return false
@@ -340,53 +376,99 @@ final class FanHardwareController: FanHardwareControlling {
 
     private func systemControlIsVerified(fanCount: Int) -> Bool {
         for index in 0..<fanCount {
-            guard let mode = try? readMode(forFan: index),
-                  mode == 0 || mode == 3,
-                  let target = try? smc.readValue(
-                    forKey: "F\(index)Tg"
-                  )?.doubleValue,
-                  abs(target) <= 5
+            let modes = modeKeyCandidates(forFan: index).compactMap {
+                try? readMode(forKey: $0)
+            }
+            guard !modes.isEmpty,
+                  modes.allSatisfy({ $0 == 0 || $0 == 3 })
             else {
                 return false
             }
         }
 
         if fixture.requiresFtstUnlock {
-            guard let ftst = try? smc.readValue(forKey: "Ftst")?.doubleValue,
-                  ftst == 0
-            else {
+            guard readIntegerValue(forKey: "Ftst") == 0 else {
                 return false
             }
         }
         return true
     }
 
-    private func setMode(_ mode: UInt8, forFan index: Int) throws {
-        try writeFirstByte(mode, key: modeKey(forFan: index))
+    private func waitForSystemControl(
+        fanCount: Int,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = now().addingTimeInterval(timeout)
+        repeat {
+            if systemControlIsVerified(fanCount: fanCount) {
+                return true
+            }
+            for index in 0..<fanCount {
+                try? requestAutomaticMode(forFan: index)
+                try? writeRPM(0, key: "F\(index)Tg")
+            }
+            sleep(0.1)
+        } while now() < deadline
+        return false
+    }
+
+    private func writeMode(_ mode: UInt8, key: String) throws {
+        try writeFirstByte(mode, key: key)
     }
 
     private func readMode(forFan index: Int) throws -> Int {
-        guard let mode = try smc.readValue(
-            forKey: modeKey(forFan: index)
-        )?.doubleValue,
-        mode.isFinite,
-        mode.rounded() == mode,
-        (0...255).contains(mode)
-        else {
+        if let activeKey = activeModeKeys[index] {
+            return try readMode(forKey: activeKey)
+        }
+
+        var firstMode: (key: String, value: Int)?
+        for key in modeKeyCandidates(forFan: index) {
+            guard let mode = try? readMode(forKey: key) else {
+                continue
+            }
+            if mode == 1 {
+                activeModeKeys[index] = key
+                return mode
+            }
+            if firstMode == nil {
+                firstMode = (key, mode)
+            }
+        }
+        guard let firstMode else {
             throw FanHardwareError.invalidTelemetry
         }
-        return Int(mode)
+        return firstMode.value
     }
 
-    private func modeKey(forFan index: Int) -> String {
-        switch fixture.modeKeyStyle {
-        case .lowercase:
-            return "F\(index)md"
-        case .uppercase:
-            return "F\(index)Md"
-        case nil:
-            return "F\(index)??"
+    private func readMode(forKey key: String) throws -> Int {
+        guard let mode = readIntegerValue(forKey: key) else {
+            throw FanHardwareError.invalidTelemetry
         }
+        return mode
+    }
+
+    private func modeKeyCandidates(forFan index: Int) -> [String] {
+        let lowercase = "F\(index)md"
+        let uppercase = "F\(index)Md"
+        return switch fixture.modeKeyStyle {
+        case .lowercase:
+            [lowercase, uppercase]
+        case .uppercase:
+            [uppercase, lowercase]
+        case nil:
+            []
+        }
+    }
+
+    private func readIntegerValue(forKey key: String) -> Int? {
+        guard let value = try? smc.readValue(forKey: key)?.doubleValue,
+              value.isFinite,
+              value.rounded() == value,
+              (0...255).contains(value)
+        else {
+            return nil
+        }
+        return Int(value)
     }
 
     private func writeFirstByte(_ byte: UInt8, key: String) throws {

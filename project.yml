@@ -3,6 +3,7 @@ name: SleepSwitch
 options:
   deploymentTarget:
     macOS: "13.0"
+    iOS: "17.0"
 
 settings:
   base:
@@ -25,22 +26,50 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AppStore/SleepSwitch.entitlements
         CODE_SIGN_STYLE: Automatic
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 12
+        CURRENT_PROJECT_VERSION: 13
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: AppStore/Info.plist
-        MARKETING_VERSION: 1.9.0
+        MARKETING_VERSION: 2.0.0
+        OTHER_LDFLAGS: "-lsqlite3"
         OTHER_SWIFT_FLAGS: "$(inherited) -parse-as-library"
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch
         PRODUCT_NAME: Sleep Switch
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APP_STORE"
+
+  SleepSwitchCompanion:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/SleepSwitchCompanion
+      - path: Sources/SleepSwitch/CompanionProtocol.swift
+      - path: Sources/SleepSwitch/InsightsModels.swift
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 13
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Companion/Info.plist
+        MARKETING_VERSION: 2.0.0
+        PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion
+        PRODUCT_NAME: Sleep Switch
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
 
 schemes:
   SleepSwitch:
     build:
       targets:
         SleepSwitch: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+  SleepSwitchCompanion:
+    build:
+      targets:
+        SleepSwitchCompanion: all
     run:
       config: Debug
     archive:

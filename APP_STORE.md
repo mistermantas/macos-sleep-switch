@@ -78,6 +78,8 @@ Start a manual session indefinitely or choose a duration. The display can still 
 
 Sleep Switch lives entirely in the menu bar. It has no accounts, analytics, ads, tracking, or network service.
 
+Version 2.0 adds **Insights**, a local view of estimated energy use and coarse agent activity intervals. History is saved on the Mac by default, can be paused, and can be deleted at any time. The charts never include prompts, output, file names, command lines, or session paths.
+
 Free and open source.
 
 ### Keywords
@@ -91,6 +93,8 @@ Sleep Switch is a menu-bar-only utility. Launch the app and use the coffee-cup i
 Manual keep-awake sessions work immediately. To test Codex tracking, choose **Connect Codex…** and select a `.codex` folder containing a `sessions` directory. Sleep Switch reads recent Codex JSONL task markers locally and read-only. No information leaves the Mac.
 
 The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sleep and `IOPMAssertionDeclareUserActivity` for the optional one-shot display wake.
+
+For version 2.0.0, reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local Codex tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
 
 ## Assets
 
@@ -107,14 +111,16 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 - Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
-- Build 11 is selected on the macOS version record, and the App Review Notes
-  answer Apple's seven Guideline 2.1 information requests.
+- The v2.0.0 Mac candidate is build 13. It adds local Insights and bounded history;
+  the iOS companion source is a preview target and is not part of this Mac App
+  Store submission.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
 - The privacy policy URL and **Data Not Collected** disclosure are published.
 - App Store Connect is ready for **Update Review** after the requested physical-
   device screen recording is attached to the reviewer reply.
 
-Record the sandboxed TestFlight build, show **Support & Creator → Version
-1.8.0 (11)**, attach the recording in the review conversation, then choose
+For a v2 submission, record the sandboxed TestFlight build, show **Support &
+Creator → Version 2.0.0 (13)**, open **Insights…**, demonstrate the history
+toggle/delete flow, attach the recording in the review conversation, then choose
 **Update Review** to resubmit.

@@ -74,6 +74,17 @@ Sleep Switch checks local activity every ten seconds. Most harnesses are recogni
 
 Tracking is local-only. No process or session information leaves your Mac, and Sleep Switch does not install hooks or edit any agent’s configuration.
 
+## Insights
+
+Open **Insights…** from the menu to see two small, useful views:
+
+- **Energy** shows the live power estimate and five-minute history for the last 24 hours, 7 days, or 30 days. Source and confidence are shown beside the estimate; missing readings stay gaps instead of becoming fake zeroes.
+- **Agent activity** shows coarse running intervals for supported agents, including overnight work. It never stores prompts, output, file names, command lines, or session paths.
+
+Energy and agent history is saved locally by default so the charts survive a restart. Sampling is once per minute and storage is capped to five-minute energy buckets for 30 days plus agent transition records. Turn **Save energy and agent history** off at any time to keep only the in-memory live view, or use **Delete History…** to remove the local database.
+
+The Mac release has no analytics, account, or network service. The repository also contains an iOS companion preview (`SleepSwitchCompanion`) and its privacy-filtered CloudKit protocol. It is deliberately not advertised as live remote control until the iCloud container, entitlements, pairing UI, and physical-device review are provisioned.
+
 ## How it works
 
 In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-management assertions:
@@ -105,7 +116,7 @@ press **Copy Diagnostics**.
 
 When you choose a display action, Sleep Switch calls macOS’s built-in `pmset displaysleepnow`. This turns off only the display and does not alter any power setting. A queued agent-completion wake uses Apple’s `IOPMAssertionDeclareUserActivity` API.
 
-There are no analytics or network requests. The Mac App Store build contains no
+There are no analytics or network requests in the Mac app. The Mac App Store build contains no
 privileged service. The signed direct build installs the cooling helper only
 after the user selects cooling and approves it in macOS settings.
 
@@ -188,6 +199,18 @@ Run the test suite with:
 ./test.sh
 ./test-app-store.sh
 ./test-direct.sh
+```
+
+To build the companion preview in the simulator:
+
+```sh
+xcodegen generate
+xcodebuild -project SleepSwitch.xcodeproj \
+  -scheme SleepSwitchCompanion \
+  -sdk iphonesimulator \
+  -configuration Debug \
+  -derivedDataPath /tmp/SleepSwitch-companion-build \
+  CODE_SIGNING_ALLOWED=NO build
 ```
 
 ## License

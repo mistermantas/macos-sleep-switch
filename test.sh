@@ -34,7 +34,10 @@ xcrun swiftc \
   -parse-as-library \
   -framework AppKit \
   -framework IOKit \
+  -framework SwiftUI \
+  -framework Charts \
   -framework Security \
+  -lsqlite3 \
   "$script_dir/Sources/SleepSwitch/AgentTracker.swift" \
   "$script_dir/Sources/SleepSwitch/AppDistribution.swift" \
   "$script_dir/Sources/SleepSwitch/AppLinks.swift" \
@@ -44,6 +47,12 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/CoolingPolicy.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingTelemetry.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingDiagnostics.swift" \
+  "$script_dir/Sources/SleepSwitch/InsightsModels.swift" \
+  "$script_dir/Sources/SleepSwitch/EnergyTelemetry.swift" \
+  "$script_dir/Sources/SleepSwitch/HistoryStore.swift" \
+  "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
+  "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingCoordinator.swift" \
   "$script_dir/Sources/SleepSwitch/DisplayPowerController.swift" \
   "$script_dir/Sources/SleepSwitch/PowerAssertionController.swift" \
@@ -69,6 +78,8 @@ xcrun swiftc \
   "$script_dir/Tests/FanHelperSecurityTests.swift" \
   "$script_dir/Tests/CoolingCoordinatorTests.swift" \
   "$script_dir/Tests/CoolingDiagnosticsTests.swift" \
+  "$script_dir/Tests/InsightsHistoryTests.swift" \
+  "$script_dir/Tests/CompanionProtocolTests.swift" \
   -o "$test_binary"
 
 "$test_binary"

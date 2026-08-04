@@ -3,6 +3,7 @@ import Foundation
 
 @main
 struct AgentTrackerTests {
+    @MainActor
     static func main() {
         let fixture = """
           101 /opt/homebrew/bin/codex
@@ -113,6 +114,8 @@ struct AgentTrackerTests {
         FanHelperSecurityTests.run()
         CoolingCoordinatorTests.run()
         CoolingDiagnosticsTests.run()
+        InsightsHistoryTests.run()
+        CompanionProtocolTests.run()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
             let codexScanStartedAt = Date()
@@ -707,8 +710,8 @@ struct AgentTrackerTests {
             "uses a heart for the support menu"
         )
         expect(
-            AppLinks.versionTitle(version: "1.9.0", build: "12")
-                == "Version 1.9.0 (12)",
+            AppLinks.versionTitle(version: "2.0.0", build: "13")
+                == "Version 2.0.0 (13)",
             "shows the reviewable app version and build"
         )
         expect(links.count == 4, "keeps the support menu concise")

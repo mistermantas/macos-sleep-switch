@@ -35,9 +35,13 @@ for arch in arm64 x86_64; do
     -O \
     -parse-as-library \
     -target "$arch-apple-macos13.0" \
+    -framework AppKit \
     -framework IOKit \
+    -framework SwiftUI \
+    -framework Charts \
     -framework Security \
     -framework ServiceManagement \
+    -lsqlite3 \
     "$script_dir/Sources/SleepSwitch/"*.swift \
     "$script_dir/Sources/SleepSwitchFanProtocol/"*.swift \
     -o "$arch_dir/SleepSwitch-$arch"

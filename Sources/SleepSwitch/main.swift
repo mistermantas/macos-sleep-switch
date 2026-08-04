@@ -50,6 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: nil,
         keyEquivalent: ""
     )
+    private let insightsItem = NSMenuItem(
+        title: "Insights…",
+        action: #selector(showInsights),
+        keyEquivalent: ""
+    )
     private let settingsMenu = NSMenu(title: "Settings")
     private let supportMenu = NSMenu(title: AppLinks.menuTitle)
     private let keepDisplayAwakeItem = NSMenuItem(
@@ -66,6 +71,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let launchAtLoginItem = NSMenuItem(
         title: "Launch at Login",
         action: #selector(toggleLaunchAtLogin),
+        keyEquivalent: ""
+    )
+    private let saveHistoryItem = NSMenuItem(
+        title: "Save Energy & Agent History",
+        action: #selector(toggleHistorySaving),
+        keyEquivalent: ""
+    )
+    private let deleteHistoryItem = NSMenuItem(
+        title: "Delete History…",
+        action: #selector(deleteHistory),
         keyEquivalent: ""
     )
     private let codexFolderItem = NSMenuItem(
@@ -85,6 +100,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let powerAssertions = PowerAssertionController()
     private let lidClosedSleep = LidClosedSleepController()
     private let displayPower = DisplayPowerController()
+    private let insightsRecorder = InsightsRecorder()
+    private var insightsWindowController: InsightsWindowController?
 #if !APP_STORE
     private let fanHelperClient = FanHelperClient()
     private lazy var coolingCoordinator = CoolingCoordinator(
@@ -121,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         codexDirectoryAccess.restoreAccess()
 #endif
         configureMenu()
+        insightsRecorder.start()
         observeDisplayWake()
 #if !APP_STORE
         lidClosedSleep.onRestorationFailure = { [weak self] error in
@@ -162,6 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshTimer?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
+        insightsRecorder.stop()
         try? lidClosedSleep.stop()
 #if !APP_STORE
         coolingCoordinator.stop()
@@ -211,6 +230,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         automaticAgentAwakeItem.target = self
         sleepDisplayItem.target = self
         sleepUntilAgentsFinishItem.target = self
+        insightsItem.target = self
+        insightsItem.image = NSImage(
+            systemSymbolName: "chart.xyaxis.line",
+            accessibilityDescription: "Energy and agent insights"
+        )
 
         automaticAgentAwakeItem.image = NSImage(
             systemSymbolName: "terminal.fill",
@@ -304,6 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
+        menu.addItem(insightsItem)
 #if APP_STORE
         menu.addItem(sleepUntilAgentsFinishItem)
 #else
@@ -427,6 +452,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         activateOnLaunchItem.target = self
         launchAtLoginItem.target = self
         codexFolderItem.target = self
+        saveHistoryItem.target = self
+        deleteHistoryItem.target = self
+        saveHistoryItem.image = NSImage(
+            systemSymbolName: "internaldrive",
+            accessibilityDescription: "Save local history"
+        )
+        deleteHistoryItem.image = NSImage(
+            systemSymbolName: "trash",
+            accessibilityDescription: "Delete local history"
+        )
 
         let defaultDurationItem = NSMenuItem(
             title: "Default Duration",
@@ -443,6 +478,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsMenu.addItem(keepDisplayAwakeItem)
         settingsMenu.addItem(activateOnLaunchItem)
         settingsMenu.addItem(defaultDurationItem)
+        settingsMenu.addItem(saveHistoryItem)
+        settingsMenu.addItem(deleteHistoryItem)
         settingsMenu.addItem(.separator())
         settingsMenu.addItem(launchAtLoginItem)
     }
@@ -533,6 +570,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let latestAgents else { return }
 
         detectedAgents = latestAgents
+        insightsRecorder.recordAgents(latestAgents)
 #if !APP_STORE
         if detectedAgents.isEmpty,
            ProcessInfoThermalMonitor().currentLevel != .critical {
@@ -869,6 +907,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         automaticAgentAwakeItem.state = automaticAgentAwakeEnabled ? .on : .off
         keepDisplayAwakeItem.state = shouldKeepDisplayAwake ? .on : .off
         activateOnLaunchItem.state = defaults.bool(forKey: activateOnLaunchKey) ? .on : .off
+        saveHistoryItem.state = insightsRecorder.historyEnabled ? .on : .off
+        deleteHistoryItem.isEnabled = insightsRecorder.storageBytes > 0
 
         let selectedDefault = defaults.integer(forKey: defaultDurationSecondsKey)
         for item in defaultDurationMenu.items {
@@ -915,6 +955,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func sleepDisplayNow() {
         sleepDisplay(wakeWhenAgentsFinish: false)
+    }
+
+    @objc private func showInsights() {
+        if insightsWindowController == nil {
+            insightsWindowController = InsightsWindowController(
+                recorder: insightsRecorder
+            )
+        }
+        insightsWindowController?.show()
+    }
+
+    @objc private func toggleHistorySaving() {
+        insightsRecorder.setHistoryEnabled(!insightsRecorder.historyEnabled)
+        updateSettingsPresentation()
+    }
+
+    @objc private func deleteHistory() {
+        let alert = NSAlert()
+        alert.messageText = "Delete local history?"
+        alert.informativeText = "Energy buckets and agent activity intervals will be removed from this Mac."
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try insightsRecorder.deleteHistory()
+            updateSettingsPresentation()
+        } catch {
+            presentAssertionError(error)
+        }
     }
 
 #if APP_STORE

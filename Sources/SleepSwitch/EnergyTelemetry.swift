@@ -1,4 +1,5 @@
 import Foundation
+import IOKit
 import IOKit.ps
 
 protocol PowerTelemetryProviding {
@@ -35,13 +36,23 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
         var watts: Double?
         var isCharging = false
 
-        if let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue()
-            as? [CFTypeRef],
-           let sourceHandle = sources.first,
-           let description = IOPSGetPowerSourceDescription(blob, sourceHandle)?
-                .takeUnretainedValue() as? [String: Any] {
+        if let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue(),
+           CFArrayGetCount(sources) > 0 {
+            let sourcePointer = CFArrayGetValueAtIndex(sources, 0)
+            let sourceHandle = unsafeBitCast(sourcePointer, to: CFTypeRef.self)
+            guard let description = IOPSGetPowerSourceDescription(blob, sourceHandle)?
+                .takeUnretainedValue() as? [String: Any] else {
+                return EnergyReading(
+                    recordedAt: date,
+                    watts: nil,
+                    source: source,
+                    confidence: .unavailable,
+                    batteryPercent: nil,
+                    isCharging: false
+                )
+            }
             let current = number(description[kIOPSCurrentKey])
-            let voltage = number(description[kIOPSVoltageKey])
+            let voltage = number(description[kIOPSVoltageKey]) ?? batteryVoltageMillivolts()
             // Some Macs expose the battery current/voltage description while
             // AC is providing the system. Keep the source label as AC, but
             // retain the reading as an estimate rather than pretending it is
@@ -62,6 +73,15 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
                 batteryPercent = max(0, min(100, currentCapacity / maxCapacity * 100))
             }
             isCharging = (description[kIOPSIsChargingKey] as? Bool) == true
+        } else if source == .battery {
+            return EnergyReading(
+                recordedAt: date,
+                watts: nil,
+                source: source,
+                confidence: .unavailable,
+                batteryPercent: nil,
+                isCharging: false
+            )
         }
 
         return EnergyReading(
@@ -79,6 +99,24 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
         if let value = value as? Double { return value }
         if let value = value as? Int { return Double(value) }
         return nil
+    }
+
+    private func batteryVoltageMillivolts() -> Double? {
+        let matching = IOServiceMatching("AppleSmartBattery")
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, matching)
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+
+        let key = ("Voltage" as NSString) as CFString
+        guard let value = IORegistryEntryCreateCFProperty(
+            service,
+            key,
+            kCFAllocatorDefault,
+            0
+        )?.takeRetainedValue() else {
+            return nil
+        }
+        return number(value)
     }
 }
 

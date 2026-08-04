@@ -111,7 +111,7 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 - Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
-- The v2.0.0 Mac candidate is build 13. It adds local Insights and bounded history;
+- The v2.0.0 Mac candidate is build 14. It adds local Insights and bounded history;
   the iOS companion source is a preview target and is not part of this Mac App
   Store submission.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
@@ -121,6 +121,6 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
   device screen recording is attached to the reviewer reply.
 
 For a v2 submission, record the sandboxed TestFlight build, show **Support &
-Creator → Version 2.0.0 (13)**, open **Insights…**, demonstrate the history
+Creator → Version 2.0.0 (14)**, open **Insights…**, demonstrate the history
 toggle/delete flow, attach the recording in the review conversation, then choose
 **Update Review** to resubmit.

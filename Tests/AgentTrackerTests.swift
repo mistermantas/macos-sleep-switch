@@ -710,8 +710,8 @@ struct AgentTrackerTests {
             "uses a heart for the support menu"
         )
         expect(
-            AppLinks.versionTitle(version: "2.0.0", build: "13")
-                == "Version 2.0.0 (13)",
+            AppLinks.versionTitle(version: "2.0.0", build: "14")
+                == "Version 2.0.0 (14)",
             "shows the reviewable app version and build"
         )
         expect(links.count == 4, "keeps the support menu concise")

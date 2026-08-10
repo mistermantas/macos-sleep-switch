@@ -55,14 +55,14 @@ The Mac App Store requires App Sandbox. A sandboxed app can use Apple’s public
 ## App Store Connect record
 
 - **Apple ID:** `6794709246`
-- **Name:** Sleep Switch for Mac AI Agents
+- **Name:** Sleep Switch for AI Agents
 - **Subtitle:** Keep long-running work awake
 - **Primary category:** Developer Tools
 - **Secondary category:** Utilities
 - **Price:** Free (`$0.00`)
 - **Bundle ID:** `lt.mantas.sleepswitch`
 - **SKU:** `sleep-switch-macos`
-- **Support URL:** `https://github.com/mistermantas/macos-sleep-switch/issues`
+- **Support URL:** `https://uncascade.com/contact/`
 - **Marketing URL:** `https://github.com/mistermantas/macos-sleep-switch`
 - **Privacy policy URL:** `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
 - **Copyright:** 2026 Mantas Vilčinskas
@@ -78,7 +78,7 @@ Start a manual session indefinitely or choose a duration. The display can still 
 
 Sleep Switch lives entirely in the menu bar. It has no accounts, analytics, ads, tracking, or network service.
 
-Version 2.0 adds **Insights**, a local view of estimated energy use and coarse agent activity intervals. History is saved on the Mac by default, can be paused, and can be deleted at any time. The charts never include prompts, output, file names, command lines, or session paths.
+Version 2.1 adds **Insights**, a local view of estimated energy use and coarse agent activity intervals. History is saved on the Mac by default, can be paused, and can be deleted at any time. The charts never include prompts, output, file names, command lines, or session paths.
 
 Free and open source.
 
@@ -94,7 +94,9 @@ Manual keep-awake sessions work immediately. To test Codex tracking, choose **Co
 
 The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sleep and `IOPMAssertionDeclareUserActivity` for the optional one-shot display wake.
 
-For version 2.0.0, reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local Codex tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
+For version 2.1.0 (build 15), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local Codex tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
+
+The **Support & Creator** menu in this App Store build contains no donation or sponsorship action. It links to the public bug/feedback form and Uncascade contact support. The app has no accounts, subscriptions, payments, or in-app purchases.
 
 ## Assets
 
@@ -111,7 +113,8 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 - Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
-- The v2.0.0 Mac candidate is build 14. It adds local Insights and bounded history;
+- The v2.1.0 Mac candidate is build 15. It adds the review fixes, local Insights,
+  and bounded history;
   the iOS companion source is a preview target and is not part of this Mac App
   Store submission.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
@@ -120,7 +123,7 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 - App Store Connect is ready for **Update Review** after the requested physical-
   device screen recording is attached to the reviewer reply.
 
-For a v2 submission, record the sandboxed TestFlight build, show **Support &
-Creator → Version 2.0.0 (14)**, open **Insights…**, demonstrate the history
+For a 2.1 submission, record the sandboxed TestFlight build, show **Support &
+Creator → Version 2.1.0 (15)**, open **Insights…**, demonstrate the history
 toggle/delete flow, attach the recording in the review conversation, then choose
-**Update Review** to resubmit.
+**Submit for Review** to resubmit.

@@ -710,8 +710,8 @@ struct AgentTrackerTests {
             "uses a heart for the support menu"
         )
         expect(
-            AppLinks.versionTitle(version: "2.0.0", build: "14")
-                == "Version 2.0.0 (14)",
+            AppLinks.versionTitle(version: "2.1.0", build: "15")
+                == "Version 2.1.0 (15)",
             "shows the reviewable app version and build"
         )
         expect(links.count == 4, "keeps the support menu concise")
@@ -730,14 +730,14 @@ struct AgentTrackerTests {
             "links to the Uncascade YouTube channel"
         )
         expect(
-            AppLinks.sourceCode.url.absoluteString
-                == "https://github.com/mistermantas/macos-sleep-switch",
-            "links to the Sleep Switch source"
+            AppLinks.reportFeedback.url.absoluteString
+                == "https://github.com/mistermantas/macos-sleep-switch/issues",
+            "links to the public bug and feedback form"
         )
         expect(
-            AppLinks.sponsor.url.absoluteString
-                == "https://github.com/sponsors/mistermantas",
-            "uses GitHub's canonical Sponsors URL"
+            AppLinks.contactUncascade.url.absoluteString
+                == "https://uncascade.com/contact/",
+            "links to a functional support page"
         )
     }
 

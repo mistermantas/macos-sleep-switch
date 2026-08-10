@@ -39,19 +39,19 @@ enum AppLinks {
         url: URL(string: "https://www.youtube.com/@uncascade")!,
         symbolName: "play.rectangle"
     )
-    static let sourceCode = AppLink(
-        title: "Sleep Switch on GitHub",
-        url: URL(string: "https://github.com/mistermantas/macos-sleep-switch")!,
-        symbolName: "chevron.left.forwardslash.chevron.right"
+    static let reportFeedback = AppLink(
+        title: "Report a Bug / Submit Feedback",
+        url: URL(string: "https://github.com/mistermantas/macos-sleep-switch/issues")!,
+        symbolName: "exclamationmark.bubble"
     )
-    static let sponsor = AppLink(
-        title: "Sponsor on GitHub",
-        url: URL(string: "https://github.com/sponsors/mistermantas")!,
-        symbolName: "heart"
+    static let contactUncascade = AppLink(
+        title: "Contact Uncascade",
+        url: URL(string: "https://uncascade.com/contact/")!,
+        symbolName: "envelope"
     )
 
     static let groups: [[AppLink]] = [
         [uncascadeWebsite, uncascadeYouTube],
-        [sourceCode, sponsor]
+        [reportFeedback, contactUncascade]
     ]
 }

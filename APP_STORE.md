@@ -65,7 +65,7 @@ The Mac App Store requires App Sandbox. A sandboxed app can use Apple’s public
 - **Support URL:** `https://uncascade.com/contact/`
 - **Marketing URL:** `https://github.com/mistermantas/macos-sleep-switch`
 - **Privacy policy URL:** `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
-- **Copyright:** 2026 Mantas Vilčinskas
+- **Copyright:** 2026 MB Uncascade
 - **App privacy:** Data Not Collected
 - **Encryption:** No non-exempt encryption
 - **Suggested age rating:** 4+
@@ -96,7 +96,7 @@ The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sle
 
 For version 2.2.0 (build 16), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local Codex tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
 
-The repository also contains the companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, iOS/iPadOS 17, version 2.2.0 build 16). It uses the private CloudKit container `iCloud.lt.mantas.sleepswitch`. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
+The repository also contains the MB Uncascade companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, display name Sleep Switch, iOS/iPadOS 17, version 2.2.0 build 19). It uses the same private CloudKit container as the shipped Mac app, `iCloud.lt.mantas.sleepswitch`, so existing Mac builds remain compatible. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
 
 The companion's History view is intentionally bounded: it shows daily kWh and agent-hours for up to 30 days, plus up to 24 hours of five-minute energy buckets. It does not receive prompts, output, file names, process names, or raw command lines.
 

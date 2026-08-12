@@ -1,6 +1,6 @@
 # Sleep Switch Companion — iOS release setup
 
-The repository now contains a real SwiftUI target, `SleepSwitchCompanion`, rather than a placeholder screen. It is version `2.2.0 (16)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
+The repository now contains a real SwiftUI target, `SleepSwitchCompanion`, rather than a placeholder screen. It is an MB Uncascade app with display name Sleep Switch, version `2.2.0 (19)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
 
 ## CloudKit setup required once
 
@@ -28,13 +28,15 @@ xcodebuild -project SleepSwitch.xcodeproj \
   -scheme SleepSwitchCompanion \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath /tmp/SleepSwitchCompanion-2.2.0-16.xcarchive \
+  -archivePath /tmp/SleepSwitchCompanion-2.2.0-19.xcarchive \
   -allowProvisioningUpdates archive
 ```
 
-The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect app record is still a manual step: create **Sleep Switch Companion**, choose Free, attach the iOS archive, and add the privacy policy URL:
+The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.2.0 (19)` includes the short display name and Settings dismissal fix; build 18 is the currently attached build until 19 finishes processing. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
 
 `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
+
+Bundle IDs are fixed once an App Store Connect app record is created. This companion uses the existing `lt.mantas.sleepswitch.companion` identifier; do not create a second companion record under a different identifier.
 
 Suggested App Store Connect metadata:
 
@@ -44,9 +46,9 @@ Suggested App Store Connect metadata:
 - **Price:** Free (`$0.00`)
 - **Marketing URL:** `https://github.com/mistermantas/macos-sleep-switch`
 - **Support URL:** `https://uncascade.com/contact/`
-- **Copyright:** 2026 Mantas Vilčinskas
+- **Copyright:** 2026 MB Uncascade
 
-Suggested review note: “Sleep Switch Companion reads the signed-in user's private CloudKit database. Launch Sleep Switch on a Mac signed into the same iCloud account, leave it running and awake, then open the companion. The dashboard shows live status, bounded energy/agent history, and only the named actions advertised by that Mac build. Sleep, lock, restart, and shutdown require confirmation. There is no account registration, subscription, payment, or developer-operated server.”
+Suggested review note: “Sleep Switch Companion is created and maintained by Mantas Vilčinskas for MB Uncascade. It reads the signed-in user's private CloudKit database. Launch Sleep Switch on a Mac signed into the same iCloud account, leave it running and awake, then open the companion. The dashboard shows live status, bounded energy/agent history, and only the named actions advertised by that Mac build. Sleep, lock, restart, and shutdown require confirmation. There is no account registration, subscription, payment, or developer-operated server.”
 
 ## Review notes and limitations
 

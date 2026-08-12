@@ -6,6 +6,8 @@ Keep long-running work awake, with or without the lid open.
 
 Sleep Switch holds a temporary macOS power assertion while it is active. It automatically stays awake while a supported coding agent is running, then returns sleep control to macOS when the agent exits. It is free and open source.
 
+Created and maintained by Mantas Vilčinskas for MB Uncascade.
+
 ## Install
 
 1. Download and unzip `Sleep-Switch.zip`.
@@ -213,7 +215,7 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app with bundle identifier `lt.mantas.sleepswitch.companion`, deployment target iOS 17, and build `2.2.0 (16)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`).
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.2.0 (19)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
 
 ### Companion actions
 

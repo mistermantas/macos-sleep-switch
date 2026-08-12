@@ -25,6 +25,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_ENTITLEMENTS: AppStore/SleepSwitch.entitlements
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: C43F5MKJF2
         COMBINE_HIDPI_IMAGES: YES
         CURRENT_PROJECT_VERSION: 16
         ENABLE_APP_SANDBOX: YES
@@ -55,8 +56,9 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 16
+        CURRENT_PROJECT_VERSION: 19
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
+        DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Companion/Info.plist
         MARKETING_VERSION: 2.2.0

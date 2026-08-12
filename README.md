@@ -83,7 +83,7 @@ Open **Insights…** from the menu to see two small, useful views:
 
 Energy and agent history is saved locally by default so the charts survive a restart. Sampling is once per minute and storage is capped to five-minute energy buckets for 30 days plus agent transition records. Turn **Save energy and agent history** off at any time to keep only the in-memory live view, or use **Delete History…** to remove the local database.
 
-The Mac release has no analytics, account, or network service. The repository also contains an iOS companion preview (`SleepSwitchCompanion`) and its privacy-filtered CloudKit protocol. It is deliberately not advertised as live remote control until the iCloud container, entitlements, pairing UI, and physical-device review are provisioned.
+The Mac release has no analytics or account service. Version 2.2 also includes a SwiftUI iOS companion (`SleepSwitchCompanion`) using the user's private iCloud database for coarse status and short-lived, capability-gated remote actions. The companion never sends arbitrary commands: it can request only named actions advertised by the Mac. A fully sleeping Mac cannot poll CloudKit, so **Wake Mac** is intentionally unavailable; **Wake Display** works when the Mac is awake.
 
 ## How it works
 
@@ -212,6 +212,22 @@ xcodebuild -project SleepSwitch.xcodeproj \
   -derivedDataPath /tmp/SleepSwitch-companion-build \
   CODE_SIGNING_ALLOWED=NO build
 ```
+
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app with bundle identifier `lt.mantas.sleepswitch.companion`, deployment target iOS 17, and build `2.2.0 (16)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`).
+
+### Companion actions
+
+The iOS dashboard shows the Mac's online/stale state, uptime, thermal state, power source, estimated watts, battery, agent count, keep-awake state, and bounded history. The History view shows five-minute kWh buckets for the last 24 hours, or daily kWh and agent activity hours for the last 7 or 30 days. Actions are limited by the Mac's advertised capabilities and require confirmation for sleep, lock, restart, and shutdown:
+
+- **Sleep Mac** — puts the whole Mac to sleep.
+- **Sleep Display** — turns off only the display in the direct-download Mac build; agents keep running.
+- **Wake Display** — declares user activity through IOKit when the Mac is already awake.
+- **Sleep Display Until Agents Finish** — direct-download build only; arms the existing wake-on-completion flow.
+- **Keep Awake for Agents** and **Wake Display When Agents Finish** — change the existing agent preferences.
+- **Lock, Restart, and Shut Down** — direct-download build only, with an explicit iOS confirmation. The sandboxed Mac App Store build does not advertise shell-backed destructive actions.
+- **Stop Sleep Switch Controls** — immediately clears the Mac's manual and automatic keep-awake controls.
+
+The Mac must be awake and signed into the same iCloud account for status and commands to move. Commands expire after 90 seconds and are addressed to a persisted per-device ID; the Mac rejects expired, misaddressed, unsupported, or replayed commands.
 
 ## License
 

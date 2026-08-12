@@ -102,6 +102,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let displayPower = DisplayPowerController()
     private let insightsRecorder = InsightsRecorder()
     private var insightsWindowController: InsightsWindowController?
+    private lazy var companionBridge = CompanionMacBridge(
+        statusProvider: { [weak self] in
+            self?.companionStatus() ?? CompanionMacStatus.unavailable
+        },
+        historyProvider: { [weak self] in
+            self?.companionHistory() ?? .empty(deviceID: "unavailable")
+        },
+        commandHandler: { [weak self] command in
+            self?.handleRemoteCommand(command)
+                ?? CompanionRemoteResult(
+                    commandID: command.id,
+                    accepted: false,
+                    executed: false,
+                    completedAt: Date(),
+                    message: "Sleep Switch is no longer running."
+                )
+        }
+    )
 #if !APP_STORE
     private let fanHelperClient = FanHelperClient()
     private lazy var coolingCoordinator = CoolingCoordinator(
@@ -160,6 +178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         refreshState()
         startRefreshTimer()
+        companionBridge.start()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -181,6 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
         insightsRecorder.stop()
+        companionBridge.stop()
         try? lidClosedSleep.stop()
 #if !APP_STORE
         coolingCoordinator.stop()
@@ -579,6 +599,194 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
         attemptQueuedDisplayWakeIfNeeded()
         reconcileAndUpdatePresentation()
+        companionBridge.synchronize()
+    }
+
+    private func companionStatus() -> CompanionMacStatus {
+        let reading = IOKitPowerTelemetryProvider().read()
+        let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
+        let thermalState: String = switch ProcessInfo.processInfo.thermalState {
+        case .nominal:
+            "nominal"
+        case .fair:
+            "fair"
+        case .serious:
+            "serious"
+        case .critical:
+            "critical"
+        @unknown default:
+            "unknown"
+        }
+
+        return CompanionMacStatus(
+            deviceID: companionBridge.deviceID,
+            displayName: Host.current().localizedName ?? "This Mac",
+            build: AppLinks.currentVersionTitle,
+            lastSeen: Date(),
+            uptimeSeconds: ProcessInfo.processInfo.systemUptime,
+            powerSource: reading.source,
+            batteryPercent: reading.batteryPercent,
+            thermalState: thermalState,
+            activeAgentCount: detectedAgents.count,
+            activeSessionCount: sessionCount,
+            awakeMode: selectedAwakeMode.rawValue,
+            displayAsleep: displaySleepOverride,
+            isKeepingAwake: powerAssertions.isActive || lidClosedSleep.isActive,
+            keepDisplayAwake: shouldKeepDisplayAwake,
+            automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
+            wakeDisplayWhenAgentsFinish: wakeDisplayWhenAgentsFinish,
+            estimatedWatts: reading.watts,
+            energySource: reading.source,
+            energyConfidence: reading.confidence,
+            isCharging: reading.isCharging,
+            capabilities: RemoteEnergyController.capabilities
+        )
+    }
+
+    private func companionHistory() -> CompanionHistorySnapshot {
+        CompanionHistoryBuilder.make(
+            deviceID: companionBridge.deviceID,
+            snapshot: insightsRecorder.snapshot(for: .month)
+        )
+    }
+
+    private func handleRemoteCommand(
+        _ command: CompanionRemoteCommand
+    ) -> CompanionRemoteResult {
+        let now = Date()
+        let capabilities = RemoteEnergyController.capabilities
+        let validation = CompanionCommandPolicy.validate(
+            command,
+            targetDeviceID: companionBridge.deviceID,
+            capabilities: capabilities,
+            now: now
+        )
+
+        guard case .success = validation else {
+            let message: String? = switch validation {
+            case .success:
+                nil
+            case .failure(let error):
+                "Remote action rejected: \(String(describing: error))."
+            }
+            return CompanionRemoteResult(
+                commandID: command.id,
+                accepted: false,
+                executed: false,
+                completedAt: now,
+                message: message
+            )
+        }
+
+        do {
+            switch command.action {
+            case .sleepMac:
+                try RemoteEnergyController.sleepMac()
+            case .sleepDisplay:
+                try sleepDisplayForRemote()
+            case .wakeDisplay:
+                try RemoteEnergyController.wakeDisplay(using: displayPower)
+                displaySleepOverride = false
+                reconcileAndUpdatePresentation()
+            case .wakeMac:
+                throw RemoteEnergyError.unavailable(
+                    "A fully sleeping Mac cannot poll CloudKit. Enable Wake on Network Access in macOS for a future wake service."
+                )
+            case .lockMac:
+#if !APP_STORE
+                try RemoteEnergyController.lockMac()
+#else
+                throw RemoteEnergyError.unavailable("Locking is not available in the Mac App Store build.")
+#endif
+            case .restartMac:
+#if !APP_STORE
+                try RemoteEnergyController.restartMac()
+#else
+                throw RemoteEnergyError.unavailable("Restart is not available in the Mac App Store build.")
+#endif
+            case .shutdownMac:
+#if !APP_STORE
+                try RemoteEnergyController.shutdownMac()
+#else
+                throw RemoteEnergyError.unavailable("Shutdown is not available in the Mac App Store build.")
+#endif
+            case .sleepDisplayUntilAgentsFinish:
+#if !APP_STORE
+                try sleepDisplayForRemote(wakeWhenAgentsFinish: true)
+#else
+                throw RemoteEnergyError.unavailable("Display sleep is not available in the Mac App Store build.")
+#endif
+            case .setKeepAwake:
+                applyRemoteKeepAwake(command.parameters)
+            case .panicStop:
+                clearManualAwakeSession()
+                wakeDisplayWhenAgentsFinish = false
+                displaySleepOverride = false
+                UserDefaults.standard.set(false, forKey: automaticAgentAwakeKey)
+                _ = reconcilePowerAssertion(forceRestart: true)
+                reconcileAndUpdatePresentation()
+            }
+
+            return CompanionRemoteResult(
+                commandID: command.id,
+                accepted: true,
+                executed: true,
+                completedAt: Date(),
+                message: "\(command.action.title) completed."
+            )
+        } catch {
+            return CompanionRemoteResult(
+                commandID: command.id,
+                accepted: true,
+                executed: false,
+                completedAt: Date(),
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func applyRemoteKeepAwake(_ parameters: [String: String]) {
+        let defaults = UserDefaults.standard
+        if let enabled = parameters["enabled"].flatMap(Bool.init) {
+            defaults.set(enabled, forKey: automaticAgentAwakeKey)
+        }
+        if let keepDisplayAwake = parameters["keepDisplayAwake"].flatMap(Bool.init) {
+            defaults.set(keepDisplayAwake, forKey: keepDisplayAwakeKey)
+        }
+        if let wakeWhenAgentsFinish = parameters["wakeWhenAgentsFinish"].flatMap(Bool.init) {
+            self.wakeDisplayWhenAgentsFinish = wakeWhenAgentsFinish
+        }
+        reconcileAndUpdatePresentation()
+    }
+
+    private func sleepDisplayForRemote(wakeWhenAgentsFinish: Bool = false) throws {
+#if APP_STORE
+        _ = wakeWhenAgentsFinish
+        throw RemoteEnergyError.unavailable("Display sleep is not available in the Mac App Store build.")
+#else
+        let previousWakeState = wakeDisplayWhenAgentsFinish
+        let previousDisplaySleepOverride = displaySleepOverride
+        self.wakeDisplayWhenAgentsFinish = wakeWhenAgentsFinish
+        self.displaySleepOverride = true
+
+        if let error = reconcilePowerAssertion(forceRestart: true) {
+            self.wakeDisplayWhenAgentsFinish = previousWakeState
+            self.displaySleepOverride = previousDisplaySleepOverride
+            _ = reconcilePowerAssertion(forceRestart: true)
+            throw error
+        }
+
+        do {
+            try RemoteEnergyController.sleepDisplay(using: displayPower)
+        } catch {
+            self.wakeDisplayWhenAgentsFinish = previousWakeState
+            self.displaySleepOverride = previousDisplaySleepOverride
+            _ = reconcilePowerAssertion(forceRestart: true)
+            throw error
+        }
+        updatePresentation()
+        updateDisplayPresentation()
+#endif
     }
 
     private func reconcileAndUpdatePresentation() {

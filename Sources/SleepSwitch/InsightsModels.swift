@@ -131,6 +131,150 @@ struct AgentActivitySummary: Equatable, Identifiable {
     var id: String { agentID }
 }
 
+/// A deliberately coarse day-level summary used by the iOS companion. The
+/// companion never receives prompts, process names, or raw one-minute samples.
+struct CompanionEnergyDay: Codable, Equatable, Identifiable {
+    let dayStart: Date
+    let kilowattHours: Double
+    let averageWatts: Double?
+    let peakWatts: Double?
+    let sampleCount: Int
+
+    var id: Date { dayStart }
+}
+
+struct CompanionAgentDay: Codable, Equatable, Identifiable {
+    let dayStart: Date
+    let activeSeconds: TimeInterval
+    let peakSessionCount: Int
+    let agentCount: Int
+
+    var id: Date { dayStart }
+}
+
+struct CompanionHistorySnapshot: Codable, Equatable {
+    let deviceID: String
+    let updatedAt: Date
+    let historyEnabled: Bool
+    let energyBuckets: [EnergyBucket]
+    let energyDays: [CompanionEnergyDay]
+    let agentDays: [CompanionAgentDay]
+    let storageBytes: Int64
+
+    static func empty(deviceID: String, updatedAt: Date = Date()) -> CompanionHistorySnapshot {
+        CompanionHistorySnapshot(
+            deviceID: deviceID,
+            updatedAt: updatedAt,
+            historyEnabled: false,
+            energyBuckets: [],
+            energyDays: [],
+            agentDays: [],
+            storageBytes: 0
+        )
+    }
+}
+
+enum CompanionHistoryBuilder {
+    static func make(
+        deviceID: String,
+        snapshot: InsightsSnapshot,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> CompanionHistorySnapshot {
+        guard snapshot.historyEnabled else {
+            return .empty(deviceID: deviceID, updatedAt: now)
+        }
+
+        let buckets = snapshot.buckets
+            .filter { $0.bucketStart <= now }
+            .sorted { $0.bucketStart < $1.bucketStart }
+        let energyDays = Dictionary(grouping: buckets) {
+            calendar.startOfDay(for: $0.bucketStart)
+        }
+        .map { dayStart, values in
+            let validValues = values.compactMap(\.averageWatts)
+                .filter { $0.isFinite && $0 >= 0 }
+            let totalEnergy = values.compactMap(\.kilowattHours)
+                .filter { $0.isFinite && $0 >= 0 }
+                .reduce(0, +)
+            return CompanionEnergyDay(
+                dayStart: dayStart,
+                kilowattHours: totalEnergy,
+                averageWatts: validValues.isEmpty
+                    ? nil
+                    : validValues.reduce(0, +) / Double(validValues.count),
+                peakWatts: values.compactMap(\.peakWatts).max(),
+                sampleCount: values.reduce(0) { $0 + $1.sampleCount }
+            )
+        }
+        .sorted { $0.dayStart < $1.dayStart }
+
+        let agentDays = makeAgentDays(
+            intervals: snapshot.activities,
+            now: now,
+            calendar: calendar
+        )
+
+        // Five-minute buckets are useful for the last day, while day-level
+        // summaries cover the full 30-day local retention window. Keeping at
+        // most 24 hours here keeps each CloudKit payload small and predictable.
+        let recentCutoff = now.addingTimeInterval(-24 * 60 * 60)
+        let recentBuckets = buckets.filter { $0.bucketStart >= recentCutoff }
+
+        return CompanionHistorySnapshot(
+            deviceID: deviceID,
+            updatedAt: now,
+            historyEnabled: true,
+            energyBuckets: recentBuckets,
+            energyDays: energyDays,
+            agentDays: agentDays,
+            storageBytes: snapshot.storageBytes
+        )
+    }
+
+    private static func makeAgentDays(
+        intervals: [AgentActivityInterval],
+        now: Date,
+        calendar: Calendar
+    ) -> [CompanionAgentDay] {
+        var totals: [Date: (seconds: TimeInterval, peak: Int, agents: Set<String>)] = [:]
+        let cutoff = now.addingTimeInterval(-30 * 24 * 60 * 60)
+
+        for interval in intervals {
+            let start = max(interval.startedAt, cutoff)
+            let end = min(interval.effectiveEnd, now)
+            guard end > start else { continue }
+
+            var dayStart = calendar.startOfDay(for: start)
+            while dayStart < end {
+                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+                    break
+                }
+                let overlapStart = max(start, dayStart)
+                let overlapEnd = min(end, nextDay)
+                if overlapEnd > overlapStart {
+                    var total = totals[dayStart] ?? (0, 0, [])
+                    total.seconds += overlapEnd.timeIntervalSince(overlapStart)
+                    total.peak = max(total.peak, interval.peakSessionCount)
+                    total.agents.insert(interval.agentID)
+                    totals[dayStart] = total
+                }
+                dayStart = nextDay
+            }
+        }
+
+        return totals.map { dayStart, value in
+            CompanionAgentDay(
+                dayStart: dayStart,
+                activeSeconds: value.seconds,
+                peakSessionCount: value.peak,
+                agentCount: value.agents.count
+            )
+        }
+        .sorted { $0.dayStart < $1.dayStart }
+    }
+}
+
 enum InsightsRange: String, CaseIterable, Identifiable {
     case live
     case day

@@ -1,8 +1,8 @@
 # Sleep Switch Privacy Policy
 
-**Last updated: August 4, 2026**
+**Last updated: August 12, 2026**
 
-Sleep Switch does not collect, transmit, sell, or share personal data.
+Sleep Switch does not collect personal data for the developer, sell data, or share it with third parties. The optional companion uses the user's private iCloud database for coarse status and history synchronization.
 
 ## Information used on your Mac
 
@@ -11,9 +11,9 @@ Sleep Switch processes only the local information needed to provide its features
 - App preferences, such as keep-awake settings and timer choices, are stored locally in macOS user defaults.
 - The direct-download version checks the local process list and Codex task markers to detect supported agent sessions.
 - The Mac App Store version reads Codex task markers only after you select a `.codex` folder. Access is read-only and is stored as an app-scoped macOS security bookmark.
-- Version 2.1.0 can save estimated power readings and coarse agent activity intervals in a local SQLite database so Insights can show history after a restart. Saving is enabled by default, can be paused in **Insights** or **Settings**, and can be deleted from either place. The database is bounded and does not contain prompts, output, file names, command lines, usernames, or serial numbers.
+- Version 2.2.0 can save estimated power readings and coarse agent activity intervals in a local SQLite database so Insights can show history after a restart. Saving is enabled by default, can be paused in **Insights** or **Settings**, and can be deleted from either place. The database is bounded and does not contain prompts, output, file names, command lines, usernames, or serial numbers.
 
-This information stays on your Mac. It is not sent to the developer or any third party.
+This local information stays on your Mac. It is not sent to the developer or any third party.
 
 ## Data collection and tracking
 
@@ -25,7 +25,7 @@ Sleep Switch has:
 - no developer-operated server; and
 - no bundled third-party SDKs.
 
-The app does not upload the local history or agent information. The repository contains an iOS companion preview with an optional private CloudKit transport, but it is not enabled in the 2.1.0 Mac App Store build and is not a developer-operated service. Local preferences, history, and folder-access bookmarks remain on your Mac until you change them, delete them, reset the app, or remove the app’s data.
+The app does not upload prompts, output, file names, command lines, or raw local history. Version 2.2 includes an optional private CloudKit transport for the iOS companion. When you use the companion, the Mac publishes a coarse status snapshot, bounded daily kWh/agent-hour summaries, and the last 24 hours of five-minute energy buckets; it reads short-lived, named commands from the user's private iCloud database. The developer does not operate a server and cannot read the user's private database. When local history saving is disabled, the companion history payload is empty. Local preferences, history, and folder-access bookmarks remain on your Mac until you change them, delete them, reset the app, or remove the app’s data.
 
 ## External links
 

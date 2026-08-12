@@ -2,18 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Sleep Switch</string>
+    <string>Sleep Switch Companion</string>
     <key>CFBundleName</key>
-    <string>Sleep Switch</string>
+    <string>Sleep Switch Companion</string>
     <key>CFBundleIdentifier</key>
     <string>lt.mantas.sleepswitch.companion</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleShortVersionString</key>
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
     <key>UILaunchScreen</key>
     <dict/>
 </dict>

@@ -7,6 +7,15 @@ dist_dir="$script_dir/dist"
 archive="$dist_dir/Sleep-Switch.zip"
 signing_identity="${SLEEP_SWITCH_SIGNING_IDENTITY:--}"
 notary_profile="${SLEEP_SWITCH_NOTARY_PROFILE:-}"
+require_distribution_signature="${SLEEP_SWITCH_REQUIRE_DISTRIBUTION_SIGNATURE:-0}"
+
+if [[ "$require_distribution_signature" == "1" ]]; then
+  if [[ "$signing_identity" == "-" || -z "$notary_profile" ]]; then
+    echo "Distribution packaging requires SLEEP_SWITCH_SIGNING_IDENTITY and SLEEP_SWITCH_NOTARY_PROFILE."
+    echo "Configure the Developer ID certificate and a notarytool keychain profile before publishing a release."
+    exit 1
+  fi
+fi
 
 "$script_dir/build.sh"
 mkdir -p "$dist_dir"

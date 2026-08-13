@@ -8,8 +8,8 @@ struct CompanionCloudClient {
         self.store = CompanionCloudStore(container: container)
     }
 
-    func accountStatus() async -> CKAccountStatus {
-        await store.accountStatus()
+    func accountStatus() async throws -> CKAccountStatus {
+        try await store.accountStatus()
     }
 
     func fetchMacs() async throws -> [CompanionMacStatus] {
@@ -22,6 +22,14 @@ struct CompanionCloudClient {
 
     func send(_ command: CompanionRemoteCommand) async throws {
         try await store.send(command)
+    }
+
+    func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
+        try await store.fetchResult(for: commandID)
+    }
+
+    func consumeLastIssue() -> String? {
+        store.consumeLastIssue()
     }
 }
 

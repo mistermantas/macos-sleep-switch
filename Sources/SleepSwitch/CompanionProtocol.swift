@@ -10,6 +10,9 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     case shutdownMac
     case sleepDisplayUntilAgentsFinish
     case setKeepAwake
+    case startManualSession
+    case stopManualSession
+    case setCoolingProfile
     case panicStop
 
     var title: String {
@@ -32,6 +35,12 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "Sleep Display Until Agents Finish"
         case .setKeepAwake:
             return "Set Keep Awake"
+        case .startManualSession:
+            return "Start Manual Session"
+        case .stopManualSession:
+            return "Stop Manual Session"
+        case .setCoolingProfile:
+            return "Set Cooling Profile"
         case .panicStop:
             return "Stop Sleep Switch Controls"
         }
@@ -45,7 +54,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
         switch self {
         case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .lockMac:
             return true
-        case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake, .panicStop:
+        case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake,
+             .startManualSession, .stopManualSession, .setCoolingProfile, .panicStop:
             return false
         }
     }
@@ -70,6 +80,12 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "moon.zzz.fill"
         case .setKeepAwake:
             return "cup.and.saucer.fill"
+        case .startManualSession:
+            return "play.circle.fill"
+        case .stopManualSession:
+            return "stop.circle.fill"
+        case .setCoolingProfile:
+            return "fan"
         case .panicStop:
             return "stop.circle"
         }
@@ -87,6 +103,9 @@ struct CompanionMacCapabilities: Codable, Equatable {
     var canSetKeepAwake = false
     var canSleepDisplayUntilAgentsFinish = false
     var supportsCloudKit = false
+    var canControlManualSession: Bool? = nil
+    var canSetCoolingProfile: Bool? = nil
+    var canPreventSleepWithLidClosed: Bool? = nil
 
     var availableActions: [CompanionRemoteAction] {
         CompanionRemoteAction.allCases.filter { action in
@@ -109,11 +128,45 @@ struct CompanionMacCapabilities: Codable, Equatable {
                 canSleepDisplayUntilAgentsFinish
             case .setKeepAwake:
                 canSetKeepAwake
+            case .startManualSession, .stopManualSession:
+                canControlManualSession == true
+            case .setCoolingProfile:
+                canSetCoolingProfile == true
             case .panicStop:
                 true
             }
         }
     }
+}
+
+struct CompanionAgentStatus: Codable, Equatable, Identifiable {
+    let id: String
+    let name: String
+    let sessionCount: Int
+}
+
+struct CompanionManualSessionStatus: Codable, Equatable {
+    let startedAt: Date
+    let endsAt: Date?
+
+    var isActive: Bool { endsAt.map { $0 > Date() } ?? true }
+}
+
+struct CompanionFanStatus: Codable, Equatable, Identifiable {
+    let id: Int
+    let actualRPM: Double
+    let targetRPM: Double?
+    let maximumRPM: Double?
+}
+
+struct CompanionCoolingStatus: Codable, Equatable {
+    let profile: String
+    let state: String
+    let temperatureCelsius: Double?
+    let verifiedDemand: Double?
+    let fans: [CompanionFanStatus]
+    let message: String?
+    let availableProfiles: [String]?
 }
 
 struct CompanionMacStatus: Codable, Equatable, Identifiable {
@@ -138,6 +191,61 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let energyConfidence: EnergyConfidence
     let isCharging: Bool
     let capabilities: CompanionMacCapabilities
+    let agents: [CompanionAgentStatus]?
+    let manualSession: CompanionManualSessionStatus?
+    let cooling: CompanionCoolingStatus?
+
+    init(
+        deviceID: String,
+        displayName: String,
+        build: String,
+        lastSeen: Date,
+        uptimeSeconds: TimeInterval,
+        powerSource: EnergySource,
+        batteryPercent: Double?,
+        thermalState: String,
+        activeAgentCount: Int,
+        activeSessionCount: Int,
+        awakeMode: String,
+        displayAsleep: Bool,
+        isKeepingAwake: Bool,
+        keepDisplayAwake: Bool,
+        automaticAgentAwakeEnabled: Bool,
+        wakeDisplayWhenAgentsFinish: Bool,
+        estimatedWatts: Double?,
+        energySource: EnergySource,
+        energyConfidence: EnergyConfidence,
+        isCharging: Bool,
+        capabilities: CompanionMacCapabilities,
+        agents: [CompanionAgentStatus]? = nil,
+        manualSession: CompanionManualSessionStatus? = nil,
+        cooling: CompanionCoolingStatus? = nil
+    ) {
+        self.deviceID = deviceID
+        self.displayName = displayName
+        self.build = build
+        self.lastSeen = lastSeen
+        self.uptimeSeconds = uptimeSeconds
+        self.powerSource = powerSource
+        self.batteryPercent = batteryPercent
+        self.thermalState = thermalState
+        self.activeAgentCount = activeAgentCount
+        self.activeSessionCount = activeSessionCount
+        self.awakeMode = awakeMode
+        self.displayAsleep = displayAsleep
+        self.isKeepingAwake = isKeepingAwake
+        self.keepDisplayAwake = keepDisplayAwake
+        self.automaticAgentAwakeEnabled = automaticAgentAwakeEnabled
+        self.wakeDisplayWhenAgentsFinish = wakeDisplayWhenAgentsFinish
+        self.estimatedWatts = estimatedWatts
+        self.energySource = energySource
+        self.energyConfidence = energyConfidence
+        self.isCharging = isCharging
+        self.capabilities = capabilities
+        self.agents = agents
+        self.manualSession = manualSession
+        self.cooling = cooling
+    }
 
     var id: String { deviceID }
 
@@ -191,7 +299,45 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             energySource: energySource,
             energyConfidence: energyConfidence,
             isCharging: isCharging,
-            capabilities: capabilities
+            capabilities: capabilities,
+            agents: agents,
+            manualSession: manualSession,
+            cooling: cooling
+        )
+    }
+
+    /// Returns a local projection of a keep-awake command. The companion uses
+    /// this while CloudKit is carrying the command to the Mac so controls do
+    /// not snap back to their stale server value.
+    func applyingKeepAwake(parameters: [String: String]) -> CompanionMacStatus {
+        CompanionMacStatus(
+            deviceID: deviceID,
+            displayName: displayName,
+            build: build,
+            lastSeen: lastSeen,
+            uptimeSeconds: uptimeSeconds,
+            powerSource: powerSource,
+            batteryPercent: batteryPercent,
+            thermalState: thermalState,
+            activeAgentCount: activeAgentCount,
+            activeSessionCount: activeSessionCount,
+            awakeMode: parameters["awakeMode"] ?? awakeMode,
+            displayAsleep: displayAsleep,
+            isKeepingAwake: isKeepingAwake,
+            keepDisplayAwake: parameters["keepDisplayAwake"].flatMap(Bool.init)
+                ?? keepDisplayAwake,
+            automaticAgentAwakeEnabled: parameters["enabled"].flatMap(Bool.init)
+                ?? automaticAgentAwakeEnabled,
+            wakeDisplayWhenAgentsFinish: parameters["wakeWhenAgentsFinish"].flatMap(Bool.init)
+                ?? wakeDisplayWhenAgentsFinish,
+            estimatedWatts: estimatedWatts,
+            energySource: energySource,
+            energyConfidence: energyConfidence,
+            isCharging: isCharging,
+            capabilities: capabilities,
+            agents: agents,
+            manualSession: manualSession,
+            cooling: cooling
         )
     }
 }
@@ -260,6 +406,10 @@ struct CompanionCommandPolicy {
             capabilities.canShutdownMac
         case .setKeepAwake:
             capabilities.canSetKeepAwake
+        case .startManualSession, .stopManualSession:
+            capabilities.canControlManualSession == true
+        case .setCoolingProfile:
+            capabilities.canSetCoolingProfile == true
         case .sleepDisplayUntilAgentsFinish:
             capabilities.canSleepDisplayUntilAgentsFinish
         case .panicStop:

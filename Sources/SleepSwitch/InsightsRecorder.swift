@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 struct EnergyBucketAccumulator {
     let bucketStart: Date
@@ -62,6 +63,10 @@ final class InsightsRecorder {
     static let historyEnabledKey = "insightsHistoryEnabled"
     static let sampleInterval: TimeInterval = 60
     static let bucketInterval: TimeInterval = 5 * 60
+    private static let logger = Logger(
+        subsystem: "lt.mantas.sleepswitch",
+        category: "history"
+    )
 
     let historyStore: HistoryStore?
     let powerProvider: PowerTelemetryProviding
@@ -73,13 +78,23 @@ final class InsightsRecorder {
     private var activeIntervals: [String: AgentActivityInterval] = [:]
     private var timer: Timer?
     private var lastPruneAt: Date?
+    private(set) var lastPersistenceError: String?
 
     init(
-        historyStore: HistoryStore? = try? HistoryStore(),
+        historyStore: HistoryStore? = nil,
         powerProvider: PowerTelemetryProviding = IOKitPowerTelemetryProvider()
     ) {
-        self.historyStore = historyStore
         self.powerProvider = powerProvider
+        if let historyStore {
+            self.historyStore = historyStore
+        } else {
+            do {
+                self.historyStore = try HistoryStore()
+            } catch {
+                self.historyStore = nil
+                self.recordPersistenceError("open", error: error)
+            }
+        }
         UserDefaults.standard.register(defaults: [
             Self.historyEnabledKey: true
         ])
@@ -135,7 +150,9 @@ final class InsightsRecorder {
             return
         }
         self.lastPruneAt = date
-        try? historyStore?.prune(now: date)
+        persist("prune") { store in
+            try store.prune(now: date)
+        }
         publish()
     }
 
@@ -158,7 +175,9 @@ final class InsightsRecorder {
                 )
                 activeIntervals.removeValue(forKey: agentID)
                 if historyEnabled {
-                    try? historyStore?.saveAgentInterval(finished)
+                    persist("save agent interval") { store in
+                        try store.saveAgentInterval(finished)
+                    }
                 }
                 continue
             }
@@ -177,7 +196,9 @@ final class InsightsRecorder {
             )
             activeIntervals[agentID] = updated
             if historyEnabled {
-                try? historyStore?.saveAgentInterval(updated)
+                persist("save agent interval") { store in
+                    try store.saveAgentInterval(updated)
+                }
             }
         }
 
@@ -193,7 +214,9 @@ final class InsightsRecorder {
             )
             activeIntervals[agent.definition.id] = interval
             if historyEnabled {
-                try? historyStore?.saveAgentInterval(interval)
+                persist("save agent interval") { store in
+                    try store.saveAgentInterval(interval)
+                }
             }
         }
         publish()
@@ -205,7 +228,13 @@ final class InsightsRecorder {
     }
 
     func deleteHistory() throws {
-        try historyStore?.deleteAll()
+        do {
+            try historyStore?.deleteAll()
+            lastPersistenceError = nil
+        } catch {
+            recordPersistenceError("delete history", error: error)
+            throw error
+        }
         liveReadings.removeAll()
         currentBucket = nil
         publish()
@@ -216,8 +245,12 @@ final class InsightsRecorder {
         now: Date = Date()
     ) -> InsightsSnapshot {
         let start = now.addingTimeInterval(-range.duration)
-        let persistedBuckets = (try? historyStore?.energyBuckets(from: start, to: now)) ?? nil
-        let intervals = (try? historyStore?.agentIntervals(from: start, to: now)) ?? nil
+        let persistedBuckets = read("read energy history") { store in
+            try store.energyBuckets(from: start, to: now)
+        }
+        let intervals = read("read agent history") { store in
+            try store.agentIntervals(from: start, to: now)
+        }
         let currentIntervals = activeIntervals.values.filter {
             $0.startedAt <= now && $0.effectiveEnd >= start
         }
@@ -233,7 +266,8 @@ final class InsightsRecorder {
             activities: allIntervals.sorted { $0.startedAt < $1.startedAt },
             updatedAt: now,
             historyEnabled: historyEnabled,
-            storageBytes: storageBytes
+            storageBytes: storageBytes,
+            historyError: lastPersistenceError
         )
     }
 
@@ -242,8 +276,45 @@ final class InsightsRecorder {
             self.currentBucket = nil
             return
         }
-        try? historyStore?.saveEnergy(currentBucket.bucket)
+        persist("save energy bucket") { store in
+            try store.saveEnergy(currentBucket.bucket)
+        }
         self.currentBucket = nil
+    }
+
+    private func persist(
+        _ operation: String,
+        _ work: (HistoryStore) throws -> Void
+    ) {
+        guard let historyStore else { return }
+        do {
+            try work(historyStore)
+            lastPersistenceError = nil
+        } catch {
+            recordPersistenceError(operation, error: error)
+        }
+    }
+
+    private func read<T>(
+        _ operation: String,
+        _ work: (HistoryStore) throws -> [T]
+    ) -> [T]? {
+        guard let historyStore else { return nil }
+        do {
+            return try work(historyStore)
+        } catch {
+            recordPersistenceError(operation, error: error)
+            return nil
+        }
+    }
+
+    private func recordPersistenceError(_ operation: String, error: Error) {
+        let userMessage = "History is unavailable while Sleep Switch tries to \(operation)."
+        lastPersistenceError = userMessage
+        let details = error.localizedDescription
+        Self.logger.error(
+            "History \(operation) failed: \(details, privacy: .private(mask: .hash))"
+        )
     }
 
     private func bucketStart(for date: Date) -> Date {

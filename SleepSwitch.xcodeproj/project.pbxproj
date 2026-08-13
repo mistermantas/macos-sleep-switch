@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00E7BA1F1C2D0B8AA3DA5F2B /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
 		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
 		16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
 		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
@@ -14,6 +15,7 @@
 		2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */; };
 		267D942E2D1DFF995D3E37D4 /* CompanionProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */; };
 		3B09BCF73D5956DCB96B594A /* CompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2282BCEAA5D823FC6501E481 /* CompanionApp.swift */; };
+		3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */; };
 		454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */; };
 		464678BC2FE3991DABF9F4A6 /* EnergyTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */; };
 		476EA4624D25306D3BFB0276 /* CompanionCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */; };
@@ -55,6 +57,7 @@
 		2282BCEAA5D823FC6501E481 /* CompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionApp.swift; sourceTree = "<group>"; };
 		240B255155829F9D001C6E38 /* SleepSwitchCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SleepSwitchCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
+		3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDashboard.swift; sourceTree = "<group>"; };
 		3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDiagnostics.swift; sourceTree = "<group>"; };
 		434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwakeSession.swift; sourceTree = "<group>"; };
 		4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingPolicy.swift; sourceTree = "<group>"; };
@@ -89,6 +92,7 @@
 			children = (
 				2282BCEAA5D823FC6501E481 /* CompanionApp.swift */,
 				0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */,
+				3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */,
 			);
 			name = SleepSwitchCompanion;
 			path = Sources/SleepSwitchCompanion;
@@ -271,9 +275,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00E7BA1F1C2D0B8AA3DA5F2B /* AppLinks.swift in Sources */,
 				3B09BCF73D5956DCB96B594A /* CompanionApp.swift in Sources */,
 				C5D2973FB812637BC5932FA7 /* CompanionCloudClient.swift in Sources */,
 				C4D5A70D1B843B7A80159E0C /* CompanionCloudStore.swift in Sources */,
+				3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */,
 				839C3B3CA1F5B7BB2C00760B /* CompanionProtocol.swift in Sources */,
 				16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */,
 			);
@@ -320,7 +326,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.entitlements;
+				CODE_SIGN_ENTITLEMENTS = AppStore/SleepSwitch.Debug.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -415,7 +421,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -423,7 +429,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion;
 				PRODUCT_NAME = "Sleep Switch";
 				SDKROOT = iphoneos;
@@ -492,11 +498,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Companion/SleepSwitchCompanion.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Companion/SleepSwitchCompanion.Debug.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -504,7 +510,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.2.0;
+				MARKETING_VERSION = 2.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion;
 				PRODUCT_NAME = "Sleep Switch";
 				SDKROOT = iphoneos;

@@ -31,7 +31,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Cooling Details…** | Shows verified helper, fan, temperature, and qualification state. Its **Copy Diagnostics** button creates an anonymized local hardware report. |
 | **Keep Awake for Agents** | Automatically prevents sleep while any supported coding agent is working. It is enabled by default. |
 | **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
-| **Agent status** | Shows the detected agent and session count. In the App Store build, **Connect Codex…** or **Change Codex Folder…** selects the local folder to watch. |
+| **Agent status** | Shows the detected agent and session count. Before pairing, the App Store build shows one **Connect Codex…** action here. |
 | **Sleep Display** | Turns off only the screen. The Mac stays signed in and active work continues. Available in the GitHub download. |
 | **Sleep Until Agents Finish** | Turns off the screen now, keeps the Mac working, then wakes the screen once all detected sessions finish. Available in the GitHub download. |
 | **Wake Display When Codex Finishes** | Arms the same one-time wake in the App Store build. It does not turn off the screen for you. |
@@ -46,7 +46,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 
 | Setting | What it does |
 | --- | --- |
-| **Connect Codex… / Change Codex Folder…** | Gives the App Store build read-only access to your local Codex session folder. |
+| **Change Codex Folder…** | After pairing, changes the local Codex session folder from Settings. |
 | **Manual Sessions Keep Display Awake** | Keeps the screen lit during manual sessions. Agent sessions still allow the screen to turn off. |
 | **Activate on Launch** | Starts a manual session whenever Sleep Switch opens, using the selected default duration. |
 | **Default Duration** | Sets the duration used by **Start Manual Session** and **Activate on Launch**. |
@@ -183,6 +183,12 @@ SLEEP_SWITCH_NOTARY_PROFILE="sleep-switch-notary" \
   ./package.sh
 ```
 
+The GitHub tag workflow intentionally refuses to publish an unsigned or
+unnotarized archive. Configure repository secrets named
+`SLEEP_SWITCH_SIGNING_IDENTITY` and `SLEEP_SWITCH_NOTARY_PROFILE` (and install
+the matching Developer ID certificate and notarytool profile on the runner)
+before creating a release tag.
+
 Before a local cooling-capable installation, run the non-mutating preflight:
 
 ```sh
@@ -203,6 +209,19 @@ Run the test suite with:
 ./test-direct.sh
 ```
 
+Before a release archive, verify that Debug uses the development CloudKit
+container while every distributed target is signed for Production:
+
+```sh
+./verify-distribution.sh
+```
+
+The Mac menu shows the companion sync state (last success, failure, or
+warning) instead of silently treating a CloudKit or iCloud problem as an empty
+dashboard. The iOS companion reports per-device history failures and waits for
+remote-action results, so a request is not presented as successful merely
+because a command record was created.
+
 To build the companion preview in the simulator:
 
 ```sh
@@ -215,7 +234,7 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.2.0 (19)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.0 (21)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
 
 ### Companion actions
 

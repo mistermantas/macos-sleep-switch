@@ -4,7 +4,7 @@ import Foundation
 @main
 struct AgentTrackerTests {
     @MainActor
-    static func main() {
+    static func main() async {
         let fixture = """
           101 /opt/homebrew/bin/codex
           102 /Users/test/.local/share/claude/versions/2.1.0/claude
@@ -116,6 +116,7 @@ struct AgentTrackerTests {
         CoolingDiagnosticsTests.run()
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
+        await CompanionMacBridgeTests.run()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {
             let codexScanStartedAt = Date()

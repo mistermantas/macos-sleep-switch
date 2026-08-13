@@ -11,6 +11,7 @@ export CLANG_MODULE_CACHE_PATH="$module_cache_dir"
 mkdir -p "$test_dir" "$module_cache_dir"
 
 /bin/zsh -n "$install_script"
+/bin/zsh -n "$script_dir/verify-distribution.sh"
 for fragment in \
   'SleepDisabled" && !found { print $2' \
   'SLEEP_SWITCH_REQUIRE_DISTRIBUTION_SIGNATURE=1' \
@@ -30,12 +31,15 @@ if /usr/bin/grep -Eq \
   exit 1
 fi
 
+"$script_dir/verify-distribution.sh"
+
 xcrun swiftc \
   -parse-as-library \
   -framework AppKit \
   -framework IOKit \
   -framework SwiftUI \
   -framework Charts \
+  -framework CloudKit \
   -framework Security \
   -lsqlite3 \
   "$script_dir/Sources/SleepSwitch/AgentTracker.swift" \
@@ -53,6 +57,8 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionCloudStore.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionMacBridge.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingCoordinator.swift" \
   "$script_dir/Sources/SleepSwitch/DisplayPowerController.swift" \
   "$script_dir/Sources/SleepSwitch/PowerAssertionController.swift" \
@@ -80,6 +86,7 @@ xcrun swiftc \
   "$script_dir/Tests/CoolingDiagnosticsTests.swift" \
   "$script_dir/Tests/InsightsHistoryTests.swift" \
   "$script_dir/Tests/CompanionProtocolTests.swift" \
+  "$script_dir/Tests/CompanionMacBridgeTests.swift" \
   -o "$test_binary"
 
 "$test_binary"

@@ -13,14 +13,32 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
+      - name: Verify generated project and distribution configuration
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+          git diff --exit-code -- SleepSwitch.xcodeproj
+          chmod +x verify-distribution.sh
+          ./verify-distribution.sh
       - name: Test
         run: |
           chmod +x test.sh
           ./test.sh
       - name: Build and package
+        env:
+          SLEEP_SWITCH_SIGNING_IDENTITY: ${{ secrets.SLEEP_SWITCH_SIGNING_IDENTITY }}
+          SLEEP_SWITCH_NOTARY_PROFILE: ${{ secrets.SLEEP_SWITCH_NOTARY_PROFILE }}
+          SLEEP_SWITCH_REQUIRE_DISTRIBUTION_SIGNATURE: "1"
         run: |
           chmod +x build.sh package.sh
           ./package.sh
+      - name: Verify signed and notarized artifact
+        env:
+          SLEEP_SWITCH_DISTRIBUTION_APP: "build/Sleep Switch.app"
+          SLEEP_SWITCH_REQUIRE_DISTRIBUTION_SIGNATURE: "1"
+        run: |
+          chmod +x test-direct.sh
+          ./test-direct.sh
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

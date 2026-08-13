@@ -15,6 +15,16 @@ for source_file in "$script_dir/Sources/SleepSwitch/"*.swift; do
     exit 1
   fi
 done
+for source_file in "$script_dir/Sources/SleepSwitchCompanion/"*.swift; do
+  source_name="${source_file:t}"
+  if ! grep -Fq "$source_name in Sources" "$project_file"; then
+    echo "The Xcode project is stale and does not compile companion source $source_name."
+    echo "Run: xcodegen generate --spec project.yml"
+    exit 1
+  fi
+done
+
+"$script_dir/verify-distribution.sh"
 
 xcodebuild \
   -quiet \

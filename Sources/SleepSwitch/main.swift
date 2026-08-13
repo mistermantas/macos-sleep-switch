@@ -83,11 +83,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(deleteHistory),
         keyEquivalent: ""
     )
+    private let companionStatusItem = NSMenuItem(
+        title: "iCloud Companion · Checking…",
+        action: nil,
+        keyEquivalent: ""
+    )
     private let codexFolderItem = NSMenuItem(
         title: "Connect Codex…",
         action: #selector(connectCodex),
         keyEquivalent: ""
     )
+    private let codexFolderSeparatorItem = NSMenuItem.separator()
     private let codexDirectoryAccess = CodexDirectoryAccess()
     private lazy var agentTracker: AgentTracker = {
 #if APP_STORE
@@ -102,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let displayPower = DisplayPowerController()
     private let insightsRecorder = InsightsRecorder()
     private var insightsWindowController: InsightsWindowController?
+    private var companionBridgeEnabled = true
     private lazy var companionBridge = CompanionMacBridge(
         statusProvider: { [weak self] in
             self?.companionStatus() ?? CompanionMacStatus.unavailable
@@ -158,6 +165,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configureMenu()
         insightsRecorder.start()
         observeDisplayWake()
+        companionBridge.onDiagnosticsChange = { [weak self] diagnostics in
+            self?.updateCompanionDiagnostics(diagnostics)
+        }
 #if !APP_STORE
         lidClosedSleep.onRestorationFailure = { [weak self] error in
             self?.presentAssertionError(error)
@@ -178,7 +188,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         refreshState()
         startRefreshTimer()
+#if DEBUG
+        let shouldShowInsights = ProcessInfo.processInfo.arguments.contains("--show-insights")
+        companionBridgeEnabled = !shouldShowInsights
+        if !shouldShowInsights {
+            companionBridge.start()
+        }
+        if shouldShowInsights {
+            DispatchQueue.main.async { [weak self] in
+                self?.showInsights()
+            }
+        }
+#else
         companionBridge.start()
+#endif
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -200,7 +223,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
         insightsRecorder.stop()
-        companionBridge.stop()
+        if companionBridgeEnabled {
+            companionBridge.stop()
+        }
         try? lidClosedSleep.stop()
 #if !APP_STORE
         coolingCoordinator.stop()
@@ -482,6 +507,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: "trash",
             accessibilityDescription: "Delete local history"
         )
+        companionStatusItem.isEnabled = false
+        companionStatusItem.image = NSImage(
+            systemSymbolName: "icloud",
+            accessibilityDescription: "iCloud companion status"
+        )
 
         let defaultDurationItem = NSMenuItem(
             title: "Default Duration",
@@ -491,15 +521,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         defaultDurationItem.submenu = defaultDurationMenu
         configureDefaultDurationMenu()
 
-#if APP_STORE
-        settingsMenu.addItem(codexFolderItem)
-        settingsMenu.addItem(.separator())
-#endif
         settingsMenu.addItem(keepDisplayAwakeItem)
         settingsMenu.addItem(activateOnLaunchItem)
         settingsMenu.addItem(defaultDurationItem)
         settingsMenu.addItem(saveHistoryItem)
         settingsMenu.addItem(deleteHistoryItem)
+        settingsMenu.addItem(companionStatusItem)
         settingsMenu.addItem(.separator())
         settingsMenu.addItem(launchAtLoginItem)
     }
@@ -599,12 +626,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
         attemptQueuedDisplayWakeIfNeeded()
         reconcileAndUpdatePresentation()
-        companionBridge.synchronize()
+        if companionBridgeEnabled {
+            companionBridge.synchronize()
+        }
     }
 
     private func companionStatus() -> CompanionMacStatus {
         let reading = IOKitPowerTelemetryProvider().read()
         let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
+        let agentStatuses = detectedAgents.map {
+            CompanionAgentStatus(
+                id: $0.definition.id,
+                name: $0.definition.name,
+                sessionCount: $0.processCount
+            )
+        }
+        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let coolingStatus = companionCoolingStatus()
+        var capabilities = RemoteEnergyController.capabilities
+#if !APP_STORE
+        capabilities.canSetCoolingProfile = (coolingStatus?.availableProfiles?.count ?? 0) > 1
+#endif
         let thermalState: String = switch ProcessInfo.processInfo.thermalState {
         case .nominal:
             "nominal"
@@ -639,8 +681,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             energySource: reading.source,
             energyConfidence: reading.confidence,
             isCharging: reading.isCharging,
-            capabilities: RemoteEnergyController.capabilities
+            capabilities: capabilities,
+            agents: agentStatuses,
+            manualSession: manualAwakeSession.map {
+                CompanionManualSessionStatus(
+                    startedAt: $0.startedAt,
+                    endsAt: $0.endDate
+                )
+            },
+            cooling: coolingStatus
         )
+    }
+
+    private func companionCoolingStatus() -> CompanionCoolingStatus? {
+#if APP_STORE
+        return nil
+#else
+        let presentation = coolingCoordinator.presentation
+        guard let snapshot = presentation.helperSnapshot else {
+            return CompanionCoolingStatus(
+                profile: presentation.selectedProfile.rawValue,
+                state: presentation.effectiveTitle,
+                temperatureCelsius: nil,
+                verifiedDemand: nil,
+                fans: [],
+                message: presentation.message,
+                availableProfiles: nil
+            )
+        }
+        let availableProfiles: [String] = switch snapshot.qualification {
+        case .monitoringOnly:
+            [CoolingProfile.systemControl.rawValue]
+        case .maximumQualified:
+            [CoolingProfile.systemControl.rawValue, CoolingProfile.maximum.rawValue]
+        case .adaptiveQualified:
+            CoolingProfile.allCases.map(\.rawValue)
+        }
+        return CompanionCoolingStatus(
+            profile: presentation.selectedProfile.rawValue,
+            state: presentation.effectiveTitle,
+            temperatureCelsius: snapshot.optionalAggregateTemperatureCelsius,
+            verifiedDemand: snapshot.optionalVerifiedDemand,
+            fans: snapshot.fans.map {
+                CompanionFanStatus(
+                    id: $0.index,
+                    actualRPM: $0.actualRPM,
+                    targetRPM: $0.optionalTargetRPM,
+                    maximumRPM: $0.optionalMaximumRPM
+                )
+            },
+            message: presentation.message ?? snapshot.detail,
+            availableProfiles: availableProfiles
+        )
+#endif
     }
 
     private func companionHistory() -> CompanionHistorySnapshot {
@@ -718,6 +811,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
             case .setKeepAwake:
                 applyRemoteKeepAwake(command.parameters)
+            case .startManualSession:
+                let duration = command.parameters["durationSeconds"].flatMap(Int.init)
+                if let duration,
+                   !(1...AwakeSession.maximumDurationSeconds).contains(duration) {
+                    throw RemoteEnergyError.unavailable("The requested manual-session duration is invalid.")
+                }
+                guard startKeepingAwake(durationSeconds: duration) else {
+                    throw RemoteEnergyError.unavailable("Sleep Switch could not start the manual session.")
+                }
+            case .stopManualSession:
+                stopKeepingAwake()
+            case .setCoolingProfile:
+#if APP_STORE
+                throw RemoteEnergyError.unavailable("Fan control is not available in the Mac App Store build.")
+#else
+                guard let rawProfile = command.parameters["profile"],
+                      let profile = CoolingProfile(rawValue: rawProfile) else {
+                    throw RemoteEnergyError.unavailable("The requested cooling profile is invalid.")
+                }
+                coolingCoordinator.selectProfile(profile)
+#endif
             case .panicStop:
                 clearManualAwakeSession()
                 wakeDisplayWhenAgentsFinish = false
@@ -755,6 +869,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if let wakeWhenAgentsFinish = parameters["wakeWhenAgentsFinish"].flatMap(Bool.init) {
             self.wakeDisplayWhenAgentsFinish = wakeWhenAgentsFinish
+        }
+        if let rawAwakeMode = parameters["awakeMode"],
+           let awakeMode = KeepAwakeMode(rawValue: rawAwakeMode) {
+#if APP_STORE
+            if awakeMode == .preventSleep {
+                defaults.set(awakeMode.rawValue, forKey: awakeModeKey)
+            }
+#else
+            defaults.set(awakeMode.rawValue, forKey: awakeModeKey)
+#endif
         }
         reconcileAndUpdatePresentation()
     }
@@ -1125,22 +1249,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
 #if APP_STORE
-        codexFolderItem.title = codexDirectoryAccess.isConnected
-            ? "Change Codex Folder…"
-            : "Connect Codex…"
+        let isCodexConnected = codexDirectoryAccess.isConnected
+        codexFolderItem.title = "Change Codex Folder…"
+
+        let hasCodexFolderItem = settingsMenu.items.contains { $0 === codexFolderItem }
+        if isCodexConnected && !hasCodexFolderItem {
+            settingsMenu.insertItem(codexFolderItem, at: 0)
+            settingsMenu.insertItem(codexFolderSeparatorItem, at: 1)
+        } else if !isCodexConnected && hasCodexFolderItem {
+            settingsMenu.removeItem(codexFolderItem)
+            settingsMenu.removeItem(codexFolderSeparatorItem)
+        }
 #endif
         updateLaunchAtLoginPresentation()
     }
 
+    private func updateCompanionDiagnostics(_ diagnostics: CompanionSyncDiagnostics) {
+        let title: String
+        let symbol: String
+        switch diagnostics.state {
+        case .idle, .syncing:
+            title = "iCloud Companion · Checking…"
+            symbol = "icloud"
+        case .unavailable:
+            title = "iCloud Companion · Unavailable"
+            symbol = "icloud.slash"
+        case .succeeded:
+            title = "iCloud Companion · Connected"
+            symbol = "checkmark.icloud"
+        case .failed:
+            title = "iCloud Companion · Needs attention"
+            symbol = "exclamationmark.icloud"
+        }
+        companionStatusItem.title = title
+        companionStatusItem.toolTip = diagnostics.lastError
+            ?? diagnostics.lastWarning
+            ?? "CloudKit sync is pull-based while this Mac is awake."
+        companionStatusItem.image = NSImage(
+            systemSymbolName: symbol,
+            accessibilityDescription: title
+        )
+    }
+
     private func startRefreshTimer() {
         let timer = Timer.scheduledTimer(
-            timeInterval: 10,
+            timeInterval: 15,
             target: self,
             selector: #selector(refreshState),
             userInfo: nil,
             repeats: true
         )
-        timer.tolerance = 2
+        timer.tolerance = 3
         refreshTimer = timer
     }
 
@@ -1284,7 +1443,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startKeepingAwake(durationSeconds: durationSeconds)
     }
 
-    private func startKeepingAwake(durationSeconds: Int?) {
+    @discardableResult
+    private func startKeepingAwake(durationSeconds: Int?) -> Bool {
 #if !APP_STORE
         coolingThermalAbortSuppressesAwake = false
 #endif
@@ -1300,7 +1460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #if !APP_STORE
             synchronizeCoolingOwnership()
 #endif
-            return
+            return false
         }
 
         if let endDate = session.endDate {
@@ -1320,6 +1480,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #if !APP_STORE
         synchronizeCoolingOwnership()
 #endif
+        return true
     }
 
     private func stopKeepingAwake() {

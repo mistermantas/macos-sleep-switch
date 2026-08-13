@@ -33,7 +33,10 @@ struct RemoteEnergyController {
             canShutdownMac: false,
             canSetKeepAwake: true,
             canSleepDisplayUntilAgentsFinish: false,
-            supportsCloudKit: true
+            supportsCloudKit: true,
+            canControlManualSession: true,
+            canSetCoolingProfile: false,
+            canPreventSleepWithLidClosed: false
         )
 #else
         return CompanionMacCapabilities(
@@ -45,7 +48,10 @@ struct RemoteEnergyController {
             canShutdownMac: canRun("/sbin/shutdown"),
             canSetKeepAwake: true,
             canSleepDisplayUntilAgentsFinish: true,
-            supportsCloudKit: true
+            supportsCloudKit: true,
+            canControlManualSession: true,
+            canSetCoolingProfile: true,
+            canPreventSleepWithLidClosed: true
         )
 #endif
     }

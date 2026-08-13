@@ -317,4 +317,23 @@ struct InsightsSnapshot: Equatable {
     let updatedAt: Date
     let historyEnabled: Bool
     let storageBytes: Int64
+    let historyError: String?
+
+    init(
+        energy: [EnergyReading],
+        buckets: [EnergyBucket],
+        activities: [AgentActivityInterval],
+        updatedAt: Date,
+        historyEnabled: Bool,
+        storageBytes: Int64,
+        historyError: String? = nil
+    ) {
+        self.energy = energy
+        self.buckets = buckets
+        self.activities = activities
+        self.updatedAt = updatedAt
+        self.historyEnabled = historyEnabled
+        self.storageBytes = storageBytes
+        self.historyError = historyError
+    }
 }

@@ -79,6 +79,10 @@ xcrun actool \
   >/dev/null
 
 xattr -cr "$app_dir"
+# Finder metadata can be reattached to bundles when the repository is hosted
+# in a synced folder. It makes an otherwise valid signature fail closed.
+xattr -r -d com.apple.FinderInfo "$app_dir" 2>/dev/null || true
+xattr -r -d 'com.apple.fileprovider.fpfs#P' "$app_dir" 2>/dev/null || true
 helper_sign_arguments=(
   --force
   --options runtime
@@ -89,6 +93,7 @@ app_sign_arguments=(
   --force
   --options runtime
   --identifier lt.mantas.sleepswitch
+  --entitlements "$script_dir/Config/Direct/SleepSwitch.entitlements"
   --sign "$signing_identity"
 )
 if [[ "$signing_identity" != "-" ]]; then

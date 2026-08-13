@@ -102,7 +102,10 @@ enum CompanionProtocolTests {
             canShutdownMac: false,
             canSetKeepAwake: true,
             canSleepDisplayUntilAgentsFinish: false,
-            supportsCloudKit: true
+            supportsCloudKit: true,
+            canControlManualSession: true,
+            canSetCoolingProfile: true,
+            canPreventSleepWithLidClosed: false
         )
         expect(
             appStoreCapabilities.availableActions.contains(.wakeDisplay),
@@ -111,6 +114,14 @@ enum CompanionProtocolTests {
         expect(
             !appStoreCapabilities.availableActions.contains(.wakeMac),
             "does not pretend CloudKit can wake a fully sleeping Mac"
+        )
+        expect(
+            appStoreCapabilities.availableActions.contains(.startManualSession),
+            "advertises manual-session control when supported"
+        )
+        expect(
+            appStoreCapabilities.availableActions.contains(.setCoolingProfile),
+            "advertises safe cooling profiles when supported"
         )
 
         let status = CompanionMacStatus(
@@ -134,12 +145,59 @@ enum CompanionProtocolTests {
             energySource: .ac,
             energyConfidence: .estimated,
             isCharging: true,
-            capabilities: appStoreCapabilities
+            capabilities: appStoreCapabilities,
+            agents: [CompanionAgentStatus(id: "opencode", name: "OpenCode", sessionCount: 2)],
+            manualSession: CompanionManualSessionStatus(startedAt: now, endsAt: nil),
+            cooling: CompanionCoolingStatus(
+                profile: "aggressive",
+                state: "Aggressive",
+                temperatureCelsius: 58,
+                verifiedDemand: 0.7,
+                fans: [CompanionFanStatus(id: 0, actualRPM: 4_500, targetRPM: 4_600, maximumRPM: 6_000)],
+                message: nil,
+                availableProfiles: ["systemControl", "aggressive", "maximum"]
+            )
         )
         expect(
             status.refreshingLastSeen(at: now.addingTimeInterval(5)).lastSeen
                 == now.addingTimeInterval(5),
             "refreshes a status heartbeat without changing its payload"
+        )
+        let encodedStatus = try! CompanionJSON.encoder.encode(status)
+        let decodedStatus = try! CompanionJSON.decoder.decode(
+            CompanionMacStatus.self,
+            from: encodedStatus
+        )
+        expect(decodedStatus == status, "round-trips detailed companion telemetry")
+
+        var legacyObject = try! JSONSerialization.jsonObject(with: encodedStatus) as! [String: Any]
+        legacyObject.removeValue(forKey: "agents")
+        legacyObject.removeValue(forKey: "manualSession")
+        legacyObject.removeValue(forKey: "cooling")
+        if var legacyCapabilities = legacyObject["capabilities"] as? [String: Any] {
+            legacyCapabilities.removeValue(forKey: "canControlManualSession")
+            legacyCapabilities.removeValue(forKey: "canSetCoolingProfile")
+            legacyObject["capabilities"] = legacyCapabilities
+        }
+        let legacyData = try! JSONSerialization.data(withJSONObject: legacyObject)
+        let legacyStatus = try! CompanionJSON.decoder.decode(
+            CompanionMacStatus.self,
+            from: legacyData
+        )
+        expect(legacyStatus.agents == nil, "decodes status written by an older Mac build")
+
+        let projectedStatus = status.applyingKeepAwake(parameters: ["enabled": "false"])
+        expect(
+            !projectedStatus.automaticAgentAwakeEnabled,
+            "projects an automatic agent-awake toggle while its command is pending"
+        )
+        expect(
+            projectedStatus.keepDisplayAwake == status.keepDisplayAwake,
+            "keeps unrelated awake settings unchanged in a local projection"
+        )
+        expect(
+            projectedStatus.awakeMode == status.awakeMode,
+            "keeps the awake mode unchanged when it was not requested"
         )
 
         let calendar = Calendar(identifier: .gregorian)

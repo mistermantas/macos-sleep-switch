@@ -12,6 +12,13 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
+      - name: Verify generated project and distribution configuration
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+          git diff --exit-code -- SleepSwitch.xcodeproj
+          chmod +x verify-distribution.sh
+          ./verify-distribution.sh
       - name: Test
         run: |
           chmod +x test.sh
@@ -24,6 +31,16 @@ jobs:
         run: |
           chmod +x test-app-store.sh
           ./test-app-store.sh
+      - name: Build iOS companion (simulator compile check)
+        run: |
+          xcodebuild -quiet \
+            -project SleepSwitch.xcodeproj \
+            -scheme SleepSwitchCompanion \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath build/companion-ci \
+            CODE_SIGNING_ALLOWED=NO \
+            build
       - uses: actions/upload-artifact@v7
         with:
           name: Sleep-Switch

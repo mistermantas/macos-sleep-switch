@@ -1,6 +1,6 @@
 # Sleep Switch Companion — iOS release setup
 
-The repository now contains a real SwiftUI target, `SleepSwitchCompanion`, rather than a placeholder screen. It is an MB Uncascade app with display name Sleep Switch, version `2.2.0 (19)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
+The repository now contains a real SwiftUI target, `SleepSwitchCompanion`, rather than a placeholder screen. It is an MB Uncascade app with display name Sleep Switch, version `2.3.0 (21)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
 
 ## CloudKit setup required once
 
@@ -14,11 +14,11 @@ In CloudKit Dashboard, create or select that container and add these record type
 | `InsightsHistory` | `payload` (Bytes), `deviceID` (String), `updatedAt` (Date), `expiresAt` (Date) |
 | `RemoteCommand` | `targetDeviceID` (String), `action` (String), `state` (String), `createdAt` (Date), `expiresAt` (Date), `payload` (Bytes), `processedAt` (Date, optional), `accepted` (Int, optional), `resultMessage` (String, optional) |
 
-Create query indexes for `MacStatus.deviceID`, `MacStatus.expiresAt`, `InsightsHistory.deviceID`, `InsightsHistory.expiresAt`, `RemoteCommand.targetDeviceID`, and `RemoteCommand.state`. Deploy the development schema before archiving. The app only uses the private database; there is no public record exposure.
+Create query indexes for `MacStatus.deviceID`, `MacStatus.expiresAt`, `InsightsHistory.deviceID`, `InsightsHistory.expiresAt`, `RemoteCommand.targetDeviceID`, and `RemoteCommand.state`. Deploy the development schema, then promote the same schema to **Production** before archiving. Release builds use the production CloudKit environment; Debug builds continue to use Development. The app only uses the private database; there is no public record exposure.
 
 `InsightsHistory` is intentionally bounded: it contains at most the last 24 hours of five-minute energy buckets plus 30 daily kWh summaries and coarse agent-hours summaries. It never contains prompts, output, process names, file names, or one-minute readings. When **Save Energy & Agent History** is off on the Mac, the published payload is empty and the companion shows that history is unavailable.
 
-The Xcode project already references the container and includes iCloud entitlements for both targets. Before a production archive, set the Release entitlement environment to `Production` after the development schema is deployed and confirm that the container is assigned to both bundle IDs in Certificates, Identifiers & Profiles.
+The Xcode project already references the container and includes separate Debug and Release iCloud entitlements for both targets. Run `./verify-distribution.sh` before an archive; it fails if Release is not Production or if either target points at the wrong entitlement. Confirm that the container is assigned to both bundle IDs in Certificates, Identifiers & Profiles.
 
 ## Build and archive
 
@@ -28,11 +28,11 @@ xcodebuild -project SleepSwitch.xcodeproj \
   -scheme SleepSwitchCompanion \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath /tmp/SleepSwitchCompanion-2.2.0-19.xcarchive \
+  -archivePath /tmp/SleepSwitchCompanion-2.3.0-21.xcarchive \
   -allowProvisioningUpdates archive
 ```
 
-The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.2.0 (19)` includes the short display name and Settings dismissal fix; build 18 is the currently attached build until 19 finishes processing. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
+The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.3.0 (21)` adds full remote controls, clearer telemetry and insights, actionable command diagnostics, and safe Simulator behavior. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
 
 `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
 

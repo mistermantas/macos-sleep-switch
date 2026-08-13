@@ -200,6 +200,21 @@ enum CompanionProtocolTests {
             "keeps the awake mode unchanged when it was not requested"
         )
 
+        let temperatureSensors = CompanionTemperatureParser.sensors(from: """
+        cpu-sensors=Tp01=57.5,Tp05=unavailable
+        gpu-sensors=Tg0K=48.0
+        auxiliary-sensors=Tm0p=43.25
+        """)
+        expect(temperatureSensors.count == 3, "parses available detailed temperature readings")
+        expect(
+            temperatureSensors.first(where: { $0.key == "Tp01" })?.celsius == 57.5,
+            "preserves precise sensor temperatures"
+        )
+        expect(
+            !temperatureSensors.contains(where: { $0.key == "Tp05" }),
+            "omits unavailable sensor readings"
+        )
+
         let calendar = Calendar(identifier: .gregorian)
         let day = calendar.startOfDay(for: now)
         let historySnapshot = InsightsSnapshot(

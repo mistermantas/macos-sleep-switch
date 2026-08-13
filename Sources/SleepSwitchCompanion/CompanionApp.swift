@@ -567,7 +567,17 @@ private enum CompanionScreenshotDemo {
                     CompanionFanStatus(id: 1, actualRPM: 4_760, targetRPM: 4_900, maximumRPM: 6_200)
                 ],
                 message: nil,
-                availableProfiles: ["systemControl", "aggressive", "maximum"]
+                availableProfiles: ["systemControl", "aggressive", "maximum"],
+                sensors: [
+                    CompanionTemperatureSensor(key: "Tp01", group: .cpu, celsius: 57.4),
+                    CompanionTemperatureSensor(key: "Tp05", group: .cpu, celsius: 58.1),
+                    CompanionTemperatureSensor(key: "Tp09", group: .cpu, celsius: 61.8),
+                    CompanionTemperatureSensor(key: "Tp0D", group: .cpu, celsius: 59.2),
+                    CompanionTemperatureSensor(key: "Tg0K", group: .gpu, celsius: 48.3),
+                    CompanionTemperatureSensor(key: "Tg0L", group: .gpu, celsius: 47.9),
+                    CompanionTemperatureSensor(key: "Tm0p", group: .auxiliary, celsius: 43.2),
+                    CompanionTemperatureSensor(key: "Tm1p", group: .auxiliary, celsius: 44.1)
+                ]
             )
         )
 
@@ -591,11 +601,30 @@ private enum CompanionScreenshotDemo {
                 agentCount: [1, 2, 3, 2, 4, 3, 3][offset]
             )
         }
+        let energyBuckets = (0..<288).compactMap { offset -> EnergyBucket? in
+            // Leave one honest gap in the demo so screenshots and visual QA do
+            // not imply that missing telemetry means zero consumption.
+            guard !(86...103).contains(offset) else { return nil }
+            let bucketStart = now.addingTimeInterval(TimeInterval(offset - 287) * 300)
+            let wave = sin(Double(offset) / 18) * 8
+            let workBurst = (164...208).contains(offset) ? 24.0 : 0
+            let watts = max(5, 20 + wave + workBurst)
+            return EnergyBucket(
+                bucketStart: bucketStart,
+                durationSeconds: 300,
+                averageWatts: watts,
+                peakWatts: watts + 7,
+                kilowattHours: watts * 300 / 3_600_000,
+                source: .ac,
+                confidence: .estimated,
+                sampleCount: 5
+            )
+        }
         let history = CompanionHistorySnapshot(
             deviceID: deviceID,
             updatedAt: now,
             historyEnabled: true,
-            energyBuckets: [],
+            energyBuckets: energyBuckets,
             energyDays: energyDays,
             agentDays: agentDays,
             storageBytes: 92_160

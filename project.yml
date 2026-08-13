@@ -62,12 +62,12 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 22
+        CURRENT_PROJECT_VERSION: 23
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Companion/Info.plist
-        MARKETING_VERSION: 2.3.1
+        MARKETING_VERSION: 2.3.2
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion
         PRODUCT_NAME: Sleep Switch
         SWIFT_VERSION: "5.0"

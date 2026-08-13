@@ -8,6 +8,8 @@ final class CoolingDetailsWindowController: NSWindowController {
     private let modelValue = NSTextField(labelWithString: "—")
     private let fansValue = NSTextField(labelWithString: "—")
     private let helperValue = NSTextField(labelWithString: "—")
+    private let sensorStack = NSStackView()
+    private let sensorScroll = NSScrollView()
     private let copyButton = NSButton(
         title: "Copy Diagnostics",
         target: nil,
@@ -21,7 +23,7 @@ final class CoolingDetailsWindowController: NSWindowController {
 
     init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -54,6 +56,7 @@ final class CoolingDetailsWindowController: NSWindowController {
         modelValue.stringValue = snapshot?.model ?? "—"
         fansValue.stringValue = fanText(snapshot?.fans ?? [])
         helperValue.stringValue = helperText(presentation.registrationState)
+        updateSensors(snapshot?.diagnosticMetadata)
         noteLabel.textColor = snapshot?.state == .restoreFailed
             ? .systemRed
             : .secondaryLabelColor
@@ -110,6 +113,18 @@ final class CoolingDetailsWindowController: NSWindowController {
             $0.font = .systemFont(ofSize: 13, weight: .medium)
         }
 
+        let sensorTitle = NSTextField(labelWithString: "Temperature sensors")
+        sensorTitle.font = .systemFont(ofSize: 13, weight: .semibold)
+        sensorStack.orientation = .vertical
+        sensorStack.alignment = .leading
+        sensorStack.spacing = 6
+        sensorStack.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 8)
+        sensorStack.translatesAutoresizingMaskIntoConstraints = false
+        sensorScroll.documentView = sensorStack
+        sensorScroll.hasVerticalScroller = true
+        sensorScroll.drawsBackground = false
+        sensorScroll.borderType = .noBorder
+
         noteLabel.maximumNumberOfLines = 2
         noteLabel.textColor = .secondaryLabelColor
         noteLabel.font = .systemFont(ofSize: 12)
@@ -140,6 +155,9 @@ final class CoolingDetailsWindowController: NSWindowController {
             separator(),
             details,
             separator(),
+            sensorTitle,
+            sensorScroll,
+            separator(),
             footer
         ])
         stack.orientation = .vertical
@@ -167,8 +185,64 @@ final class CoolingDetailsWindowController: NSWindowController {
             ),
             header.widthAnchor.constraint(equalTo: stack.widthAnchor),
             details.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            sensorScroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            sensorScroll.heightAnchor.constraint(equalToConstant: 190),
+            sensorStack.widthAnchor.constraint(
+                equalTo: sensorScroll.contentView.widthAnchor,
+                constant: -8
+            ),
             footer.widthAnchor.constraint(equalTo: stack.widthAnchor)
         ])
+    }
+
+    private func updateSensors(_ diagnosticMetadata: String?) {
+        sensorStack.arrangedSubviews.forEach {
+            sensorStack.removeArrangedSubview($0)
+            $0.removeFromSuperview()
+        }
+        let sensors = CompanionTemperatureParser.sensors(
+            from: diagnosticMetadata
+        )
+        guard !sensors.isEmpty else {
+            let unavailable = NSTextField(
+                labelWithString: "No detailed sensor readings are available."
+            )
+            unavailable.textColor = .secondaryLabelColor
+            unavailable.font = .systemFont(ofSize: 12)
+            sensorStack.addArrangedSubview(unavailable)
+            return
+        }
+
+        for group in CompanionTemperatureGroup.allCases {
+            let values = sensors.filter { $0.group == group }
+            guard !values.isEmpty else { continue }
+            let heading = NSTextField(labelWithString: group.title)
+            heading.font = .systemFont(ofSize: 12, weight: .semibold)
+            heading.textColor = .secondaryLabelColor
+            sensorStack.addArrangedSubview(heading)
+            for sensor in values {
+                let key = NSTextField(labelWithString: sensor.key)
+                key.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+                let value = NSTextField(
+                    labelWithString: String(format: "%.1f°C", sensor.celsius)
+                )
+                value.font = .monospacedDigitSystemFont(
+                    ofSize: 12,
+                    weight: .semibold
+                )
+                if sensor.celsius >= 85 {
+                    value.textColor = .systemRed
+                } else if sensor.celsius >= 70 {
+                    value.textColor = .systemOrange
+                }
+                let row = NSStackView(views: [key, NSView(), value])
+                row.orientation = .horizontal
+                row.alignment = .centerY
+                row.translatesAutoresizingMaskIntoConstraints = false
+                row.widthAnchor.constraint(equalTo: sensorStack.widthAnchor).isActive = true
+                sensorStack.addArrangedSubview(row)
+            }
+        }
     }
 
     @objc private func copyDiagnostics() {

@@ -159,6 +159,69 @@ struct CompanionFanStatus: Codable, Equatable, Identifiable {
     let maximumRPM: Double?
 }
 
+enum CompanionTemperatureGroup: String, Codable, CaseIterable {
+    case cpu
+    case gpu
+    case auxiliary
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .auxiliary: "Memory & system"
+        }
+    }
+}
+
+struct CompanionTemperatureSensor: Codable, Equatable, Identifiable {
+    let key: String
+    let group: CompanionTemperatureGroup
+    let celsius: Double
+
+    var id: String { "\(group.rawValue)-\(key)" }
+}
+
+enum CompanionTemperatureParser {
+    static func sensors(from diagnosticMetadata: String?) -> [CompanionTemperatureSensor] {
+        guard let diagnosticMetadata else { return [] }
+        let groupPrefixes: [(String, CompanionTemperatureGroup)] = [
+            ("cpu-sensors=", .cpu),
+            ("gpu-sensors=", .gpu),
+            ("auxiliary-sensors=", .auxiliary)
+        ]
+        return diagnosticMetadata
+            .split(whereSeparator: \.isNewline)
+            .flatMap { line -> [CompanionTemperatureSensor] in
+                let text = String(line)
+                guard let match = groupPrefixes.first(where: { text.hasPrefix($0.0) }) else {
+                    return []
+                }
+                return text.dropFirst(match.0.count)
+                    .split(separator: ",")
+                    .compactMap { reading in
+                        let components = reading.split(separator: "=", maxSplits: 1)
+                        guard components.count == 2,
+                              let value = Double(components[1]),
+                              value.isFinite,
+                              (10...120).contains(value) else {
+                            return nil
+                        }
+                        return CompanionTemperatureSensor(
+                            key: String(components[0]),
+                            group: match.1,
+                            celsius: value
+                        )
+                    }
+            }
+            .sorted {
+                if $0.group.rawValue != $1.group.rawValue {
+                    return $0.group.rawValue < $1.group.rawValue
+                }
+                return $0.key.localizedStandardCompare($1.key) == .orderedAscending
+            }
+    }
+}
+
 struct CompanionCoolingStatus: Codable, Equatable {
     let profile: String
     let state: String
@@ -167,6 +230,7 @@ struct CompanionCoolingStatus: Codable, Equatable {
     let fans: [CompanionFanStatus]
     let message: String?
     let availableProfiles: [String]?
+    var sensors: [CompanionTemperatureSensor]? = nil
 }
 
 struct CompanionMacStatus: Codable, Equatable, Identifiable {

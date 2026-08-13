@@ -20,6 +20,11 @@ struct CompanionDashboardRoot: View {
             NavigationStack {
                 CompanionInsightsScreen(mac: mac, history: history)
             }
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-mac-detail"),
+                  let mac = selectedMac {
+            NavigationStack {
+                CompanionMacDetailScreen(mac: mac)
+            }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-controls"),
                   let mac = selectedMac {
             NavigationStack {
@@ -93,7 +98,12 @@ struct CompanionDashboardRoot: View {
                     selectedDeviceID: $selectedMacDeviceID,
                     lastSyncAt: model.lastSyncAt
                 )
-                MacSnapshotCard(mac: mac)
+                NavigationLink {
+                    CompanionMacDetailScreen(mac: mac)
+                } label: {
+                    MacSnapshotCard(mac: mac)
+                }
+                .buttonStyle(.plain)
                 ManualSessionCard(mac: mac, model: model)
                 PrimaryRemoteControls(
                     mac: mac,
@@ -195,7 +205,11 @@ private struct MacSnapshotCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(mac.isStale ? "Last seen (mac.lastSeen.formatted(.relative(presentation: .named)))" : "Online")
+                    Text(
+                        mac.isStale
+                            ? "Last seen \(mac.lastSeen.formatted(.relative(presentation: .named)))"
+                            : "Online"
+                    )
                         .font(.headline)
                     Text(mac.build)
                         .font(.caption)
@@ -205,6 +219,9 @@ private struct MacSnapshotCard: View {
                 Circle()
                     .fill(mac.isStale ? Color.secondary : Color.green)
                     .frame(width: 10, height: 10)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.tertiary)
             }
 
             HStack(spacing: 0) {
@@ -301,6 +318,159 @@ private struct SnapshotMetric: View {
     }
 }
 
+private struct CompanionMacDetailScreen: View {
+    let mac: CompanionMacStatus
+
+    private var sensors: [CompanionTemperatureSensor] {
+        mac.cooling?.sensors ?? []
+    }
+
+    private var hottestTemperature: Double? {
+        sensors.map(\.celsius).max() ?? mac.cooling?.temperatureCelsius
+    }
+
+    private var averageTemperature: Double? {
+        guard !sensors.isEmpty else { return mac.cooling?.temperatureCelsius }
+        return sensors.map(\.celsius).reduce(0, +) / Double(sensors.count)
+    }
+
+    var body: some View {
+        List {
+            Section {
+                HStack(spacing: 0) {
+                    DetailMetric(
+                        value: hottestTemperature.map(temperatureText) ?? "—",
+                        label: "Hottest"
+                    )
+                    Divider().frame(height: 38)
+                    DetailMetric(
+                        value: averageTemperature.map(temperatureText) ?? "—",
+                        label: "Average"
+                    )
+                    Divider().frame(height: 38)
+                    DetailMetric(value: "\(sensors.count)", label: "Sensors")
+                }
+                .padding(.vertical, 6)
+
+                LabeledContent("macOS thermal pressure", value: mac.thermalState.capitalized)
+                if let state = mac.cooling?.state {
+                    LabeledContent("Cooling", value: state)
+                }
+            } header: {
+                Label("Thermals", systemImage: "thermometer.medium")
+            }
+
+            ForEach(CompanionTemperatureGroup.allCases, id: \.rawValue) { group in
+                let groupSensors = sensors.filter { $0.group == group }
+                if !groupSensors.isEmpty {
+                    Section(group.title) {
+                        ForEach(groupSensors) { sensor in
+                            HStack {
+                                Text(sensor.key)
+                                    .font(.body.monospaced())
+                                Spacer()
+                                Text(temperatureText(sensor.celsius))
+                                    .font(.body.monospacedDigit().weight(.semibold))
+                                    .foregroundStyle(temperatureColor(sensor.celsius))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let cooling = mac.cooling, !cooling.fans.isEmpty {
+                Section {
+                    ForEach(cooling.fans) { fan in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Fan \(fan.id + 1)")
+                                Spacer()
+                                Text("\(Int(fan.actualRPM.rounded())) RPM")
+                                    .font(.body.monospacedDigit().weight(.semibold))
+                            }
+                            if let maximum = fan.maximumRPM, maximum > 0 {
+                                ProgressView(value: min(1, fan.actualRPM / maximum))
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                } header: {
+                    Label("Fans", systemImage: "fan")
+                }
+            }
+
+            Section {
+                if let agents = mac.agents, !agents.isEmpty {
+                    ForEach(agents) { agent in
+                        LabeledContent(agent.name, value: "\(agent.sessionCount) running")
+                    }
+                } else {
+                    Label("No agent sessions running", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Label("Agents", systemImage: "terminal")
+            }
+
+            Section("Mac") {
+                LabeledContent("Status", value: mac.isStale ? "Last seen \(mac.lastSeen.formatted(.relative(presentation: .named)))" : "Online")
+                LabeledContent("Version", value: mac.build)
+                LabeledContent("Display", value: mac.displayAsleep ? "Asleep" : "Awake")
+                LabeledContent("Awake mode", value: awakeModeTitle)
+                LabeledContent("Uptime", value: uptimeText)
+                LabeledContent("Power", value: powerText)
+            }
+        }
+        .navigationTitle(mac.displayName)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var awakeModeTitle: String {
+        switch mac.awakeMode {
+        case "lidClosed": "Even with lid closed"
+        case "preventSleep": "Prevent sleep"
+        default: mac.isKeepingAwake ? "Keeping awake" : "Follows macOS"
+        }
+    }
+
+    private var uptimeText: String {
+        let hours = Int(mac.uptimeSeconds) / 3_600
+        return hours >= 24 ? "\(hours / 24)d \(hours % 24)h" : "\(hours)h"
+    }
+
+    private var powerText: String {
+        guard let watts = mac.estimatedWatts else { return mac.energySource.title }
+        return "\(Int(watts.rounded())) W · \(mac.energySource.title)"
+    }
+
+    private func temperatureText(_ value: Double) -> String {
+        String(format: "%.1f°C", value)
+    }
+
+    private func temperatureColor(_ value: Double) -> Color {
+        if value >= 85 { return .red }
+        if value >= 70 { return .orange }
+        return .primary
+    }
+}
+
+private struct DetailMetric: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value)
+                .font(.headline.monospacedDigit())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+    }
+}
+
 private struct ManualSessionCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
@@ -323,6 +493,7 @@ private struct ManualSessionCard: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.red)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(!manualSessionAvailable)
             } else {
                 Menu {
                     sessionButton("Indefinitely", seconds: nil)
@@ -335,6 +506,13 @@ private struct ManualSessionCard: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!manualSessionAvailable)
+            }
+
+            if let unavailableReason {
+                Label(unavailableReason, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Divider()
@@ -343,7 +521,7 @@ private struct ManualSessionCard: View {
                 get: { mac.keepDisplayAwake },
                 set: { model.send(.setKeepAwake, to: mac, parameters: ["keepDisplayAwake": String($0)]) }
             ))
-            .disabled(!mac.capabilities.canSetKeepAwake)
+            .disabled(!mac.capabilities.canSetKeepAwake || mac.isStale || model.commandInFlight)
 
             if mac.capabilities.canPreventSleepWithLidClosed == true {
                 Picker("Awake mode", selection: Binding(
@@ -354,11 +532,10 @@ private struct ManualSessionCard: View {
                     Text("Even Lid Closed").tag("lidClosed")
                 }
                 .pickerStyle(.segmented)
-                .disabled(!mac.capabilities.canSetKeepAwake)
+                .disabled(!mac.capabilities.canSetKeepAwake || mac.isStale || model.commandInFlight)
             }
         }
         .cardStyle()
-        .disabled(mac.capabilities.canControlManualSession != true || mac.isStale || model.commandInFlight)
     }
 
     @ViewBuilder
@@ -373,6 +550,21 @@ private struct ManualSessionCard: View {
     private var remainingText: String {
         guard let end = mac.manualSession?.endsAt else { return "Running" }
         return end.formatted(.relative(presentation: .named))
+    }
+
+    private var manualSessionAvailable: Bool {
+        mac.capabilities.canControlManualSession == true
+            && !mac.isStale
+            && !model.commandInFlight
+    }
+
+    private var unavailableReason: String? {
+        if mac.isStale { return "Mac is offline" }
+        if mac.capabilities.canControlManualSession != true {
+            return "Update Sleep Switch on this Mac to enable remote sessions"
+        }
+        if model.commandInFlight { return "Waiting for the Mac" }
+        return nil
     }
 }
 
@@ -636,6 +828,13 @@ struct CompanionInsightsScreen: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Insights")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--screenshot-insights-day") {
+                range = .day
+            }
+            #endif
+        }
     }
 }
 
@@ -659,12 +858,38 @@ private struct EnergyInsightsChart: View {
     let mac: CompanionMacStatus
     let history: CompanionHistorySnapshot
     let range: CompanionInsightsRange
+    @State private var selectedDate: Date?
+
+    private let calendar = Calendar.autoupdatingCurrent
 
     private var days: [CompanionEnergyDay] {
         history.energyDays.filter { $0.dayStart >= Date().addingTimeInterval(-range.duration) }
     }
     private var buckets: [EnergyBucket] {
         history.energyBuckets.filter { $0.bucketStart >= Date().addingTimeInterval(-range.duration) }
+    }
+    private var dayPoints: [EnergyDayPoint] {
+        let count = range == .week ? 7 : 30
+        let today = calendar.startOfDay(for: Date())
+        let indexed = Dictionary(uniqueKeysWithValues: days.map { (calendar.startOfDay(for: $0.dayStart), $0) })
+        return (0..<count).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset - count + 1, to: today) else {
+                return nil
+            }
+            return EnergyDayPoint(date: date, day: indexed[date])
+        }
+    }
+    private var selectedBucket: EnergyBucket? {
+        guard range == .day, let selectedDate else { return nil }
+        guard let nearest = buckets.min(by: {
+            abs($0.bucketStart.timeIntervalSince(selectedDate)) < abs($1.bucketStart.timeIntervalSince(selectedDate))
+        }) else { return nil }
+        let tolerance = max(TimeInterval(nearest.durationSeconds), 5 * 60)
+        return abs(nearest.bucketStart.timeIntervalSince(selectedDate)) <= tolerance ? nearest : nil
+    }
+    private var selectedDayPoint: EnergyDayPoint? {
+        guard range != .day, let selectedDate else { return nil }
+        return dayPoints.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
     }
 
     var body: some View {
@@ -677,17 +902,14 @@ private struct EnergyInsightsChart: View {
                 SummaryValue(value: peakText, label: "Peak draw")
             }
 
+            selectionInspector
+
             if range == .day ? buckets.isEmpty : days.isEmpty {
                 ContentUnavailableView("Energy history is building", systemImage: "bolt")
                     .frame(minHeight: 220)
             } else {
-                Chart(range == .day ? buckets.map(EnergyChartPoint.init) : days.map(EnergyChartPoint.init)) { point in
-                    BarMark(
-                        x: .value("Time", point.date),
-                        y: .value("Energy", point.kilowattHours)
-                    )
-                    .foregroundStyle(Color.blue.gradient)
-                    .cornerRadius(3)
+                Chart {
+                    energyChart
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
@@ -700,15 +922,136 @@ private struct EnergyInsightsChart: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: range == .day ? 4 : 6)) { value in
+                    AxisMarks(values: axisDates) { value in
                         AxisGridLine().foregroundStyle(.clear)
-                        AxisValueLabel(format: range == .day ? .dateTime.hour() : .dateTime.weekday(.abbreviated))
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(axisLabel(for: date))
+                            }
+                        }
                     }
                 }
+                .chartXSelection(value: $selectedDate)
                 .frame(height: 240)
             }
+
+            Label(
+                range == .day
+                    ? "Touch and drag for five-minute readings"
+                    : "Touch and drag for daily totals",
+                systemImage: "hand.draw"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .cardStyle()
+        .onAppear { selectLatest() }
+        .onChange(of: range) { _, _ in selectLatest() }
+    }
+
+    @ChartContentBuilder
+    private var energyChart: some ChartContent {
+        if range == .day {
+            ForEach(buckets) { bucket in
+                BarMark(
+                    x: .value("Time", bucket.bucketStart),
+                    y: .value("Average watts", bucket.averageWatts ?? 0)
+                )
+                .foregroundStyle(
+                    selectedBucket?.id == bucket.id
+                        ? Color.cyan
+                        : Color.blue
+                )
+                .cornerRadius(2)
+            }
+        } else {
+            ForEach(dayPoints) { point in
+                BarMark(
+                    x: .value("Day", point.date),
+                    y: .value("Energy", point.day?.kilowattHours ?? 0)
+                )
+                .foregroundStyle(
+                    selectedDayPoint?.id == point.id
+                        ? Color.cyan
+                        : Color.blue
+                )
+                .opacity(point.day == nil ? 0 : 1)
+                .cornerRadius(3)
+            }
+        }
+
+        if let selectedDate {
+            RuleMark(x: .value("Selected", selectedDate))
+                .foregroundStyle(.secondary)
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+        }
+    }
+
+    @ViewBuilder
+    private var selectionInspector: some View {
+        if range == .day, let bucket = selectedBucket {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(bucketTime(bucket)).font(.headline)
+                    Spacer()
+                    Label(readingState(bucket), systemImage: readingStateSymbol(bucket))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 0) {
+                    SummaryValue(value: bucket.averageWatts.map(wattsText) ?? "—", label: "Average")
+                    Divider().frame(height: 34)
+                    SummaryValue(value: bucket.peakWatts.map(wattsText) ?? "—", label: "Peak")
+                    Divider().frame(height: 34)
+                    SummaryValue(value: energyText(bucket.kilowattHours), label: "Energy")
+                }
+                HStack(spacing: 12) {
+                    Label(bucket.source.title, systemImage: bucket.source == .battery ? "battery.75percent" : "powerplug")
+                    Text(bucket.confidence.title)
+                    Text("\(Int((bucket.coverage * 100).rounded()))% sampled")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else if range == .day, let selectedDate {
+            HStack(spacing: 12) {
+                Image(systemName: "moon.zzz")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(selectedDate.formatted(date: .abbreviated, time: .shortened))
+                        .font(.headline)
+                    Text("No report · asleep, off, or unavailable")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(12)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else if range != .day, let point = selectedDayPoint {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(point.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                        .font(.headline)
+                    Spacer()
+                    Text(point.day == nil ? "No report" : "Daily total")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 0) {
+                    SummaryValue(value: point.day.map { String(format: "%.3f kWh", $0.kilowattHours) } ?? "—", label: "Energy")
+                    Divider().frame(height: 34)
+                    SummaryValue(value: point.day.flatMap(\.averageWatts).map(wattsText) ?? "—", label: "Average")
+                    Divider().frame(height: 34)
+                    SummaryValue(value: point.day.flatMap(\.peakWatts).map(wattsText) ?? "—", label: "Peak")
+                }
+            }
+            .padding(12)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
     }
 
     private var totalText: String {
@@ -726,23 +1069,108 @@ private struct EnergyInsightsChart: View {
         let peak = range == .day ? buckets.compactMap(\.peakWatts).max() : days.compactMap(\.peakWatts).max()
         return peak.map { "\(Int($0.rounded())) W" } ?? "—"
     }
+
+    private var axisDates: [Date] {
+        if range == .day {
+            guard let first = buckets.first?.bucketStart, let last = buckets.last?.bucketStart else { return [] }
+            return evenlySpacedDates(from: first, through: last, count: 4)
+        }
+        let points = dayPoints
+        let desiredCount = range == .week ? 4 : 5
+        guard !points.isEmpty else { return [] }
+        return evenlySpacedIndices(total: points.count, count: desiredCount).map { points[$0].date }
+    }
+
+    private func axisLabel(for date: Date) -> String {
+        if range == .day {
+            return date.formatted(.dateTime.hour().minute())
+        }
+        if range == .week {
+            return date.formatted(.dateTime.weekday(.abbreviated).day())
+        }
+        return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    private func selectLatest() {
+        selectedDate = range == .day ? buckets.last?.bucketStart : dayPoints.last?.date
+    }
+
+    private func readingState(_ bucket: EnergyBucket) -> String {
+        let isCurrent = abs(history.updatedAt.timeIntervalSince(bucket.bucketStart)) < 10 * 60
+        guard isCurrent else { return "Mac reporting" }
+        if mac.displayAsleep { return "Display asleep" }
+        if mac.isKeepingAwake { return "Kept awake" }
+        return "Display awake"
+    }
+
+    private func readingStateSymbol(_ bucket: EnergyBucket) -> String {
+        let state = readingState(bucket)
+        if state == "Display asleep" { return "moon.fill" }
+        if state == "Kept awake" { return "cup.and.saucer.fill" }
+        if state == "Display awake" { return "display" }
+        return "checkmark.circle"
+    }
+
+    private func bucketTime(_ bucket: EnergyBucket) -> String {
+        let end = bucket.bucketStart.addingTimeInterval(TimeInterval(bucket.durationSeconds))
+        return "\(bucket.bucketStart.formatted(date: .abbreviated, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened))"
+    }
+
+    private func wattsText(_ watts: Double) -> String {
+        String(format: "%.1f W", watts)
+    }
+
+    private func energyText(_ kilowattHours: Double?) -> String {
+        guard let kilowattHours else { return "—" }
+        return kilowattHours < 0.01
+            ? String(format: "%.1f Wh", kilowattHours * 1_000)
+            : String(format: "%.3f kWh", kilowattHours)
+    }
+
+    private func evenlySpacedDates(from start: Date, through end: Date, count: Int) -> [Date] {
+        guard count > 1, end > start else { return [start] }
+        return (0..<count).map { index in
+            start.addingTimeInterval(end.timeIntervalSince(start) * Double(index) / Double(count - 1))
+        }
+    }
+
+    private func evenlySpacedIndices(total: Int, count: Int) -> [Int] {
+        guard total > 1, count > 1 else { return total == 0 ? [] : [0] }
+        return Array(Set((0..<count).map { Int((Double($0) * Double(total - 1) / Double(count - 1)).rounded()) })).sorted()
+    }
 }
 
-private struct EnergyChartPoint: Identifiable {
+private struct EnergyDayPoint: Identifiable {
     let date: Date
-    let kilowattHours: Double
+    let day: CompanionEnergyDay?
     var id: Date { date }
-    init(_ day: CompanionEnergyDay) { date = day.dayStart; kilowattHours = day.kilowattHours }
-    init(_ bucket: EnergyBucket) { date = bucket.bucketStart; kilowattHours = bucket.kilowattHours ?? 0 }
 }
 
 private struct AgentInsightsChart: View {
     let mac: CompanionMacStatus
     let history: CompanionHistorySnapshot
     let range: CompanionInsightsRange
+    @State private var selectedDate: Date?
+
+    private let calendar = Calendar.autoupdatingCurrent
 
     private var days: [CompanionAgentDay] {
         history.agentDays.filter { $0.dayStart >= Date().addingTimeInterval(-range.duration) }
+    }
+    private var dayPoints: [AgentDayPoint] {
+        let count = range == .day ? 1 : range == .week ? 7 : 30
+        let today = calendar.startOfDay(for: Date())
+        let indexed = Dictionary(uniqueKeysWithValues: days.map { (calendar.startOfDay(for: $0.dayStart), $0) })
+        return (0..<count).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: offset - count + 1, to: today) else {
+                return nil
+            }
+            return AgentDayPoint(date: date, day: indexed[date])
+        }
+    }
+    private var selectedPoint: AgentDayPoint? {
+        guard let selectedDate else { return nil }
+        return dayPoints.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
     }
 
     var body: some View {
@@ -755,17 +1183,50 @@ private struct AgentInsightsChart: View {
                 SummaryValue(value: "\(mac.activeSessionCount)", label: "Active now")
             }
 
+            if let point = selectedPoint {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text(point.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                            .font(.headline)
+                        Spacer()
+                        Text(point.day == nil ? "No activity recorded" : "Daily total")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 0) {
+                        SummaryValue(
+                            value: point.day.map { String(format: "%.1f h", $0.activeSeconds / 3_600) } ?? "—",
+                            label: "Agent time"
+                        )
+                        Divider().frame(height: 34)
+                        SummaryValue(value: point.day.map { "\($0.peakSessionCount)" } ?? "—", label: "Peak sessions")
+                        Divider().frame(height: 34)
+                        SummaryValue(value: point.day.map { "\($0.agentCount)" } ?? "—", label: "Agents")
+                    }
+                }
+                .padding(12)
+                .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+
             if days.isEmpty {
                 ContentUnavailableView("No agent activity in this range", systemImage: "terminal")
                     .frame(minHeight: 220)
             } else {
-                Chart(days) { day in
-                    BarMark(
-                        x: .value("Day", day.dayStart),
-                        y: .value("Hours", day.activeSeconds / 3_600)
-                    )
-                    .foregroundStyle(Color.orange.gradient)
-                    .cornerRadius(3)
+                Chart {
+                    ForEach(dayPoints) { point in
+                        BarMark(
+                            x: .value("Day", point.date),
+                            y: .value("Hours", point.day.map { $0.activeSeconds / 3_600 } ?? 0)
+                        )
+                        .foregroundStyle(selectedPoint?.id == point.id ? Color.yellow : Color.orange)
+                        .opacity(point.day == nil ? 0 : 1)
+                        .cornerRadius(3)
+                    }
+                    if let selectedDate {
+                        RuleMark(x: .value("Selected", selectedDate))
+                            .foregroundStyle(.secondary)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
@@ -778,12 +1239,21 @@ private struct AgentInsightsChart: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                        AxisValueLabel(format: .dateTime.weekday(.abbreviated))
+                    AxisMarks(values: axisDates) { value in
+                        AxisValueLabel {
+                            if let date = value.as(Date.self) {
+                                Text(axisLabel(for: date))
+                            }
+                        }
                     }
                 }
+                .chartXSelection(value: $selectedDate)
                 .frame(height: 240)
             }
+
+            Label("Touch and drag for daily activity", systemImage: "hand.draw")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             if let agents = mac.agents, !agents.isEmpty {
                 Divider()
@@ -799,7 +1269,29 @@ private struct AgentInsightsChart: View {
             }
         }
         .cardStyle()
+        .onAppear { selectedDate = dayPoints.last?.date }
+        .onChange(of: range) { _, _ in selectedDate = dayPoints.last?.date }
     }
+
+    private var axisDates: [Date] {
+        let desiredCount = range == .month ? 5 : min(4, dayPoints.count)
+        guard dayPoints.count > 1, desiredCount > 1 else { return dayPoints.map(\.date) }
+        let indices = Array(Set((0..<desiredCount).map {
+            Int((Double($0) * Double(dayPoints.count - 1) / Double(desiredCount - 1)).rounded())
+        })).sorted()
+        return indices.map { dayPoints[$0].date }
+    }
+
+    private func axisLabel(for date: Date) -> String {
+        if range == .month { return date.formatted(.dateTime.month(.abbreviated).day()) }
+        return date.formatted(.dateTime.weekday(.abbreviated).day())
+    }
+}
+
+private struct AgentDayPoint: Identifiable {
+    let date: Date
+    let day: CompanionAgentDay?
+    var id: Date { date }
 }
 
 private struct CompanionRemoteControlsScreen: View {

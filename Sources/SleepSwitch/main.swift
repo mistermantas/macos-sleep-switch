@@ -732,7 +732,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 )
             },
             message: presentation.message ?? snapshot.detail,
-            availableProfiles: availableProfiles
+            availableProfiles: availableProfiles,
+            sensors: CompanionTemperatureParser.sensors(
+                from: snapshot.diagnosticMetadata
+            )
         )
 #endif
     }

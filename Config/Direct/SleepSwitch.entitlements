@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>com.apple.application-identifier</key>
+    <string>C43F5MKJF2.lt.mantas.sleepswitch</string>
+    <key>com.apple.developer.team-identifier</key>
+    <string>C43F5MKJF2</string>
     <key>com.apple.developer.icloud-container-identifiers</key>
     <array>
         <string>iCloud.lt.mantas.sleepswitch</string>

@@ -1,6 +1,6 @@
 # Sleep Switch Companion — iOS release setup
 
-The repository contains the SwiftUI target `SleepSwitchCompanion`. It is an MB Uncascade app with display name Sleep Switch, version `2.3.1 (22)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
+The repository contains the SwiftUI target `SleepSwitchCompanion`. It is an MB Uncascade app with display name Sleep Switch, version `2.3.2 (23)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
 
 ## CloudKit setup required once
 
@@ -28,11 +28,11 @@ xcodebuild -project SleepSwitch.xcodeproj \
   -scheme SleepSwitchCompanion \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath /tmp/SleepSwitchCompanion-2.3.1-22.xcarchive \
+  -archivePath /tmp/SleepSwitchCompanion-2.3.2-23.xcarchive \
   -allowProvisioningUpdates archive
 ```
 
-The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.3.1 (22)` adds battery-level-aware symbols and live charging-rate telemetry. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
+The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.3.2 (23)` fixes stale-state presentation and manual-session availability, adds inspectable Insights charts, and opens detailed Mac thermal, fan, agent, power, and uptime information from the status card. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
 
 `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
 

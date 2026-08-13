@@ -35,6 +35,7 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
         var batteryPercent: Double?
         var watts: Double?
         var isCharging = false
+        var chargingWatts: Double?
 
         if let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue(),
            CFArrayGetCount(sources) > 0 {
@@ -73,6 +74,9 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
                 batteryPercent = max(0, min(100, currentCapacity / maxCapacity * 100))
             }
             isCharging = (description[kIOPSIsChargingKey] as? Bool) == true
+            if isCharging, let watts {
+                chargingWatts = watts
+            }
         } else if source == .battery {
             return EnergyReading(
                 recordedAt: date,
@@ -90,7 +94,8 @@ struct IOKitPowerTelemetryProvider: PowerTelemetryProviding {
             source: source,
             confidence: watts == nil ? .unavailable : .estimated,
             batteryPercent: batteryPercent,
-            isCharging: isCharging
+            isCharging: isCharging,
+            chargingWatts: chargingWatts
         )
     }
 
@@ -130,7 +135,8 @@ struct FixturePowerTelemetryProvider: PowerTelemetryProviding {
             source: reading.source,
             confidence: reading.confidence,
             batteryPercent: reading.batteryPercent,
-            isCharging: reading.isCharging
+            isCharging: reading.isCharging,
+            chargingWatts: reading.chargingWatts
         )
     }
 }

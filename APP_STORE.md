@@ -45,12 +45,12 @@ xcodebuild \
 | Keep running with the lid closed | Yes, with administrator approval | No |
 | Keep the display awake manually | Yes | Yes |
 | Automatic Codex tracking | Yes | Yes, after choosing `.codex` |
-| Other supported agent harnesses | Yes | No |
+| OpenCode and other supported agent CLIs | Yes | Yes, when macOS exposes their executable process |
 | Put the display to sleep | Yes | No |
 | Wake the display after tasks finish | Yes | Yes |
 | Launch at login | On by default; can be disabled | Opt-in |
 
-The Mac App Store requires App Sandbox. A sandboxed app can use Apple’s public power assertion APIs, but it cannot execute `/bin/ps` or `/usr/bin/pmset`. The store target therefore removes global command-line process inspection and forced display sleep. It uses a read-only, security-scoped bookmark for Codex task files and never weakens the full direct-download build.
+The Mac App Store requires App Sandbox. A sandboxed app can use Apple’s public power assertion APIs, but it cannot execute `/bin/ps` or `/usr/bin/pmset`. The store target therefore uses the read-only macOS process API for executable discovery and a security-scoped bookmark for precise Codex task state. Forced display sleep remains unavailable in the store build.
 
 ## App Store Connect record
 
@@ -94,9 +94,9 @@ Manual keep-awake sessions work immediately. To test Codex tracking, choose **Co
 
 The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sleep and `IOPMAssertionDeclareUserActivity` for the optional one-shot display wake.
 
-For version 2.2.0 (build 16), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local Codex tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
+For version 2.3.0 (build 17), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local agent tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
 
-The repository also contains the MB Uncascade companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, display name Sleep Switch, iOS/iPadOS 17, version 2.2.0 build 19). It uses the same private CloudKit container as the shipped Mac app, `iCloud.lt.mantas.sleepswitch`, so existing Mac builds remain compatible. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
+The repository also contains the MB Uncascade companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, display name Sleep Switch, iOS/iPadOS 17, version 2.3.1 build 22). It uses the same private CloudKit container as the shipped Mac app, `iCloud.lt.mantas.sleepswitch`, so existing Mac builds remain compatible. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
 
 The companion's History view is intentionally bounded: it shows daily kWh and agent-hours for up to 30 days, plus up to 24 hours of five-minute energy buckets. It does not receive prompts, output, file names, process names, or raw command lines.
 
@@ -117,7 +117,7 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 - Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
-- The v2.2.0 Mac candidate is build 16. It adds the review fixes, local Insights,
+- The v2.3.0 Mac candidate is build 17. It adds reliable ChatGPT/Codex and OpenCode detection, charging-rate telemetry, the review fixes, local Insights,
   bounded history, and the private CloudKit bridge used by the companion target.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
@@ -126,6 +126,6 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
   device screen recording is attached to the reviewer reply.
 
 For a 2.2 submission, record the sandboxed TestFlight build, show **Support &
-Creator → Version 2.2.0 (16)**, open **Insights…**, demonstrate the history
+Creator → Version 2.3.0 (17)**, open **Insights…**, demonstrate the history
 toggle/delete flow, then attach the recording in the review conversation and
 choose **Submit for Review** to resubmit.

@@ -3,6 +3,7 @@ import Foundation
 struct CodexSessionTracker {
     private static let taskStartedMarker = "\"type\":\"task_started\""
     private static let taskCompleteMarker = "\"type\":\"task_complete\""
+    private static let turnAbortedMarker = "\"type\":\"turn_aborted\""
 
     let sessionsDirectory: URL
     let activeFileWindow: TimeInterval
@@ -91,10 +92,15 @@ struct CodexSessionTracker {
             of: Self.taskCompleteMarker,
             options: .backwards
         )?.lowerBound
+        let lastAborted = tail.range(
+            of: Self.turnAbortedMarker,
+            options: .backwards
+        )?.lowerBound
+        let lastTerminal = [lastCompleted, lastAborted].compactMap { $0 }.max()
 
-        switch (lastStarted, lastCompleted) {
-        case (.some(let started), .some(let completed)):
-            return started > completed
+        switch (lastStarted, lastTerminal) {
+        case (.some(let started), .some(let terminal)):
+            return started > terminal
         case (.some, .none):
             return true
         case (.none, .some):

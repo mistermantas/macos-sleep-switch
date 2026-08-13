@@ -313,6 +313,15 @@ struct AgentTrackerTests {
                     "rollout-complete.jsonl"
                 )
             )
+            try write(
+                """
+                {"type":"event_msg","payload":{"type":"task_started"}}
+                {"type":"event_msg","payload":{"type":"turn_aborted"}}
+                """,
+                to: completedOnlySessions.appendingPathComponent(
+                    "rollout-aborted.jsonl"
+                )
+            )
         } catch {
             fatalError("Test failed: could not create Codex session fixtures: \(error)")
         }
@@ -376,7 +385,7 @@ struct AgentTrackerTests {
         )
         expect(
             idleAgents == [anotherAgent],
-            "does not treat idle Codex task servers as running sessions"
+            "does not treat completed or aborted Codex turns as running sessions"
         )
     }
 

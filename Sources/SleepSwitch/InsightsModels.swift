@@ -44,6 +44,25 @@ struct EnergyReading: Equatable, Codable {
     let confidence: EnergyConfidence
     let batteryPercent: Double?
     let isCharging: Bool
+    let chargingWatts: Double?
+
+    init(
+        recordedAt: Date,
+        watts: Double?,
+        source: EnergySource,
+        confidence: EnergyConfidence,
+        batteryPercent: Double?,
+        isCharging: Bool,
+        chargingWatts: Double? = nil
+    ) {
+        self.recordedAt = recordedAt
+        self.watts = watts
+        self.source = source
+        self.confidence = confidence
+        self.batteryPercent = batteryPercent
+        self.isCharging = isCharging
+        self.chargingWatts = chargingWatts
+    }
 
     var displayWatts: String {
         guard let watts, watts.isFinite else { return "—" }

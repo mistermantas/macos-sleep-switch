@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 struct AgentDefinition: Hashable {
@@ -245,21 +246,26 @@ struct AgentTracker {
 
     func scan() -> [DetectedAgent]? {
 #if APP_STORE
-        guard let sessionsDirectory = codexSessionsDirectory?(),
-              let activeSessionCount = CodexSessionTracker(
-                  sessionsDirectory: sessionsDirectory
-              ).scan(),
-              let codex = definitions.first(where: { $0.id == "codex" }) else {
-            return []
+        // App Sandbox blocks launching `/bin/ps`, but libproc still provides a
+        // read-only view of executable paths. This keeps direct agent CLIs
+        // such as OpenCode discoverable without asking for broad file access.
+        let processAgents = NativeProcessSnapshotProvider().processList()
+            .map {
+                detect(
+                    in: $0,
+                    excludingPID: ProcessInfo.processInfo.processIdentifier
+                )
+            } ?? []
+
+        guard let sessionsDirectory = codexSessionsDirectory?() else {
+            return normalizedDesktopCodexFallback(processAgents)
         }
 
-        guard activeSessionCount > 0 else { return [] }
-        return [
-            DetectedAgent(
-                definition: codex,
-                processCount: activeSessionCount
-            )
-        ]
+        return applyingCodexSessionActivity(
+            to: processAgents,
+            tracker: CodexSessionTracker(sessionsDirectory: sessionsDirectory),
+            preserveProcessFallback: true
+        )
 #else
         let process = Process()
         let output = Pipe()
@@ -318,19 +324,26 @@ struct AgentTracker {
     }
 
     func applyingCodexSessionActivity(
-        to processAgents: [DetectedAgent]
+        to processAgents: [DetectedAgent],
+        tracker: CodexSessionTracker? = nil,
+        preserveProcessFallback: Bool = false
     ) -> [DetectedAgent] {
         // Codex Desktop keeps its task work in the session log while its
         // long-lived `app-server` process is deliberately excluded from the
         // generic process detector. Do not require a separate `codex` CLI
         // process before consulting the session tracker, or Desktop tasks
         // will always appear idle.
-        guard let activeSessionCount = codexSessionTracker.scan() else {
+        guard let activeSessionCount = (tracker ?? codexSessionTracker).scan() else {
             return processAgents
         }
 
         return definitions.compactMap { definition in
             if definition.id == "codex" {
+                if activeSessionCount == 0, preserveProcessFallback {
+                    return normalizedDesktopCodexFallback(processAgents).first {
+                        $0.definition.id == definition.id
+                    }
+                }
                 guard activeSessionCount > 0 else { return nil }
                 return DetectedAgent(
                     definition: definition,
@@ -341,6 +354,18 @@ struct AgentTracker {
             return processAgents.first {
                 $0.definition.id == definition.id
             }
+        }
+    }
+
+    private func normalizedDesktopCodexFallback(
+        _ processAgents: [DetectedAgent]
+    ) -> [DetectedAgent] {
+        processAgents.map { agent in
+            guard agent.definition.id == "codex" else { return agent }
+            // ChatGPT can own several persistent app-server helpers. Without
+            // access to its session folder, represent the desktop app as one
+            // active Codex source instead of claiming every helper is a task.
+            return DetectedAgent(definition: agent.definition, processCount: 1)
         }
     }
 
@@ -359,5 +384,38 @@ struct AgentTracker {
         }
 
         return (pid, commandLine)
+    }
+}
+
+private struct NativeProcessSnapshotProvider {
+    func processList() -> String? {
+        var capacity = 1_024
+
+        while capacity <= 65_536 {
+            var pids = [pid_t](repeating: 0, count: capacity)
+            let byteCount = Int32(MemoryLayout<pid_t>.stride * pids.count)
+            let count = proc_listallpids(&pids, byteCount)
+            guard count >= 0 else { return nil }
+
+            if count < capacity {
+                let lines = pids.prefix(Int(count)).compactMap { pid -> String? in
+                    guard pid > 0, let path = executablePath(for: pid) else {
+                        return nil
+                    }
+                    return "\(pid) \(path)"
+                }
+                return lines.isEmpty ? nil : lines.joined(separator: "\n")
+            }
+            capacity *= 2
+        }
+
+        return nil
+    }
+
+    private func executablePath(for pid: pid_t) -> String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN * 4))
+        let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+        guard length > 0 else { return nil }
+        return String(cString: buffer)
     }
 }

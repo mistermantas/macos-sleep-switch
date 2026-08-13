@@ -190,6 +190,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let energySource: EnergySource
     let energyConfidence: EnergyConfidence
     let isCharging: Bool
+    let chargingWatts: Double?
     let capabilities: CompanionMacCapabilities
     let agents: [CompanionAgentStatus]?
     let manualSession: CompanionManualSessionStatus?
@@ -216,6 +217,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         energySource: EnergySource,
         energyConfidence: EnergyConfidence,
         isCharging: Bool,
+        chargingWatts: Double? = nil,
         capabilities: CompanionMacCapabilities,
         agents: [CompanionAgentStatus]? = nil,
         manualSession: CompanionManualSessionStatus? = nil,
@@ -241,6 +243,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.energySource = energySource
         self.energyConfidence = energyConfidence
         self.isCharging = isCharging
+        self.chargingWatts = chargingWatts
         self.capabilities = capabilities
         self.agents = agents
         self.manualSession = manualSession
@@ -299,6 +302,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             energySource: energySource,
             energyConfidence: energyConfidence,
             isCharging: isCharging,
+            chargingWatts: chargingWatts,
             capabilities: capabilities,
             agents: agents,
             manualSession: manualSession,
@@ -334,6 +338,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             energySource: energySource,
             energyConfidence: energyConfidence,
             isCharging: isCharging,
+            chargingWatts: chargingWatts,
             capabilities: capabilities,
             agents: agents,
             manualSession: manualSession,

@@ -681,6 +681,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             energySource: reading.source,
             energyConfidence: reading.confidence,
             isCharging: reading.isCharging,
+            chargingWatts: reading.chargingWatts,
             capabilities: capabilities,
             agents: agentStatuses,
             manualSession: manualAwakeSession.map {

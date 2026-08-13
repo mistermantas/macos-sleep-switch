@@ -218,7 +218,11 @@ private struct MacSnapshotCard: View {
             HStack(spacing: 14) {
                 Label(uptimeText, systemImage: "clock")
                 if let battery = mac.batteryPercent {
-                    Label("\(Int(battery.rounded()))%", systemImage: mac.isCharging ? "battery.100percent.bolt" : "battery.100percent")
+                    Label("\(Int(battery.rounded()))%", systemImage: batterySymbol(for: battery))
+                }
+                if mac.isCharging {
+                    Label(chargingText, systemImage: "bolt.fill")
+                        .foregroundStyle(.green)
                 }
                 Label(mac.displayAsleep ? "Display asleep" : "Display awake", systemImage: "display")
             }
@@ -230,6 +234,28 @@ private struct MacSnapshotCard: View {
 
     private var energyValue: String {
         mac.estimatedWatts.map { "\(Int($0.rounded())) W" } ?? "—"
+    }
+
+    private var chargingText: String {
+        guard let watts = mac.chargingWatts, watts.isFinite else {
+            return "Charging"
+        }
+        return "Charging · \(Int(watts.rounded())) W"
+    }
+
+    private func batterySymbol(for percentage: Double) -> String {
+        switch max(0, min(100, percentage)) {
+        case 88...:
+            return "battery.100percent"
+        case 63..<88:
+            return "battery.75percent"
+        case 38..<63:
+            return "battery.50percent"
+        case 13..<38:
+            return "battery.25percent"
+        default:
+            return "battery.0percent"
+        }
     }
 
     private var energyLabel: String {

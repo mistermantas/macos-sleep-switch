@@ -28,6 +28,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Prevent Sleep** | Stops idle system sleep while a session is active. Closing the lid still follows normal macOS behavior. |
 | **Prevent Sleep Even With Lid Closed** | Keeps the Mac running after the lid closes. Available in the GitHub download and asks for administrator approval when it becomes active. |
 | **Cooling** | Chooses macOS fan control, early aggressive cooling, or maximum cooling on a specifically qualified Mac. Cooling is available only in a signed direct build. |
+| **Only Control Cooling While Agents Run** | Limits the selected cooling profile to periods when Sleep Switch detects an active coding agent. It is off by default, so cooling otherwise runs independently of awake sessions and agents. |
 | **Cooling Details…** | Shows verified helper, fan, temperature, and qualification state. Its **Copy Diagnostics** button creates an anonymized local hardware report. |
 | **Keep Awake for Agents** | Automatically prevents sleep while any supported coding agent is working. It is enabled by default. |
 | **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
@@ -101,9 +102,11 @@ The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download 
 The direct build’s optional cooling feature uses a separately signed macOS
 background helper because current macOS versions restrict AppleSMC access. The
 helper accepts only the matching Sleep Switch signing identity, exposes only a
-typed cooling lease, and restores macOS fan control on session end, disconnect,
-sleep, wake, timeout, or failed verification. Unknown and unqualified Mac models
-remain monitoring-only.
+typed cooling lease, and restores macOS fan control when cooling is disabled, on
+disconnect, sleep, wake, timeout, or failed verification. Cooling profiles run
+independently of awake sessions by default; the optional agent-only setting
+limits them to detected agent activity. Unknown and unqualified Mac models remain
+monitoring-only.
 
 Cooling also ends the Sleep Switch awake session if macOS reports critical
 thermal pressure, temperature feedback is lost, or the vetted temperature

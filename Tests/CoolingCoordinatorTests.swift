@@ -14,13 +14,13 @@ enum CoolingCoordinatorTests {
         )
 
         coordinator.selectProfile(.maximum)
-        coordinator.updateAwakeOwnership(false)
-        expect(client.beginProfiles.isEmpty, "does not cool without an owned awake session")
+        coordinator.updateControlEnabled(false)
+        expect(client.beginProfiles.isEmpty, "does not cool while control is disabled")
 
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         expect(
             client.beginProfiles == [.maximum],
-            "starts maximum cooling with an owned awake session"
+            "starts maximum cooling when control is enabled"
         )
         expect(coordinator.presentation.hasActiveLease, "tracks the helper lease")
         expect(
@@ -33,8 +33,8 @@ enum CoolingCoordinatorTests {
         )
         expect(client.renewDemands == [1], "renews maximum demand every heartbeat")
 
-        coordinator.updateAwakeOwnership(false)
-        expect(client.endTokens.count == 1, "ends cooling with the awake session")
+        coordinator.updateControlEnabled(false)
+        expect(client.endTokens.count == 1, "ends cooling when control is disabled")
         expect(!coordinator.presentation.hasActiveLease, "clears the ended lease")
         expect(
             coordinator.presentation.effectiveTitle == "System Control",
@@ -43,7 +43,7 @@ enum CoolingCoordinatorTests {
 
         var thermalAbort: CoolingAbortReason?
         coordinator.onThermalAbort = { thermalAbort = $0 }
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         client.nextSnapshot = client.snapshot(
             temperature: nil,
             leaseToken: client.leaseToken
@@ -85,7 +85,7 @@ enum CoolingCoordinatorTests {
         )
 
         coordinator.selectProfile(.maximum)
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         expect(
             client.beginProfiles == [.maximum],
             "asks the helper once before qualification is known"
@@ -115,7 +115,7 @@ enum CoolingCoordinatorTests {
         )
 
         coordinator.selectProfile(.maximum)
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         client.renewSucceeds = false
         coordinator.heartbeat(
             now: Date(timeIntervalSince1970: 105)
@@ -143,7 +143,7 @@ enum CoolingCoordinatorTests {
         coordinator.onThermalAbort = { abortReason = $0 }
 
         coordinator.selectProfile(.maximum)
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         let firstHotHeartbeat = 105.0
         let abortHeartbeat =
             firstHotHeartbeat + CoolingPolicy.abortCeilingGrace
@@ -186,7 +186,7 @@ enum CoolingCoordinatorTests {
         )
 
         coordinator.selectProfile(.aggressive)
-        coordinator.updateAwakeOwnership(true)
+        coordinator.updateControlEnabled(true)
         client.endSucceeds = false
         coordinator.selectProfile(.maximum)
 

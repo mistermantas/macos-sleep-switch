@@ -32,6 +32,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(showCoolingDetails),
         keyEquivalent: ""
     )
+    private let coolingAgentsOnlyItem = NSMenuItem(
+        title: "Only Control Cooling While Agents Run",
+        action: #selector(toggleCoolingAgentsOnly),
+        keyEquivalent: ""
+    )
 #endif
     private let automaticAgentAwakeItem = NSMenuItem(
         title: "Keep Awake for Agents",
@@ -135,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var coolingProfileItems: [NSMenuItem] = []
     private var coolingDetailsWindow: CoolingDetailsWindowController?
     private let coolingWarningShownKey = "coolingWarningShown"
+    private let coolingAgentsOnlyKey = "coolingAgentsOnly"
     private var coolingThermalAbortSuppressesAwake = false
 #endif
     private let agentScanQueue = DispatchQueue(
@@ -180,6 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         enableLaunchAtLoginByDefault()
         configureCoolingCoordinator()
         coolingCoordinator.start()
+        synchronizeCoolingOwnership()
 #endif
 
         if UserDefaults.standard.bool(forKey: activateOnLaunchKey) {
@@ -233,13 +240,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func registerDefaults() {
-        UserDefaults.standard.register(defaults: [
+        var registeredDefaults: [String: Any] = [
             keepDisplayAwakeKey: true,
             activateOnLaunchKey: false,
             defaultDurationSecondsKey: 0,
             automaticAgentAwakeKey: true,
             awakeModeKey: KeepAwakeMode.preventSleep.rawValue
-        ])
+        ]
+#if !APP_STORE
+        registeredDefaults[coolingAgentsOnlyKey] = false
+#endif
+        UserDefaults.standard.register(defaults: registeredDefaults)
     }
 
     private func observeDisplayWake() {
@@ -474,6 +485,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             coolingProfileItems.append(item)
             coolingMenu.addItem(item)
         }
+
+        coolingMenu.addItem(.separator())
+        coolingAgentsOnlyItem.target = self
+        coolingAgentsOnlyItem.image = NSImage(
+            systemSymbolName: "terminal",
+            accessibilityDescription: "Limit cooling control to active agents"
+        )
+        coolingAgentsOnlyItem.toolTip =
+            "When off, the selected cooling profile stays active whether or not an agent is running"
+        coolingMenu.addItem(coolingAgentsOnlyItem)
 
         coolingMenu.addItem(.separator())
         coolingHelperItem.target = self
@@ -1600,8 +1621,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 #if !APP_STORE
     private func synchronizeCoolingOwnership() {
-        coolingCoordinator.updateAwakeOwnership(
-            shouldKeepAwake && powerAssertions.isActive
+        let agentsOnly = UserDefaults.standard.bool(
+            forKey: coolingAgentsOnlyKey
+        )
+        coolingCoordinator.updateControlEnabled(
+            !agentsOnly || !detectedAgents.isEmpty
         )
     }
 
@@ -1637,6 +1661,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: coolingStatusSymbol(presentation),
             accessibilityDescription: coolingStatusItem.title
         )
+        coolingAgentsOnlyItem.state = UserDefaults.standard.bool(
+            forKey: coolingAgentsOnlyKey
+        ) ? .on : .off
 
         for item in coolingProfileItems {
             guard let rawValue = item.representedObject as? String,
@@ -1810,6 +1837,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateCoolingPresentation()
     }
 
+    @objc private func toggleCoolingAgentsOnly() {
+        let defaults = UserDefaults.standard
+        defaults.set(
+            !defaults.bool(forKey: coolingAgentsOnlyKey),
+            forKey: coolingAgentsOnlyKey
+        )
+        synchronizeCoolingOwnership()
+        updateCoolingPresentation()
+    }
+
     @objc private func manageCoolingHelper() {
         switch fanHelperClient.registrationState {
         case .requiresSignedBuild:
@@ -1877,7 +1914,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         displaySleepOverride = false
         powerAssertions.stop()
         try? lidClosedSleep.stop(waitForRestoration: false)
-        coolingCoordinator.updateAwakeOwnership(false)
+        coolingCoordinator.selectProfile(.systemControl)
         reconcileAndUpdatePresentation()
 
         let alert = NSAlert()

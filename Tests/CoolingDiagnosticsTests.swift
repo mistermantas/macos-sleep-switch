@@ -32,7 +32,7 @@ enum CoolingDiagnosticsTests {
             registrationState: .enabled,
             helperSnapshot: snapshot,
             message: nil,
-            ownsAwakeSession: false,
+            controlEnabled: false,
             hasActiveLease: false
         )
 

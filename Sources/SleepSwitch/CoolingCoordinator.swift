@@ -6,7 +6,7 @@ struct CoolingPresentationSnapshot {
     let registrationState: FanHelperRegistrationState
     let helperSnapshot: FanHelperSnapshot?
     let message: String?
-    let ownsAwakeSession: Bool
+    let controlEnabled: Bool
     let hasActiveLease: Bool
 
     var effectiveTitle: String {
@@ -51,7 +51,7 @@ final class CoolingCoordinator {
     private let defaults: UserDefaults
     private let thermalMonitor: ProcessInfoThermalMonitor
     private var heartbeatTimer: Timer?
-    private var ownsAwakeSession = false
+    private var controlEnabled = false
     private var leaseToken: UUID?
     private var helperSnapshot: FanHelperSnapshot?
     private var message: String?
@@ -90,7 +90,7 @@ final class CoolingCoordinator {
             registrationState: client.registrationState,
             helperSnapshot: helperSnapshot,
             message: message,
-            ownsAwakeSession: ownsAwakeSession,
+            controlEnabled: controlEnabled,
             hasActiveLease: leaseToken != nil
         )
     }
@@ -118,7 +118,7 @@ final class CoolingCoordinator {
         guard profile != selectedProfile else { return }
         leaseStartBlocked = false
         defaults.set(profile.rawValue, forKey: Self.profileDefaultsKey)
-        if profile == .systemControl || !ownsAwakeSession {
+        if profile == .systemControl || !controlEnabled {
             endLease()
         } else {
             endLease { [weak self] restored in
@@ -133,13 +133,13 @@ final class CoolingCoordinator {
         publish()
     }
 
-    func updateAwakeOwnership(_ ownsAwakeSession: Bool) {
-        guard self.ownsAwakeSession != ownsAwakeSession else {
+    func updateControlEnabled(_ controlEnabled: Bool) {
+        guard self.controlEnabled != controlEnabled else {
             reconcile()
             return
         }
-        self.ownsAwakeSession = ownsAwakeSession
-        if ownsAwakeSession {
+        self.controlEnabled = controlEnabled
+        if controlEnabled {
             leaseStartBlocked = false
             reconcile()
         } else {
@@ -172,7 +172,7 @@ final class CoolingCoordinator {
 
     func heartbeat(now: Date = Date()) {
         guard !requestInFlight else { return }
-        guard ownsAwakeSession,
+        guard controlEnabled,
               selectedProfile != .systemControl
         else {
             if leaseToken != nil {
@@ -217,7 +217,7 @@ final class CoolingCoordinator {
         let decision = CoolingPolicy.decide(
             CoolingPolicyInput(
                 profile: selectedProfile,
-                ownsAwakeSession: ownsAwakeSession,
+                ownsAwakeSession: controlEnabled,
                 temperature: temperature,
                 systemThermalLevel: thermalMonitor.currentLevel,
                 previousDemand: previousDemand,
@@ -254,7 +254,7 @@ final class CoolingCoordinator {
     }
 
     private func reconcile() {
-        guard ownsAwakeSession,
+        guard controlEnabled,
               selectedProfile != .systemControl,
               leaseToken == nil,
               !requestInFlight,

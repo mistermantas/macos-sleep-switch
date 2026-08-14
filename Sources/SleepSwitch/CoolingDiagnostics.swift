@@ -23,7 +23,7 @@ enum CoolingDiagnosticReport {
             "thermal-state=\(thermalLevelName(thermalLevel))",
             "selected-profile=\(presentation.selectedProfile.rawValue)",
             "helper-registration=\(registration)",
-            "owns-awake-session=\(presentation.ownsAwakeSession)",
+            "control-enabled=\(presentation.controlEnabled)",
             "active-lease=\(presentation.hasActiveLease)"
         ]
 

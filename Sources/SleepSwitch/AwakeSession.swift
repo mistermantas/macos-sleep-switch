@@ -61,6 +61,10 @@ enum AgentIdleGracePolicy {
     static func isActive(deadline: Date?, now: Date = Date()) -> Bool {
         deadline.map { $0 > now } ?? false
     }
+
+    static func remainingUserIdleDelay(userIdleSeconds: TimeInterval) -> TimeInterval {
+        max(0, duration - max(0, userIdleSeconds))
+    }
 }
 
 enum DisplayWakePolicy {

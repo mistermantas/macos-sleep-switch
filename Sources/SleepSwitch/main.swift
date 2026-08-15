@@ -1039,6 +1039,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             hasManualSession: manualAwakeSession != nil
         ) else { return }
 
+        scheduleAgentIdleGrace(deadline: deadline)
+    }
+
+    private func scheduleAgentIdleGrace(deadline: Date) {
         agentIdleGraceDeadline = deadline
         agentIdleGraceTimer?.invalidate()
         let timer = Timer(
@@ -1060,10 +1064,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func agentIdleGraceExpired() {
+        guard automaticAgentAwakeEnabled,
+              manualAwakeSession == nil,
+              detectedAgents.isEmpty else {
+            clearAgentIdleGrace()
+            reconcileAndUpdatePresentation()
+            return
+        }
+
+        let userIdleSeconds = CGEventSource.secondsSinceLastEventType(
+            .combinedSessionState,
+            eventType: .anyInputEventType
+        )
+        let remainingIdleDelay = AgentIdleGracePolicy.remainingUserIdleDelay(
+            userIdleSeconds: userIdleSeconds
+        )
+        if remainingIdleDelay > 0 {
+            scheduleAgentIdleGrace(
+                deadline: Date().addingTimeInterval(remainingIdleDelay)
+            )
+            reconcileAndUpdatePresentation()
+            return
+        }
+
         clearAgentIdleGrace()
         reconcileAndUpdatePresentation()
         if companionBridgeEnabled {
             companionBridge.synchronize(force: true)
+        }
+        do {
+            try RemoteEnergyController.sleepMac()
+        } catch {
+            presentAssertionError(error)
         }
     }
 

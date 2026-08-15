@@ -468,6 +468,14 @@ struct AgentTrackerTests {
             "returns sleep control to macOS after five minutes"
         )
         expect(
+            AgentIdleGracePolicy.remainingUserIdleDelay(userIdleSeconds: 30) == 270,
+            "waits until keyboard and trackpad activity has also been idle for five minutes"
+        )
+        expect(
+            AgentIdleGracePolicy.remainingUserIdleDelay(userIdleSeconds: 600) == 0,
+            "allows automatic sleep once both cooldown conditions are satisfied"
+        )
+        expect(
             AgentIdleGracePolicy.deadline(
                 previousAgentCount: 1,
                 currentAgentCount: 0,

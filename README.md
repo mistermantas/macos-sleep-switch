@@ -30,7 +30,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Cooling** | Chooses macOS fan control, early aggressive cooling, or maximum cooling on a specifically qualified Mac. Cooling is available only in a signed direct build. |
 | **Only Control Cooling While Agents Run** | Limits the selected cooling profile to periods when Sleep Switch detects an active coding agent. It is off by default, so cooling otherwise runs independently of awake sessions and agents. |
 | **Cooling Details…** | Shows verified helper, fan, temperature, and qualification state. Its **Copy Diagnostics** button creates an anonymized local hardware report. |
-| **Keep Awake for Agents** | Automatically prevents system and display sleep while any supported coding agent is working. After the final agent exits, a five-minute cooldown runs before normal macOS sleep resumes. It is enabled by default. |
+| **Keep Awake for Agents** | Automatically prevents system and display sleep while any supported coding agent is working. After the final agent exits and the Mac has been untouched for five minutes, Sleep Switch puts it to sleep. It is enabled by default. |
 | **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
 | **Agent status** | Shows the detected agent and session count. Before pairing, the App Store build shows one **Connect Codex…** action here. |
 | **Sleep Display** | Turns off only the screen. The Mac stays signed in and active work continues. Available in the GitHub download. |
@@ -58,14 +58,15 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | Situation | Result |
 | --- | --- |
 | An agent is running and **Keep Awake for Agents** is on | The Mac and display stay awake in **Prevent Sleep** mode. Lid-closed mode also keeps the Mac working after the lid closes. |
-| The final detected agent exits | Sleep Switch turns off its display assertion immediately, keeps the system awake for a five-minute cooldown, then releases control to macOS. |
+| The final detected agent exits | Sleep Switch turns off its display assertion immediately. Once there have been no agents and no keyboard or trackpad activity for five minutes, it puts the Mac to sleep. |
 | An agent restarts during the cooldown | The cooldown is cancelled and the normal agent awake session continues. |
+| You use the Mac during the cooldown | Automatic sleep is postponed until the Mac has been untouched for five minutes. |
 | A manual session is active | The Mac remains awake until its duration ends or you stop it. Agent completion never cancels a manual session. |
 | **Sleep Display** is chosen | The display turns off immediately while the active session continues to prevent system sleep. |
 | **Sleep Until Agents Finish** is chosen | The display turns off while agents work and wakes when the final detected session finishes. |
 | No agent or manual session is active | Sleep Switch holds no power assertion and the Mac follows its macOS Lock Screen and Energy settings. |
 
-The five-minute agent cooldown releases Sleep Switch's assertion; it does not override a macOS configuration that disables automatic system sleep. The default **Prevent Sleep** mode also leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
+Automatic agent sleep is deliberate and independent of the normal macOS idle-sleep timer, so it also works when automatic sleep is disabled on AC power. It never ends or overrides a manual session. The default **Prevent Sleep** mode leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
 
 ## Supported agents
 
@@ -107,7 +108,7 @@ In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-mana
 - `PreventUserIdleSystemSleep` keeps macOS from automatically sleeping.
 - `PreventUserIdleDisplaySleep` keeps the display awake for detected-agent sessions and, when enabled, manual sessions. Explicit display-sleep actions temporarily suppress it.
 
-The assertions belong to the app process. Agent sessions retain only the system assertion during their five-minute completion cooldown, then release it. Manual-session assertions are released when the session ends; all assertions are also released when automatic agent awake is paused or the app quits.
+The assertions belong to the app process. Agent sessions retain only the system assertion during their completion cooldown. After both the agent-free and user-idle windows reach five minutes, Sleep Switch releases the assertion and requests system sleep. Manual-session assertions are released only when the session ends; all assertions are also released when automatic agent awake is paused or the app quits.
 
 The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Lid mode does not install a persistent helper or retain administrator credentials.
 

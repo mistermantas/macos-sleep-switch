@@ -27,12 +27,12 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: C43F5MKJF2
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 17
+        CURRENT_PROJECT_VERSION: 18
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: AppStore/Info.plist
-        MARKETING_VERSION: 2.3.0
+        MARKETING_VERSION: 2.3.1
         OTHER_LDFLAGS: "-lsqlite3"
         OTHER_SWIFT_FLAGS: "$(inherited) -parse-as-library"
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch
@@ -62,12 +62,12 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 23
+        CURRENT_PROJECT_VERSION: 24
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Companion/Info.plist
-        MARKETING_VERSION: 2.3.2
+        MARKETING_VERSION: 2.3.3
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion
         PRODUCT_NAME: Sleep Switch
         SWIFT_VERSION: "5.0"

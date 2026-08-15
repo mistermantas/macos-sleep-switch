@@ -2,6 +2,7 @@ import Foundation
 
 enum CompanionProtocolTests {
     static func run() {
+        testPreciseElapsedTimeText()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,
@@ -271,6 +272,24 @@ enum CompanionProtocolTests {
         expect(
             history.agentDays.reduce(0) { $0 + $1.activeSeconds } == 3 * 60 * 60,
             "preserves total agent activity duration"
+        )
+    }
+
+    private static func testPreciseElapsedTimeText() {
+        let now = Date(timeIntervalSince1970: 200_000)
+        expect(
+            CompanionTimeText.elapsed(
+                since: now.addingTimeInterval(-(43 * 60 * 60)),
+                now: now
+            ) == "1d 19h ago",
+            "does not round a partial second day up to two days"
+        )
+        expect(
+            CompanionTimeText.elapsed(
+                since: now.addingTimeInterval(-(12 * 60 + 8)),
+                now: now
+            ) == "12m ago",
+            "shows concise minute precision for recent updates"
         )
     }
 

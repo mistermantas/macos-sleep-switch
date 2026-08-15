@@ -35,7 +35,7 @@ enum KeepAwakeMode: String, CaseIterable {
     var toolTip: String {
         switch self {
         case .preventSleep:
-            return "Prevents idle sleep. Closing the lid still sleeps normally."
+            return "Keeps the Mac and display awake during active sessions. Closing the lid still sleeps normally."
         case .lidClosed:
             return "Prevents sleep even after the lid closes. Administrator approval is required when this mode becomes active."
         }

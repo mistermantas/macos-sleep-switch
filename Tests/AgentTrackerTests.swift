@@ -100,6 +100,7 @@ struct AgentTrackerTests {
         )
         testPowerAssertions()
         testKeepAwakeModes()
+        testAgentIdleGrace()
         testLidClosedSleepControllerHelpers()
         testNonBlockingLidRestoration()
         testDisplayPowerCommand()
@@ -436,6 +437,55 @@ struct AgentTrackerTests {
         expect(
             KeepAwakeMode.persistedMode(from: "caffeine") == .preventSleep,
             "migrates the previous mode name without changing behavior"
+        )
+    }
+
+    private static func testAgentIdleGrace() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let deadline = AgentIdleGracePolicy.deadline(
+            previousAgentCount: 1,
+            currentAgentCount: 0,
+            automaticAgentAwakeEnabled: true,
+            hasManualSession: false,
+            now: now
+        )
+        expect(
+            deadline == now.addingTimeInterval(5 * 60),
+            "starts a five-minute cooldown when the final agent exits"
+        )
+        expect(
+            AgentIdleGracePolicy.isActive(
+                deadline: deadline,
+                now: now.addingTimeInterval(299)
+            ),
+            "keeps the Mac awake during the agent cooldown"
+        )
+        expect(
+            !AgentIdleGracePolicy.isActive(
+                deadline: deadline,
+                now: now.addingTimeInterval(300)
+            ),
+            "returns sleep control to macOS after five minutes"
+        )
+        expect(
+            AgentIdleGracePolicy.deadline(
+                previousAgentCount: 1,
+                currentAgentCount: 0,
+                automaticAgentAwakeEnabled: true,
+                hasManualSession: true,
+                now: now
+            ) == nil,
+            "keeps manual sessions independent from the agent cooldown"
+        )
+        expect(
+            AwakePolicy.shouldKeepAwake(
+                manualSession: nil,
+                automaticAgentAwakeEnabled: true,
+                wakeWhenAgentsFinishArmed: false,
+                detectedAgents: [],
+                agentIdleGraceActive: true
+            ),
+            "holds the system assertion during the cooldown"
         )
     }
 

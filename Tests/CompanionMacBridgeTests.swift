@@ -8,6 +8,7 @@ enum CompanionMacBridgeTests {
         await testQuarantinesMalformedCommands()
         await testPersistsCommandIdempotency()
         await testSurfacesAccountFailures()
+        await testRecoversFromStalledSync()
     }
 
     private static func testPublishesAndCoalesces() async {
@@ -89,9 +90,43 @@ enum CompanionMacBridgeTests {
         expect(bridge.diagnostics.lastError != nil, "retains a safe account-status diagnostic")
     }
 
+    private static func testRecoversFromStalledSync() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        cloud.accountDelayNanoseconds = 60 * 1_000_000_000
+        let bridge = makeBridge(
+            cloud: cloud,
+            defaults: defaults,
+            stalledSyncInterval: 1
+        )
+        let startedAt = Date(timeIntervalSince1970: 100)
+
+        bridge.synchronize(force: true, now: startedAt)
+        while cloud.accountStatusCallCount == 0 {
+            await Task.yield()
+        }
+
+        cloud.accountDelayNanoseconds = 0
+        bridge.synchronize(
+            force: true,
+            now: startedAt.addingTimeInterval(2)
+        )
+        await bridge.synchronizeAndWait(
+            now: startedAt.addingTimeInterval(2)
+        )
+
+        expect(cloud.statusPublishCount == 1, "publishes after replacing a stalled sync")
+        expect(
+            bridge.diagnostics.stalledSyncRecoveryCount == 1,
+            "records the stalled-sync recovery"
+        )
+        expect(bridge.diagnostics.state == .succeeded, "returns to a healthy sync state")
+    }
+
     private static func makeBridge(
         cloud: FakeCompanionCloudStore,
         defaults: UserDefaults,
+        stalledSyncInterval: TimeInterval = 2 * 60,
         commandHandler: @escaping (CompanionRemoteCommand) -> CompanionRemoteResult = { command in
             CompanionRemoteResult(
                 commandID: command.id,
@@ -109,7 +144,8 @@ enum CompanionMacBridgeTests {
             historyProvider: { makeHistory() },
             commandHandler: commandHandler,
             defaults: defaults,
-            statusHeartbeatInterval: 60 * 60
+            statusHeartbeatInterval: 60 * 60,
+            stalledSyncInterval: stalledSyncInterval
         )
     }
 
@@ -177,8 +213,14 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     var historyPublishCount = 0
     var rejectedReasons: [String] = []
     var finishedResults: [CompanionRemoteResult] = []
+    var accountDelayNanoseconds: UInt64 = 0
+    var accountStatusCallCount = 0
 
     func accountStatus() async throws -> CKAccountStatus {
+        accountStatusCallCount += 1
+        if accountDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: accountDelayNanoseconds)
+        }
         if let accountError { throw accountError }
         return accountStatusValue
     }

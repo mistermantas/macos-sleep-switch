@@ -25,12 +25,12 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | --- | --- |
 | **Status** | Shows whether the Mac can sleep, what is keeping it awake, and how much time remains. |
 | **Awake Mode** | Chooses how automatic and manual sessions prevent sleep. |
-| **Prevent Sleep** | Stops idle system sleep while a session is active. Closing the lid still follows normal macOS behavior. |
+| **Prevent Sleep** | Keeps the Mac and its display awake while a manual or detected-agent session is active. Closing the lid still follows normal macOS behavior. |
 | **Prevent Sleep Even With Lid Closed** | Keeps the Mac running after the lid closes. Available in the GitHub download and asks for administrator approval when it becomes active. |
 | **Cooling** | Chooses macOS fan control, early aggressive cooling, or maximum cooling on a specifically qualified Mac. Cooling is available only in a signed direct build. |
 | **Only Control Cooling While Agents Run** | Limits the selected cooling profile to periods when Sleep Switch detects an active coding agent. It is off by default, so cooling otherwise runs independently of awake sessions and agents. |
 | **Cooling Details…** | Shows verified helper, fan, temperature, and qualification state. Its **Copy Diagnostics** button creates an anonymized local hardware report. |
-| **Keep Awake for Agents** | Automatically prevents sleep while any supported coding agent is working. It is enabled by default. |
+| **Keep Awake for Agents** | Automatically prevents system and display sleep while any supported coding agent is working. After the final agent exits, a five-minute cooldown runs before normal macOS sleep resumes. It is enabled by default. |
 | **Keep Awake for Codex** | The App Store version of automatic agent awake. It watches the Codex folder you choose and stays awake only during active tasks. |
 | **Agent status** | Shows the detected agent and session count. Before pairing, the App Store build shows one **Connect Codex…** action here. |
 | **Sleep Display** | Turns off only the screen. The Mac stays signed in and active work continues. Available in the GitHub download. |
@@ -48,12 +48,24 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | Setting | What it does |
 | --- | --- |
 | **Change Codex Folder…** | After pairing, changes the local Codex session folder from Settings. |
-| **Manual Sessions Keep Display Awake** | Keeps the screen lit during manual sessions. Agent sessions still allow the screen to turn off. |
+| **Manual Sessions Keep Display Awake** | Keeps the screen lit during manual sessions. Detected-agent sessions always keep it lit unless you explicitly choose a display-sleep action. |
 | **Activate on Launch** | Starts a manual session whenever Sleep Switch opens, using the selected default duration. |
 | **Default Duration** | Sets the duration used by **Start Manual Session** and **Activate on Launch**. |
 | **Launch at Login** | Opens Sleep Switch automatically after you sign in to the Mac. |
 
-The default **Prevent Sleep** mode stops automatic idle sleep while leaving normal lid behavior unchanged. The direct GitHub build can also keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
+### Session behavior and common uses
+
+| Situation | Result |
+| --- | --- |
+| An agent is running and **Keep Awake for Agents** is on | The Mac and display stay awake in **Prevent Sleep** mode. Lid-closed mode also keeps the Mac working after the lid closes. |
+| The final detected agent exits | Sleep Switch turns off its display assertion immediately, keeps the system awake for a five-minute cooldown, then releases control to macOS. |
+| An agent restarts during the cooldown | The cooldown is cancelled and the normal agent awake session continues. |
+| A manual session is active | The Mac remains awake until its duration ends or you stop it. Agent completion never cancels a manual session. |
+| **Sleep Display** is chosen | The display turns off immediately while the active session continues to prevent system sleep. |
+| **Sleep Until Agents Finish** is chosen | The display turns off while agents work and wakes when the final detected session finishes. |
+| No agent or manual session is active | Sleep Switch holds no power assertion and the Mac follows its macOS Lock Screen and Energy settings. |
+
+The five-minute agent cooldown releases Sleep Switch's assertion; it does not override a macOS configuration that disables automatic system sleep. The default **Prevent Sleep** mode also leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
 
 ## Supported agents
 
@@ -86,16 +98,16 @@ Open **Insights…** from the menu to see two small, useful views:
 
 Energy and agent history is saved locally by default so the charts survive a restart. Sampling is once per minute and storage is capped to five-minute energy buckets for 30 days plus agent transition records. Turn **Save energy and agent history** off at any time to keep only the in-memory live view, or use **Delete History…** to remove the local database.
 
-The Mac release has no analytics or account service. Version 2.2 also includes a SwiftUI iOS companion (`SleepSwitchCompanion`) using the user's private iCloud database for coarse status and short-lived, capability-gated remote actions. The companion never sends arbitrary commands: it can request only named actions advertised by the Mac. A fully sleeping Mac cannot poll CloudKit, so **Wake Mac** is intentionally unavailable; **Wake Display** works when the Mac is awake.
+The Mac release has no analytics or account service. The repository also includes a SwiftUI iOS companion (`SleepSwitchCompanion`) using the user's private iCloud database for coarse status and short-lived, capability-gated remote actions. The companion never sends arbitrary commands: it can request only named actions advertised by the Mac. A fully sleeping Mac cannot poll CloudKit, so **Wake Mac** is intentionally unavailable; **Wake Display** works when the Mac is awake.
 
 ## How it works
 
-In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-management assertions:
+In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-management assertions while a qualifying session is active:
 
 - `PreventUserIdleSystemSleep` keeps macOS from automatically sleeping.
-- `PreventUserIdleDisplaySleep` optionally keeps the display awake.
+- `PreventUserIdleDisplaySleep` keeps the display awake for detected-agent sessions and, when enabled, manual sessions. Explicit display-sleep actions temporarily suppress it.
 
-The assertions belong to the app process and are released when the manual or agent session ends, automatic agent awake is paused, or the app quits.
+The assertions belong to the app process. Agent sessions retain only the system assertion during their five-minute completion cooldown, then release it. Manual-session assertions are released when the session ends; all assertions are also released when automatic agent awake is paused or the app quits.
 
 The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Lid mode does not install a persistent helper or retain administrator credentials.
 
@@ -237,7 +249,7 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.0 (21)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.3 (24)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
 
 ### Companion actions
 

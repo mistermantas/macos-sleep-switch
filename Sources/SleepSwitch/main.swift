@@ -159,6 +159,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var awakeModeItems: [NSMenuItem] = []
     private var wakeDisplayWhenAgentsFinish = false
     private var displaySleepOverride = false
+    private var agentIdleGraceDeadline: Date?
+    private var agentIdleGraceTimer: Timer?
     private var agentScanInFlight = false
     private var refreshTimer: Timer?
     private var expiryTimer: Timer?
@@ -226,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         expiryTimer?.invalidate()
+        agentIdleGraceTimer?.invalidate()
         refreshTimer?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
@@ -637,7 +640,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         agentScanInFlight = false
         guard let latestAgents else { return }
 
+        let previousAgentCount = detectedAgents.count
         detectedAgents = latestAgents
+        updateAgentIdleGrace(
+            previousAgentCount: previousAgentCount,
+            currentAgentCount: latestAgents.count
+        )
         insightsRecorder.recordAgents(latestAgents)
 #if !APP_STORE
         if detectedAgents.isEmpty,
@@ -859,6 +867,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
             case .panicStop:
                 clearManualAwakeSession()
+                clearAgentIdleGrace()
                 wakeDisplayWhenAgentsFinish = false
                 displaySleepOverride = false
                 UserDefaults.standard.set(false, forKey: automaticAgentAwakeKey)
@@ -888,6 +897,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let defaults = UserDefaults.standard
         if let enabled = parameters["enabled"].flatMap(Bool.init) {
             defaults.set(enabled, forKey: automaticAgentAwakeKey)
+            if !enabled {
+                clearAgentIdleGrace()
+            }
         }
         if let keepDisplayAwake = parameters["keepDisplayAwake"].flatMap(Bool.init) {
             defaults.set(keepDisplayAwake, forKey: keepDisplayAwakeKey)
@@ -981,7 +993,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var shouldKeepDisplayAwakeNow: Bool {
-        manualAwakeSession != nil && shouldKeepDisplayAwake && !displaySleepOverride
+        guard !displaySleepOverride else { return false }
+        let manualDisplayAwake = manualAwakeSession != nil && shouldKeepDisplayAwake
+        let agentDisplayAwake = automaticAgentAwakeEnabled && !detectedAgents.isEmpty
+        return manualDisplayAwake || agentDisplayAwake
+    }
+
+    private var agentIdleGraceActive: Bool {
+        AgentIdleGracePolicy.isActive(deadline: agentIdleGraceDeadline)
     }
 
     private var agentAwakeRequested: Bool {
@@ -999,8 +1018,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             manualSession: manualAwakeSession,
             automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
             wakeWhenAgentsFinishArmed: wakeDisplayWhenAgentsFinish,
-            detectedAgents: detectedAgents
+            detectedAgents: detectedAgents,
+            agentIdleGraceActive: agentIdleGraceActive
         )
+    }
+
+    private func updateAgentIdleGrace(
+        previousAgentCount: Int,
+        currentAgentCount: Int
+    ) {
+        if currentAgentCount > 0 || !automaticAgentAwakeEnabled || manualAwakeSession != nil {
+            clearAgentIdleGrace()
+            return
+        }
+
+        guard let deadline = AgentIdleGracePolicy.deadline(
+            previousAgentCount: previousAgentCount,
+            currentAgentCount: currentAgentCount,
+            automaticAgentAwakeEnabled: automaticAgentAwakeEnabled,
+            hasManualSession: manualAwakeSession != nil
+        ) else { return }
+
+        agentIdleGraceDeadline = deadline
+        agentIdleGraceTimer?.invalidate()
+        let timer = Timer(
+            fireAt: deadline,
+            interval: 0,
+            target: self,
+            selector: #selector(agentIdleGraceExpired),
+            userInfo: nil,
+            repeats: false
+        )
+        RunLoop.main.add(timer, forMode: .common)
+        agentIdleGraceTimer = timer
+    }
+
+    private func clearAgentIdleGrace() {
+        agentIdleGraceTimer?.invalidate()
+        agentIdleGraceTimer = nil
+        agentIdleGraceDeadline = nil
+    }
+
+    @objc private func agentIdleGraceExpired() {
+        clearAgentIdleGrace()
+        reconcileAndUpdatePresentation()
+        if companionBridgeEnabled {
+            companionBridge.synchronize(force: true)
+        }
     }
 
     private func updatePresentation() {
@@ -1091,6 +1155,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "Sleep Switch keeping this Mac awake for \(remainingText) in \(selectedAwakeMode.menuTitle) mode",
                 "\(remainingText) · \(selectedAwakeMode.stateTitle) · Click for controls",
                 "Awake · \(remainingText) · \(selectedAwakeMode.stateTitle)"
+            )
+        }
+
+        if agentIdleGraceActive, let deadline = agentIdleGraceDeadline {
+            let remaining = max(1, Int(ceil(deadline.timeIntervalSinceNow / 60)))
+            return (
+                "timer",
+                "Sleep Switch will return sleep control to macOS after the agent cooldown",
+                "No agents · Sleep resumes in \(remaining)m · Click for controls",
+                "No agents · Sleep resumes in \(remaining)m"
             )
         }
 
@@ -1474,6 +1548,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         coolingThermalAbortSuppressesAwake = false
 #endif
         expiryTimer?.invalidate()
+        clearAgentIdleGrace()
 
         let session = AwakeSession(startedAt: Date(), durationSeconds: durationSeconds)
         manualAwakeSession = session
@@ -1600,6 +1675,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let defaults = UserDefaults.standard
         let previousValue = automaticAgentAwakeEnabled
         defaults.set(!previousValue, forKey: automaticAgentAwakeKey)
+        if previousValue {
+            clearAgentIdleGrace()
+        }
 #if !APP_STORE
         if !previousValue {
             coolingThermalAbortSuppressesAwake = false

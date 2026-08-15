@@ -21,6 +21,7 @@ struct CompanionSyncDiagnostics: Equatable {
     var publishedHistoryCount = 0
     var processedCommandCount = 0
     var lastCommandAt: Date?
+    var stalledSyncRecoveryCount = 0
 }
 
 /// Polls the user's private CloudKit database while the Mac is awake. The
@@ -48,6 +49,7 @@ final class CompanionMacBridge {
     private let defaults: UserDefaults
     private let statusHeartbeatInterval: TimeInterval
     private let historyHeartbeatInterval: TimeInterval
+    private let stalledSyncInterval: TimeInterval
     private var timer: Timer?
     private var syncTask: Task<Void, Never>?
     private var commandLedger: [String: CommandLedgerEntry]
@@ -59,6 +61,7 @@ final class CompanionMacBridge {
     private var lastHistoryBuiltAt: Date?
     private var lastCommandCleanupAt: Date?
     private var lastSyncStartedAt: Date?
+    private var syncGeneration: UInt64 = 0
     private let deviceIDValue: String
 
     private(set) var diagnostics = CompanionSyncDiagnostics() {
@@ -77,7 +80,8 @@ final class CompanionMacBridge {
         commandHandler: @escaping CommandHandler,
         defaults: UserDefaults = .standard,
         statusHeartbeatInterval: TimeInterval = 60,
-        historyHeartbeatInterval: TimeInterval? = nil
+        historyHeartbeatInterval: TimeInterval? = nil,
+        stalledSyncInterval: TimeInterval = 2 * 60
     ) {
         self.cloud = cloud
         self.deviceIDValue = deviceID
@@ -87,6 +91,7 @@ final class CompanionMacBridge {
         self.defaults = defaults
         self.statusHeartbeatInterval = statusHeartbeatInterval
         self.historyHeartbeatInterval = historyHeartbeatInterval ?? statusHeartbeatInterval * 5
+        self.stalledSyncInterval = stalledSyncInterval
         self.commandLedger = Self.loadLedger(from: defaults)
     }
 
@@ -107,22 +112,46 @@ final class CompanionMacBridge {
     func stop() {
         timer?.invalidate()
         timer = nil
+        syncGeneration &+= 1
         syncTask?.cancel()
         syncTask = nil
     }
 
-    func synchronize(force: Bool = false) {
-        guard syncTask == nil else { return }
-        let now = Date()
+    func synchronize(force: Bool = false, now: Date = Date()) {
+        if syncTask != nil {
+            guard let lastSyncStartedAt,
+                  now.timeIntervalSince(lastSyncStartedAt)
+                    >= stalledSyncInterval
+            else {
+                return
+            }
+
+            syncGeneration &+= 1
+            syncTask?.cancel()
+            syncTask = nil
+            diagnostics.stalledSyncRecoveryCount += 1
+            diagnostics.lastWarning =
+                "A stalled iCloud sync was cancelled and restarted."
+            Self.logger.error(
+                "A companion sync exceeded the watchdog interval and was restarted."
+            )
+        }
+
         if !force,
            let lastSyncStartedAt,
            now.timeIntervalSince(lastSyncStartedAt) < 5 {
             return
         }
         self.lastSyncStartedAt = now
+        syncGeneration &+= 1
+        let generation = syncGeneration
         syncTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            defer { self.syncTask = nil }
+            defer {
+                if self.syncGeneration == generation {
+                    self.syncTask = nil
+                }
+            }
             await self.performSynchronization(force: force)
         }
     }
@@ -131,15 +160,16 @@ final class CompanionMacBridge {
     /// complete. This is used by deterministic tests and lifecycle-aware
     /// callers; the menu-bar timer uses `synchronize()` above so it never
     /// blocks the UI event loop.
-    func synchronizeAndWait(force: Bool = false) async {
-        if let syncTask {
-            await syncTask.value
-            return
-        }
-        await performSynchronization(force: force)
+    func synchronizeAndWait(
+        force: Bool = false,
+        now: Date = Date()
+    ) async {
+        synchronize(force: force, now: now)
+        await syncTask?.value
     }
 
     private func performSynchronization(force: Bool) async {
+        guard !Task.isCancelled else { return }
         diagnostics.state = .syncing
 
         do {
@@ -148,9 +178,11 @@ final class CompanionMacBridge {
                 return
             }
         } catch {
+            guard !Task.isCancelled else { return }
             markFailure("Could not check the iCloud account status.", error: error)
             return
         }
+        guard !Task.isCancelled else { return }
 
         let now = Date()
         let status = statusProvider().refreshingLastSeen(at: now)
@@ -172,6 +204,7 @@ final class CompanionMacBridge {
         if shouldPublishStatus {
             do {
                 try await cloud.publish(status: status)
+                guard !Task.isCancelled else { return }
                 lastStatusFingerprint = statusFingerprint(status)
                 lastStatusPublishedAt = now
                 diagnostics.publishedStatusCount += 1
@@ -183,6 +216,7 @@ final class CompanionMacBridge {
         if shouldPublishHistory {
             do {
                 try await cloud.publish(history: history)
+                guard !Task.isCancelled else { return }
                 lastHistoryFingerprint = historyFingerprint(history)
                 lastHistoryPublishedAt = now
                 diagnostics.publishedHistoryCount += 1
@@ -193,6 +227,7 @@ final class CompanionMacBridge {
 
         do {
             let handledCommands = try await processPendingCommands()
+            guard !Task.isCancelled else { return }
             if handledCommands {
                 let updatedStatus = statusProvider().refreshingLastSeen()
                 try await cloud.publish(status: updatedStatus)
@@ -210,6 +245,7 @@ final class CompanionMacBridge {
                     for: deviceIDValue,
                     before: now.addingTimeInterval(-Self.commandLedgerRetention)
                 )
+                guard !Task.isCancelled else { return }
                 lastCommandCleanupAt = now
             } catch {
                 errors.append(operationMessage("command cleanup", error: error))

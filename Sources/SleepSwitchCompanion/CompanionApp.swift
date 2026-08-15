@@ -532,7 +532,7 @@ private enum CompanionScreenshotDemo {
         let mac = CompanionMacStatus(
             deviceID: deviceID,
             displayName: "Mantas’ MacBook Pro",
-            build: "2.3.0 (17)",
+            build: "2.3.1 (18)",
             lastSeen: now,
             uptimeSeconds: 2.4 * 24 * 3_600,
             powerSource: .ac,

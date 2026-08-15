@@ -186,10 +186,14 @@ private struct DeviceAndRefreshHeader: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("Updated")
+                Text("Phone refreshed")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
-                Text(lastSyncAt?.formatted(.relative(presentation: .named)) ?? "Never")
+                Text(
+                    lastSyncAt.map {
+                        CompanionTimeText.elapsed(since: $0)
+                    } ?? "Never"
+                )
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
@@ -207,7 +211,7 @@ private struct MacSnapshotCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
                         mac.isStale
-                            ? "Last seen \(mac.lastSeen.formatted(.relative(presentation: .named)))"
+                            ? "Last seen \(CompanionTimeText.elapsed(since: mac.lastSeen))"
                             : "Online"
                     )
                         .font(.headline)
@@ -413,7 +417,12 @@ private struct CompanionMacDetailScreen: View {
             }
 
             Section("Mac") {
-                LabeledContent("Status", value: mac.isStale ? "Last seen \(mac.lastSeen.formatted(.relative(presentation: .named)))" : "Online")
+                LabeledContent(
+                    "Status",
+                    value: mac.isStale
+                        ? "Last seen \(CompanionTimeText.elapsed(since: mac.lastSeen))"
+                        : "Online"
+                )
                 LabeledContent("Version", value: mac.build)
                 LabeledContent("Display", value: mac.displayAsleep ? "Asleep" : "Awake")
                 LabeledContent("Awake mode", value: awakeModeTitle)

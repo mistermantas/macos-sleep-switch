@@ -1,5 +1,36 @@
 import Foundation
 
+enum CompanionTimeText {
+    static func elapsed(
+        since date: Date,
+        now: Date = Date()
+    ) -> String {
+        let totalSeconds = max(0, Int(now.timeIntervalSince(date)))
+        if totalSeconds < 60 {
+            return "just now"
+        }
+
+        let totalMinutes = totalSeconds / 60
+        if totalMinutes < 60 {
+            return "\(totalMinutes)m ago"
+        }
+
+        let totalHours = totalMinutes / 60
+        let remainingMinutes = totalMinutes % 60
+        if totalHours < 24 {
+            return remainingMinutes == 0
+                ? "\(totalHours)h ago"
+                : "\(totalHours)h \(remainingMinutes)m ago"
+        }
+
+        let days = totalHours / 24
+        let remainingHours = totalHours % 24
+        return remainingHours == 0
+            ? "\(days)d ago"
+            : "\(days)d \(remainingHours)h ago"
+    }
+}
+
 enum CompanionRemoteAction: String, Codable, CaseIterable {
     case sleepMac
     case sleepDisplay

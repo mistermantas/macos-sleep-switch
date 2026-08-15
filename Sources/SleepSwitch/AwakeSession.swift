@@ -29,11 +29,37 @@ enum AwakePolicy {
         manualSession: AwakeSession?,
         automaticAgentAwakeEnabled: Bool,
         wakeWhenAgentsFinishArmed: Bool,
-        detectedAgents: [DetectedAgent]
+        detectedAgents: [DetectedAgent],
+        agentIdleGraceActive: Bool = false
     ) -> Bool {
         manualSession != nil
             || (automaticAgentAwakeEnabled && !detectedAgents.isEmpty)
+            || (automaticAgentAwakeEnabled && agentIdleGraceActive)
             || wakeWhenAgentsFinishArmed
+    }
+}
+
+enum AgentIdleGracePolicy {
+    static let duration: TimeInterval = 5 * 60
+
+    static func deadline(
+        previousAgentCount: Int,
+        currentAgentCount: Int,
+        automaticAgentAwakeEnabled: Bool,
+        hasManualSession: Bool,
+        now: Date = Date()
+    ) -> Date? {
+        guard automaticAgentAwakeEnabled,
+              !hasManualSession,
+              previousAgentCount > 0,
+              currentAgentCount == 0 else {
+            return nil
+        }
+        return now.addingTimeInterval(duration)
+    }
+
+    static func isActive(deadline: Date?, now: Date = Date()) -> Bool {
+        deadline.map { $0 > now } ?? false
     }
 }
 

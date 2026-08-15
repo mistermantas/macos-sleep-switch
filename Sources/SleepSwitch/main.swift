@@ -1072,9 +1072,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
+        let anyInputEventType = CGEventType(rawValue: UInt32.max)!
         let userIdleSeconds = CGEventSource.secondsSinceLastEventType(
             .combinedSessionState,
-            eventType: .anyInputEventType
+            eventType: anyInputEventType
         )
         let remainingIdleDelay = AgentIdleGracePolicy.remainingUserIdleDelay(
             userIdleSeconds: userIdleSeconds

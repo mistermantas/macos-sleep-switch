@@ -68,6 +68,8 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 
 Automatic agent sleep is deliberate and independent of the normal macOS idle-sleep timer, so it also works when automatic sleep is disabled on AC power. It never ends or overrides a manual session. The default **Prevent Sleep** mode leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
 
+On macOS versions that reject the public IOKit sleep request, the direct build falls back to the built-in `pmset sleepnow` action. A failed automatic request is logged instead of repeatedly interrupting the desktop with an alert.
+
 ## Supported agents
 
 - Codex

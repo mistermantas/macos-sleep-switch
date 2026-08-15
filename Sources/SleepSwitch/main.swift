@@ -1096,7 +1096,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             try RemoteEnergyController.sleepMac()
         } catch {
-            presentAssertionError(error)
+            NSLog("Sleep Switch automatic sleep failed: %@", error.localizedDescription)
         }
     }
 

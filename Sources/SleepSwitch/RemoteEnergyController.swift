@@ -22,6 +22,11 @@ enum RemoteEnergyError: Error, LocalizedError {
 /// use the same local tools as its existing menu, while the sandboxed Mac App
 /// Store build stays limited to public IOKit actions.
 struct RemoteEnergyController {
+#if !APP_STORE
+    static let sleepCommand = "/usr/bin/pmset"
+    static let sleepArguments = ["sleepnow"]
+#endif
+
     static var capabilities: CompanionMacCapabilities {
 #if APP_STORE
         return CompanionMacCapabilities(
@@ -65,6 +70,16 @@ struct RemoteEnergyController {
 
         let result = IOPMSleepSystem(connection)
         guard result == kIOReturnSuccess else {
+#if !APP_STORE
+            if result == kIOReturnNotPermitted || result == kIOReturnNotPrivileged {
+                try run(
+                    executable: sleepCommand,
+                    arguments: sleepArguments,
+                    failureMessage: "macOS could not enter sleep."
+                )
+                return
+            }
+#endif
             throw RemoteEnergyError.powerManagement(result)
         }
     }

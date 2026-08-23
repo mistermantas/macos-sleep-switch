@@ -372,7 +372,11 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     )
 
     var isStale: Bool {
-        Date().timeIntervalSince(lastSeen) > 5 * 60
+        isStale(at: Date())
+    }
+
+    func isStale(at date: Date) -> Bool {
+        date.timeIntervalSince(lastSeen) > 5 * 60
     }
 
     func refreshingLastSeen(at date: Date = Date()) -> CompanionMacStatus {
@@ -439,6 +443,27 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             manualSession: manualSession,
             cooling: cooling
         )
+    }
+}
+
+enum CompanionMacSelection {
+    static func preferred(
+        from macs: [CompanionMacStatus],
+        persistedDeviceID: String,
+        now: Date = Date()
+    ) -> CompanionMacStatus? {
+        let persisted = macs.first { $0.deviceID == persistedDeviceID }
+        if let persisted, !persisted.isStale(at: now) {
+            return persisted
+        }
+
+        if let freshestOnline = macs
+            .filter({ !$0.isStale(at: now) })
+            .max(by: { $0.lastSeen < $1.lastSeen }) {
+            return freshestOnline
+        }
+
+        return persisted ?? macs.max(by: { $0.lastSeen < $1.lastSeen })
     }
 }
 

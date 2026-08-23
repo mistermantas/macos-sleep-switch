@@ -8,7 +8,10 @@ struct CompanionDashboardRoot: View {
     @State private var pendingAction: CompanionRemoteAction?
 
     private var selectedMac: CompanionMacStatus? {
-        model.macs.first(where: { $0.deviceID == selectedMacDeviceID }) ?? model.macs.first
+        CompanionMacSelection.preferred(
+            from: model.macs,
+            persistedDeviceID: selectedMacDeviceID
+        )
     }
 
     @ViewBuilder

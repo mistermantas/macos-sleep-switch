@@ -252,7 +252,7 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.3 (24)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.4 (25)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record instead of remaining pinned to the stale one.
 
 ### Companion actions
 

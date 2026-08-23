@@ -3,6 +3,7 @@ import Foundation
 enum CompanionProtocolTests {
     static func run() {
         testPreciseElapsedTimeText()
+        testSelectsFreshReplacementForStalePersistedMac()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,
@@ -272,6 +273,57 @@ enum CompanionProtocolTests {
         expect(
             history.agentDays.reduce(0) { $0 + $1.activeSeconds } == 3 * 60 * 60,
             "preserves total agent activity duration"
+        )
+    }
+
+    private static func testSelectsFreshReplacementForStalePersistedMac() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let stale = selectionStatus(
+            deviceID: "old-device",
+            lastSeen: now.addingTimeInterval(-7 * 24 * 60 * 60)
+        )
+        let fresh = selectionStatus(
+            deviceID: "replacement-device",
+            lastSeen: now.addingTimeInterval(-2)
+        )
+
+        let selected = CompanionMacSelection.preferred(
+            from: [stale, fresh],
+            persistedDeviceID: stale.deviceID,
+            now: now
+        )
+        expect(
+            selected?.deviceID == fresh.deviceID,
+            "replaces a stale persisted Mac identity with its fresh same-name record"
+        )
+    }
+
+    private static func selectionStatus(
+        deviceID: String,
+        lastSeen: Date
+    ) -> CompanionMacStatus {
+        CompanionMacStatus(
+            deviceID: deviceID,
+            displayName: "Manto MBP",
+            build: "2.3.1 (18)",
+            lastSeen: lastSeen,
+            uptimeSeconds: 100,
+            powerSource: .ac,
+            batteryPercent: 80,
+            thermalState: "nominal",
+            activeAgentCount: 0,
+            activeSessionCount: 0,
+            awakeMode: "preventSleep",
+            displayAsleep: false,
+            isKeepingAwake: false,
+            keepDisplayAwake: true,
+            automaticAgentAwakeEnabled: true,
+            wakeDisplayWhenAgentsFinish: false,
+            estimatedWatts: 10,
+            energySource: .ac,
+            energyConfidence: .estimated,
+            isCharging: true,
+            capabilities: CompanionMacCapabilities(supportsCloudKit: true)
         )
     }
 

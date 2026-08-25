@@ -1,6 +1,6 @@
 # Sleep Switch Companion — iOS release setup
 
-The repository contains the SwiftUI target `SleepSwitchCompanion`. It is an MB Uncascade app with display name Sleep Switch, version `2.3.4 (25)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
+The repository contains the SwiftUI target `SleepSwitchCompanion`. It is an MB Uncascade app with display name Sleep Switch, version `2.3.5 (26)`, targets iOS/iPadOS 17, and uses bundle identifier `lt.mantas.sleepswitch.companion`.
 
 ## CloudKit setup required once
 
@@ -28,11 +28,11 @@ xcodebuild -project SleepSwitch.xcodeproj \
   -scheme SleepSwitchCompanion \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath /tmp/SleepSwitchCompanion-2.3.4-25.xcarchive \
+  -archivePath /tmp/SleepSwitchCompanion-2.3.5-26.xcarchive \
   -allowProvisioningUpdates archive
 ```
 
-The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.3.4 (25)` automatically replaces a stale saved Mac identity with the freshest online record after an app reinstall, macOS upgrade, or distribution-channel change. It also includes the full dashboard, inspectable Insights charts, precise Mac-vs-phone freshness labels, and the Mac publisher watchdog. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
+The connected Apple Developer account must provide an iOS App ID for `lt.mantas.sleepswitch.companion` with iCloud/CloudKit enabled. The App Store Connect record is **Sleep Switch Companion** (Apple ID `6800694858`), set to Free with worldwide availability. Build `2.3.5 (26)` automatically replaces a stale saved Mac identity with the freshest online record with the same Mac name after an app reinstall, macOS upgrade, or distribution-channel change, without silently retargeting controls to another Mac. It also includes the full dashboard, inspectable Insights charts, precise Mac-vs-phone freshness labels, and the Mac publisher watchdog. The screenshots, metadata, review contact, Content Rights declaration, and App Privacy declaration are configured in App Store Connect. The privacy policy URL is set to:
 
 `https://github.com/mistermantas/macos-sleep-switch/blob/main/PRIVACY.md`
 

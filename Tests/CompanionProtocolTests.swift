@@ -4,6 +4,7 @@ enum CompanionProtocolTests {
     static func run() {
         testPreciseElapsedTimeText()
         testSelectsFreshReplacementForStalePersistedMac()
+        testDoesNotSwitchAStaleSelectionToAnotherMac()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,
@@ -298,13 +299,38 @@ enum CompanionProtocolTests {
         )
     }
 
+    private static func testDoesNotSwitchAStaleSelectionToAnotherMac() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let selected = selectionStatus(
+            deviceID: "selected-device",
+            displayName: "Studio Mac",
+            lastSeen: now.addingTimeInterval(-7 * 24 * 60 * 60)
+        )
+        let unrelated = selectionStatus(
+            deviceID: "other-device",
+            displayName: "Travel Mac",
+            lastSeen: now.addingTimeInterval(-2)
+        )
+
+        let result = CompanionMacSelection.preferred(
+            from: [selected, unrelated],
+            persistedDeviceID: selected.deviceID,
+            now: now
+        )
+        expect(
+            result?.deviceID == selected.deviceID,
+            "does not silently retarget remote controls to a different Mac"
+        )
+    }
+
     private static func selectionStatus(
         deviceID: String,
+        displayName: String = "Manto MBP",
         lastSeen: Date
     ) -> CompanionMacStatus {
         CompanionMacStatus(
             deviceID: deviceID,
-            displayName: "Manto MBP",
+            displayName: displayName,
             build: "2.3.1 (18)",
             lastSeen: lastSeen,
             uptimeSeconds: 100,

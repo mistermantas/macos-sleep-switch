@@ -457,13 +457,23 @@ enum CompanionMacSelection {
             return persisted
         }
 
-        if let freshestOnline = macs
-            .filter({ !$0.isStale(at: now) })
-            .max(by: { $0.lastSeen < $1.lastSeen }) {
-            return freshestOnline
+        if let persisted {
+            if let replacement = macs
+                .filter({
+                    $0.deviceID != persisted.deviceID
+                        && $0.displayName == persisted.displayName
+                        && !$0.isStale(at: now)
+                })
+                .max(by: { $0.lastSeen < $1.lastSeen }) {
+                return replacement
+            }
+            return persisted
         }
 
-        return persisted ?? macs.max(by: { $0.lastSeen < $1.lastSeen })
+        return macs
+            .filter({ !$0.isStale(at: now) })
+            .max(by: { $0.lastSeen < $1.lastSeen })
+            ?? macs.max(by: { $0.lastSeen < $1.lastSeen })
     }
 }
 

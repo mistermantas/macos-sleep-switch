@@ -252,7 +252,7 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.5 (26)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record with the same Mac name instead of remaining pinned to the stale one. It never silently retargets remote controls to a different Mac.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.6 (27)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record with the same Mac name instead of remaining pinned to the stale one. It never silently retargets remote controls to a different Mac.
 
 ### Companion actions
 
@@ -267,6 +267,8 @@ The iOS dashboard shows the Mac's online/stale state, uptime, thermal state, pow
 - **Stop Sleep Switch Controls** — immediately clears the Mac's manual and automatic keep-awake controls.
 
 The Mac must be awake and signed into the same iCloud account for status and commands to move. Commands expire after 90 seconds and are addressed to a persisted per-device ID; the Mac rejects expired, misaddressed, unsupported, or replayed commands.
+
+While the Mac is awake, Sleep Switch checks for remote commands every three seconds without rebuilding or uploading Insights history. The companion keeps each action visible as **Sending**, **Waiting for Mac**, **Confirming**, or **Done**, so normal iCloud propagation is distinguishable from a failed control. A fully sleeping or offline Mac cannot receive a CloudKit command until it wakes.
 
 ## License
 

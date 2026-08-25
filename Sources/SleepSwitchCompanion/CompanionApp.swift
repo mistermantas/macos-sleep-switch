@@ -27,15 +27,18 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var lastConnectionError: CompanionConnectionError?
     @Published private(set) var syncStage = "Not checked"
     @Published private(set) var lastCommandStatus = "Never"
+    @Published private(set) var commandProgress: CompanionCommandProgress?
 
     private lazy var cloud = CompanionCloudClient()
     private let requesterDeviceID = CompanionDeviceIdentity.load(key: "companionIOSDeviceID")
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
+    private var progressDismissTask: Task<Void, Never>?
 
     #if DEBUG
     private let isScreenshotDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-demo")
     private let isConnectionDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-connection")
+    private let isCommandProgressDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-command-progress")
     #endif
 
     init() {
@@ -48,6 +51,14 @@ final class CompanionAppModel: ObservableObject {
             lastSyncAt = Date()
             lastSuccessfulSyncAt = lastSyncAt
             syncStage = "Connected"
+            if isCommandProgressDemo {
+                commandInFlight = true
+                commandProgress = CompanionCommandProgress(
+                    commandID: UUID(),
+                    actionTitle: "Prevent Sleep",
+                    stage: .waitingForMac
+                )
+            }
         } else if isConnectionDemo {
             accountStatus = .available
             lastSyncAt = Date()
@@ -66,6 +77,7 @@ final class CompanionAppModel: ObservableObject {
     deinit {
         refreshTask?.cancel()
         commandTask?.cancel()
+        progressDismissTask?.cancel()
     }
 
     func refresh() {
@@ -308,6 +320,12 @@ final class CompanionAppModel: ObservableObject {
             expiresAt: now.addingTimeInterval(90),
             policyVersion: 1
         )
+        progressDismissTask?.cancel()
+        commandProgress = CompanionCommandProgress(
+            commandID: command.id,
+            actionTitle: action.title,
+            stage: .sending
+        )
 
         commandTask?.cancel()
         commandTask = Task { @MainActor [weak self] in
@@ -318,10 +336,12 @@ final class CompanionAppModel: ObservableObject {
             }
             do {
                 try await self.cloud.send(command)
+                self.commandProgress = self.commandProgress?.withStage(.waitingForMac)
                 self.message = "\(action.title) requested for \(mac.displayName). Waiting for the Mac…"
                 let result = try await self.waitForCommandResult(command.id)
                 let completionMessage: String
                 if let result {
+                    self.commandProgress = self.commandProgress?.withStage(.confirming)
                     completionMessage = result.message ?? (result.executed
                         ? "\(action.title) completed."
                         : "The Mac rejected \(action.title.lowercased()).")
@@ -331,14 +351,19 @@ final class CompanionAppModel: ObservableObject {
                     if !result.executed, action == .setKeepAwake {
                         self.replaceMac(originalMac)
                     }
+                    self.commandProgress = self.commandProgress?.withStage(
+                        result.executed ? .completed : .failed
+                    )
                 } else {
                     completionMessage = "\(action.title) is still pending. The Mac may be asleep or offline."
                     self.lastCommandStatus = "Pending — \(action.title)"
+                    self.commandProgress = self.commandProgress?.withStage(.failed)
                 }
                 if ![.sleepMac, .restartMac, .shutdownMac].contains(action) {
                     await self.refreshAndWait()
                 }
                 self.message = completionMessage
+                self.dismissCommandProgress(commandID: command.id)
             } catch is CancellationError {
                 return
             } catch {
@@ -349,9 +374,24 @@ final class CompanionAppModel: ObservableObject {
                 self.lastCommandStatus = "Failed — \(action.title): \(issue.domain) \(issue.code)"
                 self.lastSyncIssue = issue.userMessage
                 self.message = "Could not send \(action.title.lowercased()). \(issue.recovery)"
+                self.commandProgress = self.commandProgress?.withStage(.failed)
+                self.dismissCommandProgress(commandID: command.id)
             }
         }
 #endif
+    }
+
+    private func dismissCommandProgress(commandID: UUID) {
+        progressDismissTask?.cancel()
+        progressDismissTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            guard let self,
+                  self.commandProgress?.commandID == commandID,
+                  self.commandProgress?.isTerminal == true
+            else { return }
+            self.commandProgress = nil
+            self.progressDismissTask = nil
+        }
     }
 
     private func replaceMac(_ updatedMac: CompanionMacStatus) {
@@ -386,9 +426,8 @@ final class CompanionAppModel: ObservableObject {
 #endif
 
     private func waitForCommandResult(_ commandID: UUID) async throws -> CompanionRemoteResult? {
-        // The awake Mac intentionally polls CloudKit rather than relying on a
-        // push wake. Allow two normal 15-second polling intervals before
-        // presenting the command as pending.
+        // The Mac uses a lightweight three-second command poll. Keep a longer
+        // timeout for CloudKit propagation and temporarily slow connections.
         for _ in 0..<60 {
             try Task.checkCancellation()
             if let result = try await cloud.fetchResult(for: commandID) {

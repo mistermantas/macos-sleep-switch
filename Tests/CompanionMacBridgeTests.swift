@@ -9,6 +9,7 @@ enum CompanionMacBridgeTests {
         await testPersistsCommandIdempotency()
         await testSurfacesAccountFailures()
         await testRecoversFromStalledSync()
+        await testFastCommandPollingSkipsHeartbeatWrites()
     }
 
     private static func testPublishesAndCoalesces() async {
@@ -121,6 +122,29 @@ enum CompanionMacBridgeTests {
             "records the stalled-sync recovery"
         )
         expect(bridge.diagnostics.state == .succeeded, "returns to a healthy sync state")
+    }
+
+    private static func testFastCommandPollingSkipsHeartbeatWrites() async {
+        expect(
+            CompanionMacBridge.commandPollInterval <= 3,
+            "checks for remote commands within three seconds"
+        )
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let command = makeCommand()
+        cloud.pendingCommands = [
+            CompanionPendingCommand(
+                recordName: command.id.uuidString,
+                command: command
+            )
+        ]
+        let bridge = makeBridge(cloud: cloud, defaults: defaults)
+
+        await bridge.pollCommandsAndWait()
+
+        expect(cloud.finishedResults.count == 1, "executes a fast-polled command")
+        expect(cloud.historyPublishCount == 0, "does not publish history during a command poll")
+        expect(cloud.statusPublishCount == 1, "publishes status only after executing a command")
     }
 
     private static func makeBridge(

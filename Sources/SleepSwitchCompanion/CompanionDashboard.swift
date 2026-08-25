@@ -48,6 +48,8 @@ struct CompanionDashboardRoot: View {
             Group {
                 if let mac = selectedMac {
                     dashboard(mac)
+                } else if model.isLoading {
+                    connectionLoadingState
                 } else {
                     connectionState
                 }
@@ -73,6 +75,13 @@ struct CompanionDashboardRoot: View {
                     showingSettings = false
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let progress = model.commandProgress {
+                    CommandProgressBar(progress: progress)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.snappy, value: model.commandProgress)
             .confirmationDialog(
                 pendingAction?.title ?? "Confirm action",
                 isPresented: Binding(
@@ -146,6 +155,26 @@ struct CompanionDashboardRoot: View {
             .padding(.bottom, 28)
         }
         .scrollIndicators(.hidden)
+        .overlay(alignment: .top) {
+            if model.isLoading {
+                ProgressView()
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+            }
+        }
+    }
+
+    private var connectionLoadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+            Text(model.syncStage)
+                .font(.headline)
+            Text("Connecting to your Mac")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var connectionState: some View {
@@ -160,6 +189,50 @@ struct CompanionDashboardRoot: View {
                 showingSettings = true
             }
             .buttonStyle(.bordered)
+        }
+    }
+}
+
+private struct CommandProgressBar: View {
+    let progress: CompanionCommandProgress
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 10) {
+                Image(systemName: symbolName)
+                    .foregroundStyle(symbolColor)
+                Text(progress.actionTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(progress.statusText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView(value: progress.fraction)
+                .progressViewStyle(.linear)
+                .tint(progress.stage == .failed ? .red : .accentColor)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) { Divider() }
+    }
+
+    private var symbolName: String {
+        switch progress.stage {
+        case .sending: "icloud.and.arrow.up"
+        case .waitingForMac, .confirming: "laptopcomputer"
+        case .completed: "checkmark.circle.fill"
+        case .failed: "xmark.octagon.fill"
+        }
+    }
+
+    private var symbolColor: Color {
+        switch progress.stage {
+        case .completed: .green
+        case .failed: .red
+        default: .accentColor
         }
     }
 }

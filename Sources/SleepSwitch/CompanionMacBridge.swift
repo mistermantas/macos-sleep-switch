@@ -41,6 +41,8 @@ final class CompanionMacBridge {
     private static let commandLedgerRetention: TimeInterval = 24 * 60 * 60
     private static let historyBuildInterval: TimeInterval = 60
     private static let commandCleanupInterval: TimeInterval = 6 * 60 * 60
+    static let commandPollInterval: TimeInterval = 3
+    private static let fullSyncInterval: TimeInterval = 15
 
     private let cloud: CompanionCloudStoring
     private let statusProvider: StatusProvider
@@ -51,6 +53,7 @@ final class CompanionMacBridge {
     private let historyHeartbeatInterval: TimeInterval
     private let stalledSyncInterval: TimeInterval
     private var timer: Timer?
+    private var commandTimer: Timer?
     private var syncTask: Task<Void, Never>?
     private var commandLedger: [String: CommandLedgerEntry]
     private var lastStatusFingerprint: Data?
@@ -61,6 +64,7 @@ final class CompanionMacBridge {
     private var lastHistoryBuiltAt: Date?
     private var lastCommandCleanupAt: Date?
     private var lastSyncStartedAt: Date?
+    private var lastFullSyncStartedAt: Date?
     private var syncGeneration: UInt64 = 0
     private let deviceIDValue: String
 
@@ -96,9 +100,9 @@ final class CompanionMacBridge {
     }
 
     func start() {
-        guard timer == nil else { return }
+        guard timer == nil, commandTimer == nil else { return }
         timer = Timer.scheduledTimer(
-            withTimeInterval: 15,
+            withTimeInterval: Self.fullSyncInterval,
             repeats: true
         ) { [weak self] _ in
             Task { @MainActor in
@@ -106,12 +110,23 @@ final class CompanionMacBridge {
             }
         }
         timer?.tolerance = 3
+        commandTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.commandPollInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.pollCommands()
+            }
+        }
+        commandTimer?.tolerance = 0.5
         synchronize(force: true)
     }
 
     func stop() {
         timer?.invalidate()
         timer = nil
+        commandTimer?.invalidate()
+        commandTimer = nil
         syncGeneration &+= 1
         syncTask?.cancel()
         syncTask = nil
@@ -138,11 +153,12 @@ final class CompanionMacBridge {
         }
 
         if !force,
-           let lastSyncStartedAt,
-           now.timeIntervalSince(lastSyncStartedAt) < 5 {
+           let lastFullSyncStartedAt,
+           now.timeIntervalSince(lastFullSyncStartedAt) < 5 {
             return
         }
         self.lastSyncStartedAt = now
+        self.lastFullSyncStartedAt = now
         syncGeneration &+= 1
         let generation = syncGeneration
         syncTask = Task { @MainActor [weak self] in
@@ -156,6 +172,22 @@ final class CompanionMacBridge {
         }
     }
 
+    func pollCommands(now: Date = Date()) {
+        guard syncTask == nil else { return }
+        lastSyncStartedAt = now
+        syncGeneration &+= 1
+        let generation = syncGeneration
+        syncTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.syncGeneration == generation {
+                    self.syncTask = nil
+                }
+            }
+            await self.performCommandPoll()
+        }
+    }
+
     /// Runs one synchronization pass and suspends until all CloudKit work is
     /// complete. This is used by deterministic tests and lifecycle-aware
     /// callers; the menu-bar timer uses `synchronize()` above so it never
@@ -166,6 +198,31 @@ final class CompanionMacBridge {
     ) async {
         synchronize(force: force, now: now)
         await syncTask?.value
+    }
+
+    func pollCommandsAndWait(now: Date = Date()) async {
+        pollCommands(now: now)
+        await syncTask?.value
+    }
+
+    private func performCommandPoll() async {
+        guard !Task.isCancelled else { return }
+        diagnostics.state = .syncing
+        do {
+            let handledCommands = try await processPendingCommands()
+            guard !Task.isCancelled else { return }
+            if handledCommands {
+                let updatedStatus = statusProvider().refreshingLastSeen()
+                try await cloud.publish(status: updatedStatus)
+                lastStatusFingerprint = statusFingerprint(updatedStatus)
+                lastStatusPublishedAt = Date()
+                diagnostics.publishedStatusCount += 1
+            }
+            markSuccess()
+        } catch {
+            guard !Task.isCancelled else { return }
+            markFailure("remote commands", error: error)
+        }
     }
 
     private func performSynchronization(force: Bool) async {

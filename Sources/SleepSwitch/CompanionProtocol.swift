@@ -123,6 +123,53 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     }
 }
 
+enum CompanionCommandStage: String, Equatable {
+    case sending
+    case waitingForMac
+    case confirming
+    case completed
+    case failed
+}
+
+struct CompanionCommandProgress: Equatable, Identifiable {
+    let commandID: UUID
+    let actionTitle: String
+    let stage: CompanionCommandStage
+
+    var id: UUID { commandID }
+
+    var fraction: Double {
+        switch stage {
+        case .sending: 0.18
+        case .waitingForMac: 0.52
+        case .confirming: 0.82
+        case .completed, .failed: 1
+        }
+    }
+
+    var statusText: String {
+        switch stage {
+        case .sending: "Sending"
+        case .waitingForMac: "Waiting for Mac"
+        case .confirming: "Confirming"
+        case .completed: "Done"
+        case .failed: "Failed"
+        }
+    }
+
+    var isTerminal: Bool {
+        stage == .completed || stage == .failed
+    }
+
+    func withStage(_ stage: CompanionCommandStage) -> CompanionCommandProgress {
+        CompanionCommandProgress(
+            commandID: commandID,
+            actionTitle: actionTitle,
+            stage: stage
+        )
+    }
+}
+
 struct CompanionMacCapabilities: Codable, Equatable {
     var canSleepMac = true
     var canSleepDisplay = false

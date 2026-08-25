@@ -3,6 +3,7 @@ import Foundation
 enum CompanionProtocolTests {
     static func run() {
         testPreciseElapsedTimeText()
+        testCommandProgressStages()
         testSelectsFreshReplacementForStalePersistedMac()
         testDoesNotSwitchAStaleSelectionToAnotherMac()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -369,6 +370,22 @@ enum CompanionProtocolTests {
             ) == "12m ago",
             "shows concise minute precision for recent updates"
         )
+    }
+
+    private static func testCommandProgressStages() {
+        let commandID = UUID()
+        let sending = CompanionCommandProgress(
+            commandID: commandID,
+            actionTitle: "Prevent Sleep",
+            stage: .sending
+        )
+        let waiting = sending.withStage(.waitingForMac)
+        let completed = waiting.withStage(.completed)
+
+        expect(sending.fraction < waiting.fraction, "advances progress while waiting for the Mac")
+        expect(waiting.fraction < completed.fraction, "finishes progress after confirmation")
+        expect(completed.isTerminal, "marks completed command progress as terminal")
+        expect(completed.statusText == "Done", "uses a concise completed status")
     }
 
     private static func expect(

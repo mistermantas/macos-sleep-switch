@@ -94,9 +94,9 @@ Manual keep-awake sessions work immediately. To test Codex tracking, choose **Co
 
 The app uses `IOPMAssertionCreateWithName` to prevent idle system or display sleep and `IOPMAssertionDeclareUserActivity` for the optional one-shot display wake.
 
-For version 2.3.3 (build 20), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local agent tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
+For version 2.3.4 (build 21), reviewers can also open **Insights…** from the menu. The Energy tab shows the live estimate and five-minute local buckets; the Agent activity tab shows coarse intervals for supported local agent tasks. If the test Mac has not been running long enough to produce a bucket, the app displays an empty state rather than fabricated data. **Settings → Save Energy & Agent History** pauses disk writes, and **Delete History…** removes the local SQLite rows.
 
-The repository also contains the MB Uncascade companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, display name Sleep Switch, iOS/iPadOS 17, version 2.3.6 build 27). It uses the same private CloudKit container as the shipped Mac app, `iCloud.lt.mantas.sleepswitch`, so existing Mac builds remain compatible. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. The Mac checks for lightweight remote commands every three seconds, and the companion shows each action's send, wait, confirmation, and completion progress. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
+The repository also contains the MB Uncascade companion target `SleepSwitchCompanion` (bundle ID `lt.mantas.sleepswitch.companion`, display name Sleep Switch, iOS/iPadOS 17, version 2.3.7 build 28). It uses the same private CloudKit container as the shipped Mac app, `iCloud.lt.mantas.sleepswitch`, so existing Mac builds remain compatible. When the Mac is awake and Sleep Switch is running, the companion can show status and request capability-gated actions such as Sleep Mac, Sleep Display, Wake Display, Keep Awake for Agents, and Wake Display When Agents Finish. Sleep, lock, restart, and shutdown have explicit confirmation in the iOS UI. The Mac checks for lightweight remote commands every three seconds, and the companion shows each action's send, wait, confirmation, and completion progress. A fully sleeping Mac cannot poll CloudKit, so Wake Mac is intentionally unavailable. CloudKit schema and App Store Connect setup are documented in `COMPANION_APP_STORE.md`.
 
 The companion's History view is intentionally bounded: it shows daily kWh and agent-hours for up to 30 days, plus up to 24 hours of five-minute energy buckets. It does not receive prompts, output, file names, process names, or raw command lines.
 
@@ -117,7 +117,7 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
 
 - Version 1.8.0 (build 11) was uploaded to App Store Connect on August 1, 2026,
   and accepted for processing as a universal sandboxed app.
-- The v2.3.3 Mac candidate is build 20. It adds reliable ChatGPT/Codex and OpenCode detection, charging-rate telemetry, local Insights, bounded history, and a dedicated three-second command channel for a more responsive companion.
+- The v2.3.4 Mac candidate is build 21. It adds reliable ChatGPT/Codex and OpenCode detection, charging-rate telemetry, local Insights, bounded history, and independent command/status scheduling so remote actions are never held behind history sync.
 - Screenshots, listing copy, URLs, review notes, categories, and the free price
   are configured.
 - The privacy policy URL and **Data Not Collected** disclosure are published.
@@ -125,6 +125,6 @@ them. `AppStore/Screenshots/Source/current-menu.png` is the real menu reference.
   device screen recording is attached to the reviewer reply.
 
 For a 2.2 submission, record the sandboxed TestFlight build, show **Support &
-Creator → Version 2.3.3 (20)**, open **Insights…**, demonstrate the history
+Creator → Version 2.3.4 (21)**, open **Insights…**, demonstrate the history
 toggle/delete flow, then attach the recording in the review conversation and
 choose **Submit for Review** to resubmit.

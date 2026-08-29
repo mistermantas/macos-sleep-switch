@@ -10,6 +10,8 @@ enum CompanionMacBridgeTests {
         await testSurfacesAccountFailures()
         await testRecoversFromStalledSync()
         await testFastCommandPollingSkipsHeartbeatWrites()
+        await testCommandPollDoesNotWaitForFullSync()
+        await testChangedStatusPublishesWithoutHistory()
     }
 
     private static func testPublishesAndCoalesces() async {
@@ -147,6 +149,55 @@ enum CompanionMacBridgeTests {
         expect(cloud.statusPublishCount == 1, "publishes status only after executing a command")
     }
 
+    /// A status/history pass can take substantially longer than the command
+    /// poll. A remote cooling change must not wait behind that lower-priority
+    /// work, or the companion feels unresponsive despite a short poll cadence.
+    private static func testCommandPollDoesNotWaitForFullSync() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let command = makeCommand()
+        cloud.pendingCommands = [
+            CompanionPendingCommand(
+                recordName: command.id.uuidString,
+                command: command
+            )
+        ]
+        cloud.accountDelayNanoseconds = 500_000_000
+        let bridge = makeBridge(cloud: cloud, defaults: defaults)
+
+        bridge.synchronize(force: true)
+        while cloud.accountStatusCallCount == 0 {
+            await Task.yield()
+        }
+        bridge.pollCommands()
+        for _ in 0..<20 where cloud.finishedResults.isEmpty {
+            await Task.yield()
+        }
+
+        expect(
+            cloud.finishedResults.count == 1,
+            "does not hold a remote command behind a slow full sync"
+        )
+    }
+
+    private static func testChangedStatusPublishesWithoutHistory() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let bridge = makeBridge(cloud: cloud, defaults: defaults)
+
+        await bridge.synchronizeAndWait(force: true)
+        await bridge.publishStatusChangeAndWait()
+
+        expect(
+            cloud.statusPublishCount == 2,
+            "publishes changed local controls immediately"
+        )
+        expect(
+            cloud.historyPublishCount == 1,
+            "does not upload history for a local control change"
+        )
+    }
+
     private static func makeBridge(
         cloud: FakeCompanionCloudStore,
         defaults: UserDefaults,
@@ -255,7 +306,10 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     func fetchHistory(for deviceID: String) async throws -> CompanionHistorySnapshot? { nil }
     func send(_ command: CompanionRemoteCommand) async throws {}
     func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? { nil }
-    func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand] { pendingCommands }
+    func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand] {
+        if let accountError { throw accountError }
+        return pendingCommands
+    }
 
     func finish(
         command: CompanionPendingCommand,

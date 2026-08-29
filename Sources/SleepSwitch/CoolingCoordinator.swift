@@ -62,6 +62,7 @@ final class CoolingCoordinator {
     private var aboveAbortCeilingSince: Date?
 
     var onChange: ((CoolingPresentationSnapshot) -> Void)?
+    var onProfileApplicationChange: (() -> Void)?
     var onThermalAbort: ((CoolingAbortReason) -> Void)?
 
     init(
@@ -131,6 +132,7 @@ final class CoolingCoordinator {
             }
         }
         publish()
+        onProfileApplicationChange?()
     }
 
     func updateControlEnabled(_ controlEnabled: Bool) {
@@ -293,6 +295,7 @@ final class CoolingCoordinator {
             } else {
                 self.leaseStartBlocked = true
             }
+            self.onProfileApplicationChange?()
         }
     }
 
@@ -313,6 +316,7 @@ final class CoolingCoordinator {
         previousDecisionAt = nil
         client.endLease(token: token) { [weak self] response in
             self?.consume(response)
+            self?.onProfileApplicationChange?()
             completion?(response.succeeded)
         }
     }

@@ -55,6 +55,8 @@ final class CompanionMacBridge {
     private var timer: Timer?
     private var commandTimer: Timer?
     private var syncTask: Task<Void, Never>?
+    private var commandTask: Task<Void, Never>?
+    private var statusPublishTask: Task<Void, Never>?
     private var commandLedger: [String: CommandLedgerEntry]
     private var lastStatusFingerprint: Data?
     private var lastHistoryFingerprint: Data?
@@ -64,6 +66,7 @@ final class CompanionMacBridge {
     private var lastHistoryBuiltAt: Date?
     private var lastCommandCleanupAt: Date?
     private var lastSyncStartedAt: Date?
+    private var lastCommandPollStartedAt: Date?
     private var lastFullSyncStartedAt: Date?
     private var syncGeneration: UInt64 = 0
     private let deviceIDValue: String
@@ -130,6 +133,10 @@ final class CompanionMacBridge {
         syncGeneration &+= 1
         syncTask?.cancel()
         syncTask = nil
+        commandTask?.cancel()
+        commandTask = nil
+        statusPublishTask?.cancel()
+        statusPublishTask = nil
     }
 
     func synchronize(force: Bool = false, now: Date = Date()) {
@@ -170,19 +177,34 @@ final class CompanionMacBridge {
             }
             await self.performSynchronization(force: force)
         }
+        // Commands are latency-sensitive. Start a separate poll immediately
+        // rather than making the first action wait for status/history sync.
+        pollCommands(now: now)
     }
 
     func pollCommands(now: Date = Date()) {
-        guard syncTask == nil else { return }
-        lastSyncStartedAt = now
-        syncGeneration &+= 1
-        let generation = syncGeneration
-        syncTask = Task { @MainActor [weak self] in
+        if commandTask != nil {
+            guard let lastCommandPollStartedAt,
+                  now.timeIntervalSince(lastCommandPollStartedAt)
+                    >= stalledSyncInterval
+            else {
+                return
+            }
+            commandTask?.cancel()
+            commandTask = nil
+            diagnostics.stalledSyncRecoveryCount += 1
+            diagnostics.lastWarning =
+                "A stalled remote-command poll was cancelled and restarted."
+            Self.logger.error(
+                "A companion remote-command poll exceeded the watchdog interval and was restarted."
+            )
+        }
+
+        lastCommandPollStartedAt = now
+        commandTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
-                if self.syncGeneration == generation {
-                    self.syncTask = nil
-                }
+                self.commandTask = nil
             }
             await self.performCommandPoll()
         }
@@ -197,12 +219,45 @@ final class CompanionMacBridge {
         now: Date = Date()
     ) async {
         synchronize(force: force, now: now)
-        await syncTask?.value
+        let activeSyncTask = syncTask
+        let activeCommandTask = commandTask
+        await activeSyncTask?.value
+        await activeCommandTask?.value
     }
 
     func pollCommandsAndWait(now: Date = Date()) async {
         pollCommands(now: now)
-        await syncTask?.value
+        await commandTask?.value
+    }
+
+    /// Publishes a changed local control state without rebuilding or uploading
+    /// history. This is used for actions such as cooling-profile changes where
+    /// the companion needs confirmation promptly, not on the next heartbeat.
+    func publishStatusChange() {
+        guard statusPublishTask == nil else { return }
+        statusPublishTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.statusPublishTask = nil }
+            guard !Task.isCancelled else { return }
+
+            let status = self.statusProvider().refreshingLastSeen()
+            do {
+                try await self.cloud.publish(status: status)
+                guard !Task.isCancelled else { return }
+                self.lastStatusFingerprint = self.statusFingerprint(status)
+                self.lastStatusPublishedAt = Date()
+                self.diagnostics.publishedStatusCount += 1
+                self.markSuccess()
+            } catch {
+                guard !Task.isCancelled else { return }
+                self.markFailure("changed status", error: error)
+            }
+        }
+    }
+
+    func publishStatusChangeAndWait() async {
+        publishStatusChange()
+        await statusPublishTask?.value
     }
 
     private func performCommandPoll() async {
@@ -280,20 +335,6 @@ final class CompanionMacBridge {
             } catch {
                 errors.append(operationMessage("history", error: error))
             }
-        }
-
-        do {
-            let handledCommands = try await processPendingCommands()
-            guard !Task.isCancelled else { return }
-            if handledCommands {
-                let updatedStatus = statusProvider().refreshingLastSeen()
-                try await cloud.publish(status: updatedStatus)
-                lastStatusFingerprint = statusFingerprint(updatedStatus)
-                lastStatusPublishedAt = Date()
-                diagnostics.publishedStatusCount += 1
-            }
-        } catch {
-            errors.append(operationMessage("remote commands", error: error))
         }
 
         if shouldPruneCommands(now: now) {

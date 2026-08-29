@@ -312,19 +312,7 @@ private struct MacSnapshotCard: View {
                 SnapshotMetric(value: "\(mac.activeSessionCount)", label: agentLabel, symbol: "terminal")
             }
 
-            HStack(spacing: 14) {
-                Label(uptimeText, systemImage: "clock")
-                if let battery = mac.batteryPercent {
-                    Label("\(Int(battery.rounded()))%", systemImage: batterySymbol(for: battery))
-                }
-                if mac.isCharging {
-                    Label(chargingText, systemImage: "bolt.fill")
-                        .foregroundStyle(.green)
-                }
-                Label(mac.displayAsleep ? "Display asleep" : "Display awake", systemImage: "display")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            statusStrip
         }
         .cardStyle()
     }
@@ -338,6 +326,63 @@ private struct MacSnapshotCard: View {
             return "Charging"
         }
         return "Charging · \(Int(watts.rounded())) W"
+    }
+
+    private var chargingValue: String {
+        guard let watts = mac.chargingWatts, watts.isFinite else {
+            return "Charging"
+        }
+        return "\(Int(watts.rounded())) W"
+    }
+
+    private var statusStrip: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) {
+                statusLabels
+            }
+            .fixedSize(horizontal: true, vertical: false)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 16) {
+                    Label(uptimeText, systemImage: "clock")
+                    if let battery = mac.batteryPercent {
+                        Label("\(Int(battery.rounded()))%", systemImage: batterySymbol(for: battery))
+                    }
+                }
+                HStack(spacing: 16) {
+                    if mac.isCharging {
+                        chargingLabel
+                    }
+                    displayLabel
+                }
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var statusLabels: some View {
+        Label(uptimeText, systemImage: "clock")
+        if let battery = mac.batteryPercent {
+            Label("\(Int(battery.rounded()))%", systemImage: batterySymbol(for: battery))
+        }
+        if mac.isCharging {
+            chargingLabel
+        }
+        displayLabel
+    }
+
+    private var chargingLabel: some View {
+        Label(chargingValue, systemImage: "bolt.fill")
+            .foregroundStyle(.green)
+            .accessibilityLabel(chargingText)
+    }
+
+    private var displayLabel: some View {
+        Label(mac.displayAsleep ? "Asleep" : "Awake", systemImage: "display")
+            .accessibilityLabel(mac.displayAsleep ? "Display asleep" : "Display awake")
     }
 
     private func batterySymbol(for percentage: Double) -> String {

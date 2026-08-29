@@ -1748,6 +1748,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.coolingDetailsWindow?.update(presentation)
             }
         }
+        coolingCoordinator.onProfileApplicationChange = { [weak self] in
+            DispatchQueue.main.async {
+                // Profile transitions are actionable state, not telemetry.
+                // Send them immediately so iPhone feedback does not wait for
+                // the normal 15-second status/history cycle.
+                self?.companionBridge.publishStatusChange()
+            }
+        }
         coolingCoordinator.onThermalAbort = { [weak self] reason in
             DispatchQueue.main.async {
                 self?.handleCoolingThermalAbort(reason)

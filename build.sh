@@ -12,6 +12,7 @@ helper_plist_dir="$app_dir/Contents/Library/LaunchDaemons"
 helper_plist_name="lt.mantas.sleepswitch.fanhelper.plist"
 signing_identity="${SLEEP_SWITCH_SIGNING_IDENTITY:--}"
 allow_development_signing="${SLEEP_SWITCH_ALLOW_DEVELOPMENT_SIGNING:-0}"
+provisioning_profile="${SLEEP_SWITCH_PROVISIONING_PROFILE:-}"
 module_cache_dir="${CLANG_MODULE_CACHE_PATH:-$build_dir/module-cache}"
 export CLANG_MODULE_CACHE_PATH="$module_cache_dir"
 
@@ -25,6 +26,19 @@ mkdir -p \
   "$helper_arch_dir" \
   "$module_cache_dir"
 cp "$script_dir/Info.plist" "$app_dir/Contents/Info.plist"
+if [[ -n "$provisioning_profile" ]]; then
+  if [[ ! -f "$provisioning_profile" ]]; then
+    echo "The provisioning profile at SLEEP_SWITCH_PROVISIONING_PROFILE was not found."
+    exit 1
+  fi
+  # Development-signed direct builds with iCloud/helper entitlements need the
+  # matching profile embedded before signing. macOS 27 otherwise refuses to
+  # spawn the bundle even though codesign verification succeeds.
+  cp "$provisioning_profile" "$app_dir/Contents/embedded.provisionprofile"
+elif [[ "$allow_development_signing" == "1" && "$signing_identity" != "-" ]]; then
+  echo "Development signing requires SLEEP_SWITCH_PROVISIONING_PROFILE."
+  exit 1
+fi
 cp \
   "$script_dir/Config/FanHelper/$helper_plist_name" \
   "$helper_plist_dir/$helper_plist_name"

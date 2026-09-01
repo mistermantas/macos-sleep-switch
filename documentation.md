@@ -23,8 +23,8 @@ xcodegen generate
 ## Demo recipes
 
 - **Thermals:** while the companion is foregrounded, it refetches Mac status every 15 seconds. Open a paired Mac, select a cooling profile, and verify the temperature/fan timestamp advances as the Mac publishes status.
-- **Widgets:** add a Sleep Switch widget, choose a paired Mac and a focused metric, then check it displays the cached app-group snapshot with a visible freshness state.
-- **Agent finish action:** queue a finish action on the Mac or iPhone, start/finish an agent session, and confirm the action occurs only after the final session ends.
+- **Widgets:** add any of the overview, battery, thermal, fan, agents, power, or connection widgets. Choose a paired Mac, hide its name if desired, then check that the focused value comes from the cached app-group snapshot.
+- **Agent finish action:** queue sleep or shutdown on the Mac or iPhone while agents are active. The one-shot request waits for the final session to end, holds for 15 seconds, and cancels if an agent starts again in that window.
 
 ## Important architecture
 
@@ -36,6 +36,6 @@ xcodegen generate
 
 ## Release notes
 
-iOS build 30 is valid in App Store Connect. Build 31 is reserved for the destructive-controls correction. New uploads authenticate with the supplied App Store Connect API key; never place that `.p8` file in the repository.
+iOS build 30 is valid in App Store Connect. Builds 31 and 32 are reserved for follow-up releases; build 32 is the thermal-refresh, finish-actions, and widget-family archive. New uploads authenticate with the supplied App Store Connect API key; never place that `.p8` file in the repository.
 
-macOS App Store export currently requires Mac App Distribution and Mac Installer Distribution identities that are not present in this keychain. Do not use an Apple Development-signed archive as a substitute.
+The local keychain currently has Apple Development identities only. An iOS 2.4.0 (32) archive can be produced, but App Store export stops at `Failed to Use Accounts` because no iOS Distribution identity is available. macOS App Store export separately requires Mac App Distribution and Mac Installer Distribution identities. Do not use an Apple Development-signed archive as a substitute.

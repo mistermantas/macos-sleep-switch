@@ -224,18 +224,21 @@ final class CompanionAppModel: ObservableObject {
     private func publishCompanionSurfaces(for macs: [CompanionMacStatus]) {
         let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
         let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
-        if let mac = selected {
-            CompanionWidgetStore.save(CompanionWidgetSnapshot(
+        let widgetMacs = macs.map { mac in
+            CompanionWidgetSnapshot(
+                deviceID: mac.deviceID,
                 macName: mac.displayName,
                 batteryPercent: mac.batteryPercent,
                 temperatureCelsius: mac.cooling?.temperatureCelsius,
+                fanRPM: mac.cooling?.fans.map(\.actualRPM).max(),
                 isCharging: mac.isCharging,
                 activeSessionCount: mac.activeSessionCount,
                 thermalState: mac.thermalState,
                 updatedAt: mac.lastSeen
-            ))
-            WidgetCenter.shared.reloadAllTimelines()
+            )
         }
+        CompanionWidgetStore.save(macs: widgetMacs, defaultDeviceID: selected?.deviceID)
+        WidgetCenter.shared.reloadAllTimelines()
         liveActivity.synchronize(with: selected)
         heatNotifications.evaluate(macs)
     }

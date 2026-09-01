@@ -146,7 +146,11 @@ struct CompanionDashboardRoot: View {
                     model: model,
                     confirm: { pendingAction = $0 }
                 )
-                AgentAutomationCard(mac: mac, model: model)
+                AgentAutomationCard(
+                    mac: mac,
+                    model: model,
+                    confirm: { pendingAction = $0 }
+                )
                 if mac.cooling != nil || mac.capabilities.canSetCoolingProfile == true {
                     CoolingControlCard(mac: mac, model: model)
                 }
@@ -783,6 +787,7 @@ private struct PrimaryRemoteControls: View {
 private struct AgentAutomationCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
+    let confirm: (CompanionRemoteAction) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -816,6 +821,36 @@ private struct AgentAutomationCard: View {
                 get: { mac.wakeDisplayWhenAgentsFinish },
                 set: { model.send(.setKeepAwake, to: mac, parameters: ["wakeWhenAgentsFinish": String($0)]) }
             ))
+
+            let finishActions: [CompanionRemoteAction] = [
+                .sleepMacWhenAgentsFinish,
+                .shutdownMacWhenAgentsFinish
+            ].filter { mac.capabilities.availableActions.contains($0) }
+            if !finishActions.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("When agents finish")
+                        .font(.subheadline.weight(.semibold))
+                    HStack(spacing: 10) {
+                        ForEach(finishActions, id: \.rawValue) { action in
+                            Button {
+                                confirm(action)
+                            } label: {
+                                Label(
+                                    action == .sleepMacWhenAgentsFinish ? "Sleep Mac" : "Shut Down",
+                                    systemImage: action.symbolName
+                                )
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(action.isDestructive ? .red : nil)
+                        }
+                    }
+                    Text("A one-time action waits until sessions end, then checks again after 15 seconds.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .cardStyle()
         .disabled(!mac.capabilities.canSetKeepAwake || mac.isStale || model.commandInFlight)

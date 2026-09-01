@@ -55,6 +55,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: nil,
         keyEquivalent: ""
     )
+    private let sleepMacWhenAgentsFinishItem = NSMenuItem(
+        title: "Sleep Mac When Agents Finish",
+        action: #selector(toggleSleepMacWhenAgentsFinish),
+        keyEquivalent: ""
+    )
+#if !APP_STORE
+    private let shutdownMacWhenAgentsFinishItem = NSMenuItem(
+        title: "Shut Down Mac When Agents Finish",
+        action: #selector(toggleShutdownMacWhenAgentsFinish),
+        keyEquivalent: ""
+    )
+#endif
     private let insightsItem = NSMenuItem(
         title: "Insights…",
         action: #selector(showInsights),
@@ -165,6 +177,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var agentItems: [NSMenuItem] = []
     private var awakeModeItems: [NSMenuItem] = []
     private var wakeDisplayWhenAgentsFinish = false
+    private var queuedAgentFinishAction: CompanionRemoteAction?
+    private var queuedAgentFinishTimer: Timer?
+    private var queuedAgentFinishObservedIdle = false
     private var displaySleepOverride = false
     private var agentIdleGraceDeadline: Date?
     private var agentIdleGraceTimer: Timer?
@@ -238,6 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         expiryTimer?.invalidate()
         agentIdleGraceTimer?.invalidate()
+        queuedAgentFinishTimer?.invalidate()
         refreshTimer?.invalidate()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
@@ -305,6 +321,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         automaticAgentAwakeItem.target = self
         sleepDisplayItem.target = self
         sleepUntilAgentsFinishItem.target = self
+        sleepMacWhenAgentsFinishItem.target = self
+#if !APP_STORE
+        shutdownMacWhenAgentsFinishItem.target = self
+#endif
         insightsItem.target = self
         insightsItem.image = NSImage(
             systemSymbolName: "chart.xyaxis.line",
@@ -323,6 +343,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: "moon.zzz",
             accessibilityDescription: "Sleep until agents finish"
         )
+        sleepMacWhenAgentsFinishItem.image = NSImage(
+            systemSymbolName: "moon.badge.clock",
+            accessibilityDescription: "Sleep this Mac when agents finish"
+        )
+#if !APP_STORE
+        shutdownMacWhenAgentsFinishItem.image = NSImage(
+            systemSymbolName: "power.circle",
+            accessibilityDescription: "Shut down this Mac when agents finish"
+        )
+#endif
         toggleItem.image = NSImage(
             systemSymbolName: "cup.and.saucer.fill",
             accessibilityDescription: "Manual awake controls"
@@ -407,9 +437,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(insightsItem)
 #if APP_STORE
         menu.addItem(sleepUntilAgentsFinishItem)
+        menu.addItem(sleepMacWhenAgentsFinishItem)
 #else
         menu.addItem(sleepDisplayItem)
         menu.addItem(sleepUntilAgentsFinishItem)
+        menu.addItem(sleepMacWhenAgentsFinishItem)
+        menu.addItem(shutdownMacWhenAgentsFinishItem)
 #endif
         menu.addItem(.separator())
         menu.addItem(toggleItem)
@@ -687,6 +720,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 #endif
         attemptQueuedDisplayWakeIfNeeded()
+        updateQueuedAgentFinishAction(previousAgentCount: previousAgentCount)
         reconcileAndUpdatePresentation()
         if companionBridgeEnabled {
             companionBridge.synchronize()
@@ -883,6 +917,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #else
                 throw RemoteEnergyError.unavailable("Display sleep is not available in the Mac App Store build.")
 #endif
+            case .sleepMacWhenAgentsFinish:
+                try queueAgentFinishAction(.sleepMacWhenAgentsFinish)
+            case .shutdownMacWhenAgentsFinish:
+#if !APP_STORE
+                try queueAgentFinishAction(.shutdownMacWhenAgentsFinish)
+#else
+                throw RemoteEnergyError.unavailable("Shutdown is not available in the Mac App Store build.")
+#endif
             case .setKeepAwake:
                 applyRemoteKeepAwake(command.parameters)
             case .startManualSession:
@@ -912,6 +954,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 clearManualAwakeSession()
                 clearAgentIdleGrace()
                 wakeDisplayWhenAgentsFinish = false
+                clearQueuedAgentFinishAction()
                 displaySleepOverride = false
                 UserDefaults.standard.set(false, forKey: automaticAgentAwakeKey)
                 _ = reconcilePowerAssertion(forceRestart: true)
@@ -1235,6 +1278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             : (lidClosedSafetyDecision.message ?? selectedAwakeMode.toolTip)
         updateAwakeModeChecks()
         updateDurationChecks()
+        updateAgentFinishActionPresentation()
     }
 
     private var awakePresentation: (
@@ -1553,6 +1597,113 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// A one-shot finish action gets a short confirmation window. Agent scans
+    /// occasionally fluctuate while a harness is handing work to a child
+    /// process, so the Mac must still be idle when the timer fires.
+    private func updateQueuedAgentFinishAction(previousAgentCount: Int) {
+        guard let action = queuedAgentFinishAction else { return }
+
+        if !detectedAgents.isEmpty {
+            queuedAgentFinishTimer?.invalidate()
+            queuedAgentFinishTimer = nil
+            if queuedAgentFinishObservedIdle {
+                // A new job started during the safety window. Disarm rather
+                // than carrying a destructive request into a later workload.
+                clearQueuedAgentFinishAction()
+                reconcileAndUpdatePresentation()
+            }
+            return
+        }
+
+        guard previousAgentCount > 0, queuedAgentFinishTimer == nil else { return }
+        queuedAgentFinishObservedIdle = true
+        queuedAgentFinishTimer = Timer.scheduledTimer(
+            withTimeInterval: 15,
+            repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.performQueuedAgentFinishActionIfStillIdle(action)
+            }
+        }
+        reconcileAndUpdatePresentation()
+    }
+
+    private func performQueuedAgentFinishActionIfStillIdle(_ action: CompanionRemoteAction) {
+        queuedAgentFinishTimer?.invalidate()
+        queuedAgentFinishTimer = nil
+        guard detectedAgents.isEmpty, queuedAgentFinishAction == action else { return }
+
+        queuedAgentFinishAction = nil
+        reconcileAndUpdatePresentation()
+        if companionBridgeEnabled {
+            companionBridge.synchronize(force: true)
+        }
+
+        do {
+            switch action {
+            case .sleepMacWhenAgentsFinish:
+                try RemoteEnergyController.sleepMac()
+            case .shutdownMacWhenAgentsFinish:
+#if !APP_STORE
+                try RemoteEnergyController.shutdownMac()
+#endif
+            default:
+                return
+            }
+        } catch {
+            presentAssertionError(error)
+        }
+    }
+
+    private func queueAgentFinishAction(_ action: CompanionRemoteAction) throws {
+        guard action == .sleepMacWhenAgentsFinish || action == .shutdownMacWhenAgentsFinish else {
+            return
+        }
+        guard !detectedAgents.isEmpty else {
+            throw RemoteEnergyError.unavailable("Start this while at least one agent session is running.")
+        }
+        queuedAgentFinishTimer?.invalidate()
+        queuedAgentFinishTimer = nil
+        queuedAgentFinishObservedIdle = false
+        queuedAgentFinishAction = action
+        reconcileAndUpdatePresentation()
+        if companionBridgeEnabled {
+            companionBridge.synchronize(force: true)
+        }
+    }
+
+    private func clearQueuedAgentFinishAction() {
+        queuedAgentFinishTimer?.invalidate()
+        queuedAgentFinishTimer = nil
+        queuedAgentFinishObservedIdle = false
+        queuedAgentFinishAction = nil
+    }
+
+    private func updateAgentFinishActionPresentation() {
+        let hasRunningAgents = !detectedAgents.isEmpty
+        let isSleepingQueued = queuedAgentFinishAction == .sleepMacWhenAgentsFinish
+        sleepMacWhenAgentsFinishItem.title = isSleepingQueued
+            ? "Cancel Sleep When Agents Finish"
+            : "Sleep Mac When Agents Finish"
+        sleepMacWhenAgentsFinishItem.state = isSleepingQueued ? .on : .off
+        sleepMacWhenAgentsFinishItem.isEnabled = isSleepingQueued || hasRunningAgents
+        sleepMacWhenAgentsFinishItem.toolTip = isSleepingQueued
+            ? "Cancels the queued one-time Mac sleep action"
+            : "Sleeps this Mac 15 seconds after all current agent sessions finish"
+
+#if !APP_STORE
+        let isShutdownQueued = queuedAgentFinishAction == .shutdownMacWhenAgentsFinish
+        shutdownMacWhenAgentsFinishItem.title = isShutdownQueued
+            ? "Cancel Shut Down When Agents Finish"
+            : "Shut Down Mac When Agents Finish"
+        shutdownMacWhenAgentsFinishItem.state = isShutdownQueued ? .on : .off
+        shutdownMacWhenAgentsFinishItem.isEnabled = isShutdownQueued || hasRunningAgents
+        shutdownMacWhenAgentsFinishItem.toolTip = isShutdownQueued
+            ? "Cancels the queued one-time Mac shutdown action"
+            : "Shuts down this Mac 15 seconds after all current agent sessions finish"
+#endif
+    }
+
     @objc private func sleepDisplayNow() {
         sleepDisplay(wakeWhenAgentsFinish: false)
     }
@@ -1780,6 +1931,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         sleepDisplay(wakeWhenAgentsFinish: true)
+    }
+#endif
+
+    @objc private func toggleSleepMacWhenAgentsFinish() {
+        if queuedAgentFinishAction == .sleepMacWhenAgentsFinish {
+            clearQueuedAgentFinishAction()
+            reconcileAndUpdatePresentation()
+            return
+        }
+        do {
+            try queueAgentFinishAction(.sleepMacWhenAgentsFinish)
+        } catch {
+            NSSound.beep()
+        }
+    }
+
+#if !APP_STORE
+    @objc private func toggleShutdownMacWhenAgentsFinish() {
+        if queuedAgentFinishAction == .shutdownMacWhenAgentsFinish {
+            clearQueuedAgentFinishAction()
+            reconcileAndUpdatePresentation()
+            return
+        }
+
+        guard !detectedAgents.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Shut down when agents finish?"
+        alert.informativeText = "Sleep Switch will wait for the current agent sessions to finish, verify they stay idle for 15 seconds, then shut down this Mac."
+        alert.addButton(withTitle: "Queue Shutdown")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try queueAgentFinishAction(.shutdownMacWhenAgentsFinish)
+        } catch {
+            presentAssertionError(error)
+        }
     }
 #endif
 

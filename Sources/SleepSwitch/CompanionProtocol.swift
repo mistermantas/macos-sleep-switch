@@ -40,6 +40,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     case restartMac
     case shutdownMac
     case sleepDisplayUntilAgentsFinish
+    case sleepMacWhenAgentsFinish
+    case shutdownMacWhenAgentsFinish
     case setKeepAwake
     case startManualSession
     case stopManualSession
@@ -65,6 +67,10 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "Shut Down Mac"
         case .sleepDisplayUntilAgentsFinish:
             return "Sleep Display Until Agents Finish"
+        case .sleepMacWhenAgentsFinish:
+            return "Sleep Mac When Agents Finish"
+        case .shutdownMacWhenAgentsFinish:
+            return "Shut Down Mac When Agents Finish"
         case .setKeepAwake:
             return "Set Keep Awake"
         case .startManualSession:
@@ -81,12 +87,13 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     }
 
     var isDestructive: Bool {
-        self == .restartMac || self == .shutdownMac || self == .panicStop
+        self == .restartMac || self == .shutdownMac || self == .shutdownMacWhenAgentsFinish || self == .panicStop
     }
 
     var requiresConfirmation: Bool {
         switch self {
-        case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .lockMac, .panicStop:
+        case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .sleepMacWhenAgentsFinish,
+             .shutdownMacWhenAgentsFinish, .lockMac, .panicStop:
             return true
         case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake,
              .startManualSession, .stopManualSession, .setCoolingProfile,
@@ -113,6 +120,10 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "power"
         case .sleepDisplayUntilAgentsFinish:
             return "moon.zzz.fill"
+        case .sleepMacWhenAgentsFinish:
+            return "moon.badge.clock"
+        case .shutdownMacWhenAgentsFinish:
+            return "power.circle"
         case .setKeepAwake:
             return "cup.and.saucer.fill"
         case .startManualSession:
@@ -186,6 +197,10 @@ struct CompanionMacCapabilities: Codable, Equatable {
     var canShutdownMac = false
     var canSetKeepAwake = false
     var canSleepDisplayUntilAgentsFinish = false
+    /// Optional so companions can safely decode status from older Mac builds.
+    var canSleepMacWhenAgentsFinish: Bool? = nil
+    /// Optional so companions can safely decode status from older Mac builds.
+    var canShutdownMacWhenAgentsFinish: Bool? = nil
     var supportsCloudKit = false
     var canControlManualSession: Bool? = nil
     var canSetCoolingProfile: Bool? = nil
@@ -211,6 +226,10 @@ struct CompanionMacCapabilities: Codable, Equatable {
                 canShutdownMac
             case .sleepDisplayUntilAgentsFinish:
                 canSleepDisplayUntilAgentsFinish
+            case .sleepMacWhenAgentsFinish:
+                canSleepMacWhenAgentsFinish == true
+            case .shutdownMacWhenAgentsFinish:
+                canShutdownMacWhenAgentsFinish == true
             case .setKeepAwake:
                 canSetKeepAwake
             case .startManualSession, .stopManualSession:
@@ -617,6 +636,10 @@ struct CompanionCommandPolicy {
             capabilities.canSetSafetyPreferences == true
         case .sleepDisplayUntilAgentsFinish:
             capabilities.canSleepDisplayUntilAgentsFinish
+        case .sleepMacWhenAgentsFinish:
+            capabilities.canSleepMacWhenAgentsFinish == true
+        case .shutdownMacWhenAgentsFinish:
+            capabilities.canShutdownMacWhenAgentsFinish == true
         case .panicStop:
             true
         }

@@ -737,6 +737,22 @@ private enum CompanionScreenshotDemo {
             energyBuckets: energyBuckets,
             energyDays: energyDays,
             agentDays: agentDays,
+            agentTypeDays: [
+                CompanionAgentTypeDay(
+                    dayStart: calendar.startOfDay(for: now),
+                    agentID: "codex",
+                    agentName: "Codex",
+                    activeSeconds: 7_200,
+                    peakSessionCount: 3
+                ),
+                CompanionAgentTypeDay(
+                    dayStart: calendar.startOfDay(for: now),
+                    agentID: "opencode",
+                    agentName: "OpenCode",
+                    activeSeconds: 4_500,
+                    peakSessionCount: 2
+                )
+            ],
             storageBytes: 92_160
         )
         return Snapshot(mac: mac, history: history)

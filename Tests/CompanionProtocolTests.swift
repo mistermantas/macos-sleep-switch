@@ -276,6 +276,11 @@ enum CompanionProtocolTests {
             history.agentDays.reduce(0) { $0 + $1.activeSeconds } == 3 * 60 * 60,
             "preserves total agent activity duration"
         )
+        expect(history.agentTypeDays?.count == 2, "publishes a day-level total for each agent type")
+        expect(
+            history.agentTypeDays?.reduce(0) { $0 + $1.activeSeconds } == 3 * 60 * 60,
+            "preserves typed agent activity duration"
+        )
     }
 
     private static func testSelectsFreshReplacementForStalePersistedMac() {

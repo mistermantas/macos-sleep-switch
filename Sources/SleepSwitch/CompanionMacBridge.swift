@@ -451,6 +451,7 @@ final class CompanionMacBridge {
             energyBuckets: history.energyBuckets,
             energyDays: history.energyDays,
             agentDays: history.agentDays,
+            agentTypeDays: history.agentTypeDays,
             storageBytes: history.storageBytes
         )
         return (try? CompanionJSON.encoder.encode(normalized)) ?? Data()

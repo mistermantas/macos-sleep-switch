@@ -64,7 +64,7 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 29
+        CURRENT_PROJECT_VERSION: 30
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
@@ -96,7 +96,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 29
+        CURRENT_PROJECT_VERSION: 30
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionWidgets/Info.plist
         MARKETING_VERSION: 2.4.0

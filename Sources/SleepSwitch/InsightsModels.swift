@@ -171,6 +171,20 @@ struct CompanionAgentDay: Codable, Equatable, Identifiable {
     var id: Date { dayStart }
 }
 
+/// A coarse per-harness daily total for the companion. Like `CompanionAgentDay`,
+/// this deliberately excludes prompts, process names, and raw samples.
+struct CompanionAgentTypeDay: Codable, Equatable, Identifiable {
+    let dayStart: Date
+    let agentID: String
+    let agentName: String
+    let activeSeconds: TimeInterval
+    let peakSessionCount: Int
+
+    var id: String {
+        "\(Int(dayStart.timeIntervalSince1970)):\(agentID)"
+    }
+}
+
 struct CompanionHistorySnapshot: Codable, Equatable {
     let deviceID: String
     let updatedAt: Date
@@ -178,6 +192,9 @@ struct CompanionHistorySnapshot: Codable, Equatable {
     let energyBuckets: [EnergyBucket]
     let energyDays: [CompanionEnergyDay]
     let agentDays: [CompanionAgentDay]
+    /// Optional so companions on an older app release can still decode a
+    /// history record published before typed agent totals existed.
+    let agentTypeDays: [CompanionAgentTypeDay]?
     let storageBytes: Int64
 
     static func empty(deviceID: String, updatedAt: Date = Date()) -> CompanionHistorySnapshot {
@@ -188,6 +205,7 @@ struct CompanionHistorySnapshot: Codable, Equatable {
             energyBuckets: [],
             energyDays: [],
             agentDays: [],
+            agentTypeDays: [],
             storageBytes: 0
         )
     }
@@ -233,6 +251,11 @@ enum CompanionHistoryBuilder {
             now: now,
             calendar: calendar
         )
+        let agentTypeDays = makeAgentTypeDays(
+            intervals: snapshot.activities,
+            now: now,
+            calendar: calendar
+        )
 
         // Five-minute buckets are useful for the last day, while day-level
         // summaries cover the full 30-day local retention window. Keeping at
@@ -247,6 +270,7 @@ enum CompanionHistoryBuilder {
             energyBuckets: recentBuckets,
             energyDays: energyDays,
             agentDays: agentDays,
+            agentTypeDays: agentTypeDays,
             storageBytes: snapshot.storageBytes
         )
     }
@@ -291,6 +315,67 @@ enum CompanionHistoryBuilder {
             )
         }
         .sorted { $0.dayStart < $1.dayStart }
+    }
+
+    private static func makeAgentTypeDays(
+        intervals: [AgentActivityInterval],
+        now: Date,
+        calendar: Calendar
+    ) -> [CompanionAgentTypeDay] {
+        struct Total {
+            var dayStart: Date
+            var agentID: String
+            var agentName: String
+            var seconds: TimeInterval
+            var peak: Int
+        }
+
+        var totals: [String: Total] = [:]
+        let cutoff = now.addingTimeInterval(-30 * 24 * 60 * 60)
+
+        for interval in intervals {
+            let start = max(interval.startedAt, cutoff)
+            let end = min(interval.effectiveEnd, now)
+            guard end > start else { continue }
+
+            var dayStart = calendar.startOfDay(for: start)
+            while dayStart < end {
+                guard let nextDay = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+                    break
+                }
+                let overlapStart = max(start, dayStart)
+                let overlapEnd = min(end, nextDay)
+                if overlapEnd > overlapStart {
+                    let key = "\(Int(dayStart.timeIntervalSince1970)):\(interval.agentID)"
+                    var total = totals[key] ?? Total(
+                        dayStart: dayStart,
+                        agentID: interval.agentID,
+                        agentName: interval.agentName,
+                        seconds: 0,
+                        peak: 0
+                    )
+                    total.seconds += overlapEnd.timeIntervalSince(overlapStart)
+                    total.peak = max(total.peak, interval.peakSessionCount)
+                    totals[key] = total
+                }
+                dayStart = nextDay
+            }
+        }
+
+        return totals.values.map {
+            CompanionAgentTypeDay(
+                dayStart: $0.dayStart,
+                agentID: $0.agentID,
+                agentName: $0.agentName,
+                activeSeconds: $0.seconds,
+                peakSessionCount: $0.peak
+            )
+        }
+        .sorted {
+            $0.dayStart == $1.dayStart
+                ? $0.agentName.localizedCaseInsensitiveCompare($1.agentName) == .orderedAscending
+                : $0.dayStart < $1.dayStart
+        }
     }
 }
 

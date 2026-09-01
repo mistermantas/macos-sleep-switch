@@ -964,6 +964,15 @@ struct CompanionInsightsScreen: View {
     let history: CompanionHistorySnapshot
     @State private var range = CompanionInsightsRange.week
     @State private var metric = CompanionInsightsMetric.energy
+    @State private var selectedAgentID = ""
+
+    private var agentTypes: [CompanionAgentTypeDay] {
+        Dictionary(grouping: history.agentTypeDays ?? [], by: \.agentID)
+            .compactMap { $0.value.first }
+            .sorted {
+                $0.agentName.localizedCaseInsensitiveCompare($1.agentName) == .orderedAscending
+            }
+    }
 
     var body: some View {
         ScrollView {
@@ -985,7 +994,21 @@ struct CompanionInsightsScreen: View {
                 if metric == .energy {
                     EnergyInsightsChart(mac: mac, history: history, range: range)
                 } else {
-                    AgentInsightsChart(mac: mac, history: history, range: range)
+                    if !agentTypes.isEmpty {
+                        Picker("Agent", selection: $selectedAgentID) {
+                            Text("All agents").tag("")
+                            ForEach(agentTypes) { agent in
+                                Text(agent.agentName).tag(agent.agentID)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    AgentInsightsChart(
+                        mac: mac,
+                        history: history,
+                        range: range,
+                        selectedAgentID: selectedAgentID
+                    )
                 }
 
                 HStack {
@@ -1003,6 +1026,10 @@ struct CompanionInsightsScreen: View {
         .navigationTitle("Insights")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            if !selectedAgentID.isEmpty,
+               !agentTypes.contains(where: { $0.agentID == selectedAgentID }) {
+                selectedAgentID = ""
+            }
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--screenshot-insights-day") {
                 range = .day
@@ -1324,12 +1351,31 @@ private struct AgentInsightsChart: View {
     let mac: CompanionMacStatus
     let history: CompanionHistorySnapshot
     let range: CompanionInsightsRange
+    let selectedAgentID: String
     @State private var selectedDate: Date?
 
     private let calendar = Calendar.autoupdatingCurrent
 
     private var days: [CompanionAgentDay] {
-        history.agentDays.filter { $0.dayStart >= Date().addingTimeInterval(-range.duration) }
+        let cutoff = Date().addingTimeInterval(-range.duration)
+        guard !selectedAgentID.isEmpty else {
+            return history.agentDays.filter { $0.dayStart >= cutoff }
+        }
+        return (history.agentTypeDays ?? [])
+            .filter { $0.agentID == selectedAgentID && $0.dayStart >= cutoff }
+            .map {
+                CompanionAgentDay(
+                    dayStart: $0.dayStart,
+                    activeSeconds: $0.activeSeconds,
+                    peakSessionCount: $0.peakSessionCount,
+                    agentCount: 1
+                )
+            }
+    }
+
+    private var selectedAgentName: String? {
+        guard !selectedAgentID.isEmpty else { return nil }
+        return (history.agentTypeDays ?? []).first(where: { $0.agentID == selectedAgentID })?.agentName
     }
     private var dayPoints: [AgentDayPoint] {
         let count = range == .day ? 1 : range == .week ? 7 : 30
@@ -1350,7 +1396,10 @@ private struct AgentInsightsChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 0) {
-                SummaryValue(value: String(format: "%.1f h", days.reduce(0) { $0 + $1.activeSeconds / 3_600 }), label: "Agent time")
+                SummaryValue(
+                    value: String(format: "%.1f h", days.reduce(0) { $0 + $1.activeSeconds / 3_600 }),
+                    label: selectedAgentName ?? "Agent time"
+                )
                 Divider().frame(height: 38)
                 SummaryValue(value: "\(days.map(\.peakSessionCount).max() ?? 0)", label: "Peak sessions")
                 Divider().frame(height: 38)
@@ -1363,7 +1412,7 @@ private struct AgentInsightsChart: View {
                         Text(point.date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                             .font(.headline)
                         Spacer()
-                        Text(point.day == nil ? "No activity recorded" : "Daily total")
+                        Text(point.day == nil ? "No activity recorded" : selectedAgentName ?? "Daily total")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }

@@ -3,6 +3,7 @@ import Charts
 import SwiftUI
 import UIKit
 import WidgetKit
+import UserNotifications
 
 extension Notification.Name {
     static let sleepSwitchStatusPush = Notification.Name("sleepSwitchStatusPush")
@@ -20,11 +21,12 @@ struct SleepSwitchCompanionApp: App {
     }
 }
 
-final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
+final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
         application.registerForRemoteNotifications()
         return true
     }
@@ -32,6 +34,14 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         NotificationCenter.default.post(name: .sleepSwitchStatusPush, object: nil)
         return .newData
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
     }
 }
 

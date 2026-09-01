@@ -12,6 +12,7 @@ enum SleepSwitchPreferenceKey {
     static let agentStartedTriggerCommand = "agentStartedTriggerCommand"
     static let agentFinishedTriggerCommand = "agentFinishedTriggerCommand"
     static let agentDiagnosticsEnabled = "agentDiagnosticsEnabled"
+    static let codexActiveWindowSeconds = "codexActiveWindowSeconds"
 }
 
 struct LidClosedSafetyConfiguration: Equatable {

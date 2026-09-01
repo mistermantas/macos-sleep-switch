@@ -101,11 +101,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let codexFolderSeparatorItem = NSMenuItem.separator()
     private let codexDirectoryAccess = CodexDirectoryAccess()
     private lazy var agentTracker: AgentTracker = {
+        let tracker = CodexSessionTracker(activeFileWindow: TimeInterval(codexActiveWindowSeconds))
 #if APP_STORE
         let access = codexDirectoryAccess
-        return AgentTracker(codexSessionsDirectory: { access.sessionsDirectory })
+        return AgentTracker(
+            codexSessionTracker: tracker,
+            codexSessionsDirectory: { access.sessionsDirectory }
+        )
 #else
-        return AgentTracker()
+        return AgentTracker(codexSessionTracker: tracker)
 #endif
     }()
     private let powerAssertions = PowerAssertionController()
@@ -259,7 +263,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             SleepSwitchPreferenceKey.agentTriggerEnabled: false,
             SleepSwitchPreferenceKey.agentStartedTriggerCommand: "",
             SleepSwitchPreferenceKey.agentFinishedTriggerCommand: "",
-            SleepSwitchPreferenceKey.agentDiagnosticsEnabled: false
+            SleepSwitchPreferenceKey.agentDiagnosticsEnabled: false,
+            SleepSwitchPreferenceKey.codexActiveWindowSeconds: 3 * 60
         ]
 #if !APP_STORE
         registeredDefaults[coolingAgentsOnlyKey] = false
@@ -652,7 +657,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         agentScanInFlight = false
         guard let latestAgents else { return }
 
-        let previousAgentCount = detectedAgents.count
+        let previousAgents = detectedAgents
+        let previousAgentCount = previousAgents.count
         detectedAgents = latestAgents
         lastAgentScanAt = Date()
         lastCodexSessionCount = agentTracker.codexSessionTracker.scan()
@@ -665,7 +671,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if previousAgentCount > 0, latestAgents.isEmpty {
             triggerRunner.run(
                 event: .finished,
-                agents: [],
+                agents: previousAgents,
                 configuration: agentTriggerConfiguration
             )
         }
@@ -1066,6 +1072,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             isEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentTriggerEnabled),
             whenAgentsStartCommand: defaults.string(forKey: SleepSwitchPreferenceKey.agentStartedTriggerCommand) ?? "",
             whenAgentsFinishCommand: defaults.string(forKey: SleepSwitchPreferenceKey.agentFinishedTriggerCommand) ?? ""
+        )
+    }
+
+    private var codexActiveWindowSeconds: Int {
+        min(
+            max(
+                UserDefaults.standard.integer(
+                    forKey: SleepSwitchPreferenceKey.codexActiveWindowSeconds
+                ),
+                60
+            ),
+            15 * 60
         )
     }
 
@@ -1595,6 +1613,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lidClosedSafetyMessage: lidClosedSafetyDecision.message,
             agentTriggers: agentTriggerConfiguration,
             diagnosticsEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
+            codexActiveWindowSeconds: codexActiveWindowSeconds,
             coolingDescription: coolingDescription,
             aggressiveComfortTargetCelsius: aggressiveComfortTargetCelsius,
             aggressiveLaunchBoostDemand: aggressiveLaunchBoostDemand
@@ -1636,6 +1655,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             defaults.set(configuration.whenAgentsFinishCommand, forKey: SleepSwitchPreferenceKey.agentFinishedTriggerCommand)
         case .diagnosticsEnabled(let enabled):
             defaults.set(enabled, forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled)
+        case .codexActiveWindowSeconds(let seconds):
+            defaults.set(min(max(seconds, 60), 15 * 60), forKey: SleepSwitchPreferenceKey.codexActiveWindowSeconds)
+            // The tracker captures its window when first used. Recreate it so
+            // Settings changes apply to the next scan without relaunching.
+            agentTracker = {
+                let tracker = CodexSessionTracker(activeFileWindow: TimeInterval(codexActiveWindowSeconds))
+#if APP_STORE
+                let access = codexDirectoryAccess
+                return AgentTracker(codexSessionTracker: tracker, codexSessionsDirectory: { access.sessionsDirectory })
+#else
+                return AgentTracker(codexSessionTracker: tracker)
+#endif
+            }()
         case .aggressiveComfortTarget(let celsius):
 #if !APP_STORE
             defaults.set(

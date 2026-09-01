@@ -101,6 +101,13 @@ final class CompanionCloudStore: CompanionCloudStoring {
     /// record from the signed-in user's private database.
     func ensureStatusSubscription() async throws {
         let subscriptionID = "sleep-switch-mac-status-v1"
+        do {
+            _ = try await database.subscription(for: subscriptionID)
+            return
+        } catch let error as CKError where error.code == .unknownItem {
+            // Create the subscription below. Re-saving an existing query
+            // subscription can produce unnecessary CloudKit conflicts.
+        }
         let subscription = CKQuerySubscription(
             recordType: Self.statusRecordType,
             predicate: NSPredicate(value: true),

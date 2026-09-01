@@ -15,6 +15,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var lidClosedSafetyMessage: String?
     var agentTriggers: AgentTriggerConfiguration
     var diagnosticsEnabled: Bool
+    var codexActiveWindowSeconds: Int
     var coolingDescription: String?
     var aggressiveComfortTargetCelsius: Double?
     var aggressiveLaunchBoostDemand: Double?
@@ -25,7 +26,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         historyEnabled: true, companionStatus: "Unavailable", isDirectBuild: false,
         lidClosedMinimumBatteryPercent: 11, lidClosedRequiresExternalPower: true,
         lidClosedSafetyMessage: nil, agentTriggers: .disabled,
-        diagnosticsEnabled: false, coolingDescription: nil,
+        diagnosticsEnabled: false, codexActiveWindowSeconds: 180, coolingDescription: nil,
         aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil
     )
 }
@@ -41,6 +42,7 @@ enum SleepSwitchPreferencesMutation {
     case lidClosedRequiresExternalPower(Bool)
     case agentTriggers(AgentTriggerConfiguration)
     case diagnosticsEnabled(Bool)
+    case codexActiveWindowSeconds(Int)
     case aggressiveComfortTarget(Double)
     case aggressiveLaunchBoost(Double)
 }
@@ -195,6 +197,19 @@ private struct PreferencesWindowView: View {
                     get: { viewModel.snapshot.diagnosticsEnabled },
                     set: { .diagnosticsEnabled($0) }
                 ))
+                Picker("Codex quiet-window", selection: binding(
+                    get: { viewModel.snapshot.codexActiveWindowSeconds },
+                    set: { .codexActiveWindowSeconds($0) }
+                )) {
+                    Text("1 minute").tag(60)
+                    Text("3 minutes (default)").tag(180)
+                    Text("5 minutes").tag(300)
+                    Text("10 minutes").tag(600)
+                    Text("15 minutes").tag(900)
+                }
+                Text("A Codex task without a local session-log update for this long is treated as idle. Shorter windows clear stale tasks sooner; longer windows tolerate quiet network waits.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Button("Open Detection Diagnostics…") { viewModel.showDiagnostics() }
                     Spacer()

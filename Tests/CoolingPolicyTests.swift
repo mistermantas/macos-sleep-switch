@@ -69,8 +69,8 @@ enum CoolingPolicyTests {
                     now: now
                 )
             ),
-            equals: 0.5,
-            "starts aggressive cooling at half demand below 50°C"
+            equals: 0.3,
+            "settles aggressive cooling to its low comfort demand below the target"
         )
         expectDemand(
             CoolingPolicy.decide(
@@ -80,8 +80,8 @@ enum CoolingPolicyTests {
                     now: now
                 )
             ),
-            equals: 0.75,
-            "ramps aggressive cooling linearly between 50°C and 60°C"
+            equals: 0.5464,
+            "follows the cubic comfort curve at the configured target"
         )
         expectDemand(
             CoolingPolicy.decide(
@@ -91,8 +91,31 @@ enum CoolingPolicyTests {
                     now: now
                 )
             ),
+            equals: 0.7536,
+            "ramps decisively as the live temperature rises"
+        )
+        expectDemand(
+            CoolingPolicy.decide(
+                input(
+                    profile: .aggressive,
+                    temperature: sample(70, at: now),
+                    now: now
+                )
+            ),
             equals: 1,
-            "reaches full demand by 60°C"
+            "reaches full demand 15 degrees above the comfort target"
+        )
+        expectDemand(
+            CoolingPolicy.decide(
+                input(
+                    profile: .aggressive,
+                    temperature: sample(45, at: now),
+                    leaseStartedAt: now,
+                    now: now
+                )
+            ),
+            equals: 0.92,
+            "uses a short high-response boost when aggressive cooling starts"
         )
         expectDemand(
             CoolingPolicy.decide(
@@ -154,12 +177,12 @@ enum CoolingPolicyTests {
                     profile: .aggressive,
                     temperature: sample(45, at: now),
                     previousDemand: 1,
-                    previousDecisionAt: now.addingTimeInterval(-30),
+                    previousDecisionAt: now.addingTimeInterval(-10),
                     now: now
                 )
             ),
-            equals: 0.95,
-            "limits downward fan demand changes"
+            equals: 0.75,
+            "limits downward fan demand changes while still allowing a prompt cool-down"
         )
         expectDemand(
             CoolingPolicy.decide(
@@ -171,7 +194,7 @@ enum CoolingPolicyTests {
                     now: now
                 )
             ),
-            equals: 0.5,
+            equals: 0.3,
             "ignores invalid prior demand instead of emitting an invalid request"
         )
         expect(
@@ -201,6 +224,7 @@ enum CoolingPolicyTests {
         previousDecisionAt: Date? = nil,
         maximumCoolingVerified: Bool = false,
         aboveAbortCeilingSince: Date? = nil,
+        leaseStartedAt: Date? = nil,
         now: Date
     ) -> CoolingPolicyInput {
         CoolingPolicyInput(
@@ -212,7 +236,8 @@ enum CoolingPolicyTests {
             previousDecisionAt: previousDecisionAt,
             maximumCoolingVerified: maximumCoolingVerified,
             aboveAbortCeilingSince: aboveAbortCeilingSince,
-            now: now
+            now: now,
+            leaseStartedAt: leaseStartedAt
         )
     }
 

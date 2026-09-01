@@ -60,6 +60,7 @@ final class CoolingCoordinator {
     private var requestInFlight = false
     private var leaseStartBlocked = false
     private var aboveAbortCeilingSince: Date?
+    private var leaseStartedAt: Date?
 
     var onChange: ((CoolingPresentationSnapshot) -> Void)?
     var onProfileApplicationChange: (() -> Void)?
@@ -75,7 +76,9 @@ final class CoolingCoordinator {
         self.defaults = defaults
         self.thermalMonitor = thermalMonitor
         defaults.register(defaults: [
-            Self.profileDefaultsKey: CoolingProfile.systemControl.rawValue
+            Self.profileDefaultsKey: CoolingProfile.systemControl.rawValue,
+            AggressiveCoolingConfiguration.comfortTargetDefaultsKey: AggressiveCoolingConfiguration.defaults.comfortTargetCelsius,
+            AggressiveCoolingConfiguration.launchBoostDefaultsKey: AggressiveCoolingConfiguration.defaults.launchBoostDemand
         ])
     }
 
@@ -226,7 +229,9 @@ final class CoolingCoordinator {
                 previousDecisionAt: previousDecisionAt,
                 maximumCoolingVerified: maximumCoolingVerified,
                 aboveAbortCeilingSince: aboveAbortCeilingSince,
-                now: now
+                now: now,
+                aggressiveConfiguration: AggressiveCoolingConfiguration(defaults: defaults),
+                leaseStartedAt: leaseStartedAt
             )
         )
 
@@ -245,8 +250,8 @@ final class CoolingCoordinator {
                 guard let self else { return }
                 self.requestInFlight = false
                 if response.succeeded {
-                    self.previousDemand = demand
-                    self.previousDecisionAt = now
+                self.previousDemand = demand
+                self.previousDecisionAt = now
                 } else {
                     self.leaseStartBlocked = true
                 }
@@ -292,6 +297,7 @@ final class CoolingCoordinator {
                 self.previousDemand =
                     response.snapshot.optionalVerifiedDemand
                 self.previousDecisionAt = Date()
+                self.leaseStartedAt = self.previousDecisionAt
             } else {
                 self.leaseStartBlocked = true
             }
@@ -306,6 +312,7 @@ final class CoolingCoordinator {
         guard let token = leaseToken else {
             previousDemand = nil
             previousDecisionAt = nil
+            leaseStartedAt = nil
             completion?(helperSnapshot?.state != .restoreFailed)
             publish()
             return
@@ -314,6 +321,7 @@ final class CoolingCoordinator {
         leaseToken = nil
         previousDemand = nil
         previousDecisionAt = nil
+        leaseStartedAt = nil
         client.endLease(token: token) { [weak self] response in
             self?.consume(response)
             self?.onProfileApplicationChange?()

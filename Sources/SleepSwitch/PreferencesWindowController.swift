@@ -16,6 +16,8 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var agentTriggers: AgentTriggerConfiguration
     var diagnosticsEnabled: Bool
     var coolingDescription: String?
+    var aggressiveComfortTargetCelsius: Double?
+    var aggressiveLaunchBoostDemand: Double?
 
     static let empty = SleepSwitchPreferencesSnapshot(
         keepDisplayAwake: true, activateOnLaunch: false, defaultDurationSeconds: 0,
@@ -23,7 +25,8 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         historyEnabled: true, companionStatus: "Unavailable", isDirectBuild: false,
         lidClosedMinimumBatteryPercent: 11, lidClosedRequiresExternalPower: true,
         lidClosedSafetyMessage: nil, agentTriggers: .disabled,
-        diagnosticsEnabled: false, coolingDescription: nil
+        diagnosticsEnabled: false, coolingDescription: nil,
+        aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil
     )
 }
 
@@ -38,6 +41,8 @@ enum SleepSwitchPreferencesMutation {
     case lidClosedRequiresExternalPower(Bool)
     case agentTriggers(AgentTriggerConfiguration)
     case diagnosticsEnabled(Bool)
+    case aggressiveComfortTarget(Double)
+    case aggressiveLaunchBoost(Double)
 }
 
 @MainActor
@@ -232,7 +237,36 @@ private struct PreferencesWindowView: View {
 
                 Section("Cooling") {
                     Text(viewModel.snapshot.coolingDescription ?? "Cooling is unavailable in this build.")
-                    Text("Aggressive begins above the normal baseline: it starts at 50% fan demand around 50°C, rises toward maximum by 60°C, and can step up to maximum under serious macOS thermal pressure. Maximum asks every qualified fan for full demand. Sleep Switch restores macOS fan control when cooling ends, temperature feedback is unreliable, macOS reports critical thermal pressure, or a verified maximum profile stays at or above 80°C for 30 seconds.")
+                    if let target = viewModel.snapshot.aggressiveComfortTargetCelsius,
+                       let launchBoost = viewModel.snapshot.aggressiveLaunchBoostDemand {
+                        Stepper(
+                            "Comfort target \(Int(target.rounded()))°C",
+                            value: binding(
+                                get: { target },
+                                set: { .aggressiveComfortTarget($0) }
+                            ),
+                            in: 45...65,
+                            step: 1
+                        )
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Launch boost")
+                                Spacer()
+                                Text("\(Int((launchBoost * 100).rounded()))%")
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                            Slider(
+                                value: binding(
+                                    get: { launchBoost },
+                                    set: { .aggressiveLaunchBoost($0) }
+                                ),
+                                in: 0.70...1,
+                                step: 0.05
+                            )
+                        }
+                    }
+                    Text("Aggressive gives every qualified fan a brief launch boost, then follows the hottest live temperature every three seconds with a cubic comfort curve. At the comfort target it eases down; 15°C above it it reaches full demand again. A rise in temperature always raises demand immediately. Maximum asks every qualified fan for full demand. Sleep Switch restores macOS fan control when cooling ends, temperature feedback is unreliable, macOS reports critical thermal pressure, or a verified maximum profile stays at or above 80°C for 30 seconds.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Open Cooling Details…") { viewModel.showCoolingDetails() }

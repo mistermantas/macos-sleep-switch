@@ -1572,9 +1572,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let defaults = UserDefaults.standard
 #if APP_STORE
         let coolingDescription: String? = nil
+        let aggressiveComfortTargetCelsius: Double? = nil
+        let aggressiveLaunchBoostDemand: Double? = nil
 #else
         let coolingDescription = coolingCoordinator.presentation.message
             ?? coolingCoordinator.presentation.effectiveTitle
+        let aggressiveCooling = AggressiveCoolingConfiguration(defaults: defaults)
+        let aggressiveComfortTargetCelsius: Double? = aggressiveCooling.comfortTargetCelsius
+        let aggressiveLaunchBoostDemand: Double? = aggressiveCooling.launchBoostDemand
 #endif
         return SleepSwitchPreferencesSnapshot(
             keepDisplayAwake: shouldKeepDisplayAwake,
@@ -1590,7 +1595,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lidClosedSafetyMessage: lidClosedSafetyDecision.message,
             agentTriggers: agentTriggerConfiguration,
             diagnosticsEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
-            coolingDescription: coolingDescription
+            coolingDescription: coolingDescription,
+            aggressiveComfortTargetCelsius: aggressiveComfortTargetCelsius,
+            aggressiveLaunchBoostDemand: aggressiveLaunchBoostDemand
         )
     }
 
@@ -1629,6 +1636,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             defaults.set(configuration.whenAgentsFinishCommand, forKey: SleepSwitchPreferenceKey.agentFinishedTriggerCommand)
         case .diagnosticsEnabled(let enabled):
             defaults.set(enabled, forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled)
+        case .aggressiveComfortTarget(let celsius):
+#if !APP_STORE
+            defaults.set(
+                AggressiveCoolingConfiguration(
+                    comfortTargetCelsius: celsius,
+                    launchBoostDemand: AggressiveCoolingConfiguration(defaults: defaults).launchBoostDemand
+                ).comfortTargetCelsius,
+                forKey: AggressiveCoolingConfiguration.comfortTargetDefaultsKey
+            )
+#else
+            _ = celsius
+#endif
+        case .aggressiveLaunchBoost(let demand):
+#if !APP_STORE
+            defaults.set(
+                AggressiveCoolingConfiguration(
+                    comfortTargetCelsius: AggressiveCoolingConfiguration(defaults: defaults).comfortTargetCelsius,
+                    launchBoostDemand: demand
+                ).launchBoostDemand,
+                forKey: AggressiveCoolingConfiguration.launchBoostDefaultsKey
+            )
+#else
+            _ = demand
+#endif
         }
         _ = reconcilePowerAssertion(forceRestart: true)
         reconcileAndUpdatePresentation()

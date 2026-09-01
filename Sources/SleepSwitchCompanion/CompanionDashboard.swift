@@ -856,7 +856,7 @@ private struct CoolingControlCard: View {
                 .foregroundStyle(.secondary)
             }
             DisclosureGroup("What does Aggressive do?") {
-                Text("Aggressive starts above macOS’s baseline: 50% fan demand near 50°C, rising toward full speed by 60°C. It gives control back to macOS if readings are unreliable, thermal pressure becomes critical, or a verified maximum profile remains at 80°C or higher for 30 seconds.")
+                Text("Aggressive gives the fans a brief high-response boost, then follows the Mac’s live temperature every three seconds with a smooth comfort curve. It eases down around the Mac’s chosen comfort target and climbs back to full demand as heat rises. It gives control back to macOS if readings are unreliable, thermal pressure becomes critical, or a verified maximum profile remains at 80°C or higher for 30 seconds.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)

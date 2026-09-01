@@ -107,7 +107,9 @@ final class FanLeaseManager {
             }
 
             let token = UUID()
-            let demand = profile == .maximum ? 1 : 0.5
+            // Aggressive begins with a short high response. The app renews it
+            // every three seconds with its temperature-following comfort curve.
+            let demand = profile == .maximum ? 1 : 0.92
 
             do {
                 try backend.setRecoveryMarker(active: true)
@@ -171,7 +173,7 @@ final class FanLeaseManager {
 
             let demand = lease.profile == .maximum
                 ? 1
-                : max(0.5, coolingDemand)
+                : max(0.30, coolingDemand)
             do {
                 try backend.applyCoolingDemand(demand)
                 lease.demand = demand

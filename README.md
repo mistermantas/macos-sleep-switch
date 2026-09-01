@@ -123,6 +123,13 @@ independently of awake sessions by default; the optional agent-only setting
 limits them to detected agent activity. Unknown and unqualified Mac models remain
 monitoring-only.
 
+**Aggressive** is the lap-comfort profile. It starts with a 24-second high
+response (92% by default) to clear already-stored heat, then follows the hottest
+verified temperature every three seconds with a cubic comfort curve. Its default
+55°C comfort target and launch boost are configurable in Settings. Demand eases
+down when the Mac has cooled, but rises immediately whenever live temperature
+does; 15°C above the chosen target it is at full demand.
+
 Cooling also ends the Sleep Switch awake session if macOS reports critical
 thermal pressure, temperature feedback is lost, or the vetted temperature
 aggregate remains at or above 80 °C for 30 seconds while maximum fan demand is

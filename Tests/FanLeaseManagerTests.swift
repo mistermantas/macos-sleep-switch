@@ -59,7 +59,7 @@ enum FanLeaseManagerTests {
             "returns the lease token only to its owning connection"
         )
         expect(backend.markerIsActive, "persists a crash-recovery marker")
-        expect(backend.appliedDemands == [0.5], "starts adaptive cooling at its floor")
+        expect(backend.appliedDemands == [0.92], "starts adaptive cooling with its high-response boost")
 
         time.addTimeInterval(3)
         let renew = manager.renewLease(
@@ -68,7 +68,7 @@ enum FanLeaseManagerTests {
             coolingDemand: 0.8
         )
         expect(renew.succeeded, "renews the active lease")
-        expect(backend.appliedDemands == [0.5, 0.8], "applies normalized demand")
+        expect(backend.appliedDemands == [0.92, 0.8], "applies normalized demand")
 
         let end = manager.endLease(
             connectionID: connectionID,
@@ -386,7 +386,7 @@ enum FanLeaseManagerTests {
             "does not apply a new profile after restoration fails"
         )
         expect(
-            backend.appliedDemands == [0.5],
+            backend.appliedDemands == [0.92],
             "performs no second write after failed profile-change restoration"
         )
     }

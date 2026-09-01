@@ -19,7 +19,7 @@ final class CompanionHeatNotificationManager {
 
     func requestAuthorization() async -> Bool {
         do {
-            let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge, .timeSensitive])
+            let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             if granted { defaults.set(true, forKey: Self.enabledKey) }
             return granted
         } catch { return false }

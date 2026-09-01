@@ -41,7 +41,8 @@ struct RemoteEnergyController {
             supportsCloudKit: true,
             canControlManualSession: true,
             canSetCoolingProfile: false,
-            canPreventSleepWithLidClosed: false
+            canPreventSleepWithLidClosed: false,
+            canSetSafetyPreferences: false
         )
 #else
         return CompanionMacCapabilities(
@@ -56,7 +57,8 @@ struct RemoteEnergyController {
             supportsCloudKit: true,
             canControlManualSession: true,
             canSetCoolingProfile: true,
-            canPreventSleepWithLidClosed: true
+            canPreventSleepWithLidClosed: true,
+            canSetSafetyPreferences: true
         )
 #endif
     }

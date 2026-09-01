@@ -113,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let displayPower = DisplayPowerController()
     private let insightsRecorder = InsightsRecorder()
     private var insightsWindowController: InsightsWindowController?
+    private var preferencesWindowController: SleepSwitchPreferencesWindowController?
+    private var agentDiagnosticsWindowController: AgentDiagnosticsWindowController?
     private var companionBridgeEnabled = true
     private lazy var companionBridge = CompanionMacBridge(
         statusProvider: { [weak self] in
@@ -153,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let defaultDurationSecondsKey = "defaultDurationSeconds"
     private let automaticAgentAwakeKey = "automaticAgentAwake"
     private let awakeModeKey = "awakeMode"
+    private let triggerRunner = AgentTriggerRunner()
     private var manualAwakeSession: AwakeSession?
     private var detectedAgents: [DetectedAgent] = []
     private var agentItems: [NSMenuItem] = []
@@ -162,6 +165,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var agentIdleGraceDeadline: Date?
     private var agentIdleGraceTimer: Timer?
     private var agentScanInFlight = false
+    private var lastAgentScanAt: Date?
+    private var lastCodexSessionCount: Int?
     private var refreshTimer: Timer?
     private var expiryTimer: Timer?
 
@@ -248,7 +253,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             activateOnLaunchKey: false,
             defaultDurationSecondsKey: 0,
             automaticAgentAwakeKey: true,
-            awakeModeKey: KeepAwakeMode.preventSleep.rawValue
+            awakeModeKey: KeepAwakeMode.preventSleep.rawValue,
+            SleepSwitchPreferenceKey.lidClosedMinimumBatteryPercent: LidClosedSafetyPolicy.defaultMinimumBatteryPercent,
+            SleepSwitchPreferenceKey.lidClosedRequiresExternalPower: true,
+            SleepSwitchPreferenceKey.agentTriggerEnabled: false,
+            SleepSwitchPreferenceKey.agentStartedTriggerCommand: "",
+            SleepSwitchPreferenceKey.agentFinishedTriggerCommand: "",
+            SleepSwitchPreferenceKey.agentDiagnosticsEnabled: false
         ]
 #if !APP_STORE
         registeredDefaults[coolingAgentsOnlyKey] = false
@@ -336,8 +347,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configureCoolingMenu()
 #endif
 
-        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
-        settingsItem.submenu = settingsMenu
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showPreferences), keyEquivalent: ",")
+        settingsItem.target = self
+        settingsItem.keyEquivalentModifierMask = .command
         settingsItem.image = NSImage(
             systemSymbolName: "gearshape",
             accessibilityDescription: "Sleep Switch settings"
@@ -642,6 +654,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let previousAgentCount = detectedAgents.count
         detectedAgents = latestAgents
+        lastAgentScanAt = Date()
+        lastCodexSessionCount = agentTracker.codexSessionTracker.scan()
+        if previousAgentCount == 0, !latestAgents.isEmpty {
+            triggerRunner.run(
+                event: .started,
+                agents: latestAgents,
+                configuration: agentTriggerConfiguration
+            )
+        } else if previousAgentCount > 0, latestAgents.isEmpty {
+            triggerRunner.run(
+                event: .finished,
+                agents: [],
+                configuration: agentTriggerConfiguration
+            )
+        }
         updateAgentIdleGrace(
             previousAgentCount: previousAgentCount,
             currentAgentCount: latestAgents.count
@@ -676,6 +703,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #if !APP_STORE
         capabilities.canSetCoolingProfile = (coolingStatus?.availableProfiles?.count ?? 0) > 1
 #endif
+        capabilities.canSetSafetyPreferences = AppDistribution.supportsLidClosedAwake
         let thermalState: String = switch ProcessInfo.processInfo.thermalState {
         case .nominal:
             "nominal"
@@ -719,7 +747,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     endsAt: $0.endDate
                 )
             },
-            cooling: coolingStatus
+            cooling: coolingStatus,
+            safety: CompanionSafetySettings(
+                lidClosedMinimumBatteryPercent: lidClosedSafetyConfiguration.minimumBatteryPercent,
+                lidClosedRequiresExternalPower: lidClosedSafetyConfiguration.requiresExternalPower,
+                lidClosedAllowedNow: lidClosedSafetyDecision == .allowed,
+                lidClosedBlockReason: lidClosedSafetyDecision.message
+            )
         )
     }
 
@@ -780,7 +814,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ command: CompanionRemoteCommand
     ) -> CompanionRemoteResult {
         let now = Date()
-        let capabilities = RemoteEnergyController.capabilities
+        var capabilities = RemoteEnergyController.capabilities
+        capabilities.canSetSafetyPreferences = AppDistribution.supportsLidClosedAwake
         let validation = CompanionCommandPolicy.validate(
             command,
             targetDeviceID: companionBridge.deviceID,
@@ -865,6 +900,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 coolingCoordinator.selectProfile(profile)
 #endif
+            case .setSafetyPreferences:
+                applyRemoteSafetyPreferences(command.parameters)
             case .panicStop:
                 clearManualAwakeSession()
                 clearAgentIdleGrace()
@@ -920,6 +957,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         reconcileAndUpdatePresentation()
     }
 
+    private func applyRemoteSafetyPreferences(_ parameters: [String: String]) {
+        let defaults = UserDefaults.standard
+        if let floor = parameters["lidClosedMinimumBatteryPercent"].flatMap(Int.init) {
+            defaults.set(min(max(floor, 1), 50), forKey: SleepSwitchPreferenceKey.lidClosedMinimumBatteryPercent)
+        }
+        if let requiresExternalPower = parameters["lidClosedRequiresExternalPower"].flatMap(Bool.init) {
+            defaults.set(requiresExternalPower, forKey: SleepSwitchPreferenceKey.lidClosedRequiresExternalPower)
+        }
+        reconcileAndUpdatePresentation()
+    }
+
     private func sleepDisplayForRemote(wakeWhenAgentsFinish: Bool = false) throws {
 #if APP_STORE
         _ = wakeWhenAgentsFinish
@@ -951,7 +999,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func reconcileAndUpdatePresentation() {
-        let attemptedMode = selectedAwakeMode
+        let attemptedMode = effectiveAwakeMode
         if let error = reconcilePowerAssertion(),
            attemptedMode == .lidClosed {
             UserDefaults.standard.set(
@@ -990,6 +1038,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         let storedValue = UserDefaults.standard.string(forKey: awakeModeKey)
         return KeepAwakeMode.persistedMode(from: storedValue)
+    }
+
+    private var lidClosedSafetyConfiguration: LidClosedSafetyConfiguration {
+        LidClosedSafetyConfiguration()
+    }
+
+    private var lidClosedSafetyDecision: LidClosedSafetyPolicy.Decision {
+#if APP_STORE
+        return .allowed
+#else
+        return lidClosedSafetyConfiguration.decision(for: IOKitPowerTelemetryProvider().read())
+#endif
+    }
+
+    private var effectiveAwakeMode: KeepAwakeMode {
+        guard selectedAwakeMode == .lidClosed,
+              lidClosedSafetyDecision == .allowed else {
+            return selectedAwakeMode == .lidClosed ? .preventSleep : selectedAwakeMode
+        }
+        return .lidClosed
+    }
+
+    private var agentTriggerConfiguration: AgentTriggerConfiguration {
+        let defaults = UserDefaults.standard
+        return AgentTriggerConfiguration(
+            isEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentTriggerEnabled),
+            whenAgentsStartCommand: defaults.string(forKey: SleepSwitchPreferenceKey.agentStartedTriggerCommand) ?? "",
+            whenAgentsFinishCommand: defaults.string(forKey: SleepSwitchPreferenceKey.agentFinishedTriggerCommand) ?? ""
+        )
     }
 
     private var shouldKeepDisplayAwakeNow: Bool {
@@ -1123,15 +1200,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         toggleItem.title = manualAwakeSession == nil
             ? "Start Manual Session"
             : "Stop Manual Session"
-        toggleItem.toolTip = "Uses \(selectedAwakeMode.menuTitle)"
+        toggleItem.toolTip = effectiveAwakeMode == selectedAwakeMode
+            ? "Uses \(selectedAwakeMode.menuTitle)"
+            : (lidClosedSafetyDecision.message ?? "Uses \(effectiveAwakeMode.menuTitle)")
         toggleItem.image = NSImage(
             systemSymbolName: manualAwakeSession == nil
                 ? "cup.and.saucer.fill"
                 : "stop.circle",
             accessibilityDescription: toggleItem.title
         )
-        awakeModeItem.title = "Awake Mode · \(selectedAwakeMode.shortTitle)"
-        awakeModeItem.toolTip = selectedAwakeMode.toolTip
+        awakeModeItem.title = effectiveAwakeMode == selectedAwakeMode
+            ? "Awake Mode · \(selectedAwakeMode.shortTitle)"
+            : "Awake Mode · Lid Closed Paused"
+        awakeModeItem.toolTip = effectiveAwakeMode == selectedAwakeMode
+            ? selectedAwakeMode.toolTip
+            : (lidClosedSafetyDecision.message ?? selectedAwakeMode.toolTip)
         updateAwakeModeChecks()
         updateDurationChecks()
     }
@@ -1176,18 +1259,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let remainingSeconds = manualAwakeSession.remainingSeconds() else {
                 return (
                     "cup.and.saucer.fill",
-                    "Sleep Switch keeping this Mac awake manually in \(selectedAwakeMode.menuTitle) mode",
-                    "Awake manually · \(selectedAwakeMode.stateTitle) · Click for controls",
-                    "Awake · Manual · \(selectedAwakeMode.stateTitle)"
+                "Sleep Switch keeping this Mac awake manually in \(effectiveAwakeMode.menuTitle) mode",
+                "Awake manually · \(effectiveAwakeMode.stateTitle) · Click for controls",
+                "Awake · Manual · \(effectiveAwakeMode.stateTitle)"
                 )
             }
 
             let remainingText = AwakeTimeText.remaining(seconds: remainingSeconds)
             return (
                 "timer",
-                "Sleep Switch keeping this Mac awake for \(remainingText) in \(selectedAwakeMode.menuTitle) mode",
-                "\(remainingText) · \(selectedAwakeMode.stateTitle) · Click for controls",
-                "Awake · \(remainingText) · \(selectedAwakeMode.stateTitle)"
+                "Sleep Switch keeping this Mac awake for \(remainingText) in \(effectiveAwakeMode.menuTitle) mode",
+                "\(remainingText) · \(effectiveAwakeMode.stateTitle) · Click for controls",
+                "Awake · \(remainingText) · \(effectiveAwakeMode.stateTitle)"
             )
         }
 
@@ -1207,9 +1290,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 : "\(detectedAgents.count) agents"
             return (
                 "terminal.fill",
-                "Sleep Switch keeping this Mac awake for \(agentName) in \(selectedAwakeMode.menuTitle) mode",
-                "Awake for \(agentName) · \(selectedAwakeMode.stateTitle) · Click for controls",
-                "Awake · \(agentName) · \(selectedAwakeMode.stateTitle)"
+                "Sleep Switch keeping this Mac awake for \(agentName) in \(effectiveAwakeMode.menuTitle) mode",
+                "Awake for \(agentName) · \(effectiveAwakeMode.stateTitle) · Click for controls",
+                "Awake · \(agentName) · \(effectiveAwakeMode.stateTitle)"
             )
         }
 
@@ -1465,6 +1548,117 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         insightsWindowController?.show()
     }
 
+    @objc private func showPreferences() {
+        if preferencesWindowController == nil {
+            preferencesWindowController = SleepSwitchPreferencesWindowController(
+                snapshotProvider: { [weak self] in
+                    self?.preferencesSnapshot ?? .empty
+                },
+                apply: { [weak self] mutation in
+                    self?.applyPreferencesMutation(mutation)
+                },
+                showDiagnostics: { [weak self] in
+                    self?.showAgentDiagnostics()
+                },
+                showCoolingDetails: { [weak self] in
+                    self?.showCoolingDetailsFromPreferences()
+                }
+            )
+        }
+        preferencesWindowController?.show()
+    }
+
+    private var preferencesSnapshot: SleepSwitchPreferencesSnapshot {
+        let defaults = UserDefaults.standard
+#if APP_STORE
+        let coolingDescription: String? = nil
+#else
+        let coolingDescription = coolingCoordinator.presentation.message
+            ?? coolingCoordinator.presentation.effectiveTitle
+#endif
+        return SleepSwitchPreferencesSnapshot(
+            keepDisplayAwake: shouldKeepDisplayAwake,
+            activateOnLaunch: defaults.bool(forKey: activateOnLaunchKey),
+            defaultDurationSeconds: defaults.integer(forKey: defaultDurationSecondsKey),
+            automaticAgentAwake: automaticAgentAwakeEnabled,
+            launchAtLoginTitle: launchAtLoginPreferencesTitle,
+            historyEnabled: insightsRecorder.historyEnabled,
+            companionStatus: companionStatusItem.title,
+            isDirectBuild: AppDistribution.supportsLidClosedAwake,
+            lidClosedMinimumBatteryPercent: lidClosedSafetyConfiguration.minimumBatteryPercent,
+            lidClosedRequiresExternalPower: lidClosedSafetyConfiguration.requiresExternalPower,
+            lidClosedSafetyMessage: lidClosedSafetyDecision.message,
+            agentTriggers: agentTriggerConfiguration,
+            diagnosticsEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
+            coolingDescription: coolingDescription
+        )
+    }
+
+    private var launchAtLoginPreferencesTitle: String {
+        switch SMAppService.mainApp.status {
+        case .enabled: "Disable Launch at Login"
+        case .requiresApproval: "Finish Launch at Login Setup…"
+        default: "Enable Launch at Login"
+        }
+    }
+
+    private func applyPreferencesMutation(_ mutation: SleepSwitchPreferencesMutation) {
+        let defaults = UserDefaults.standard
+        switch mutation {
+        case .keepDisplayAwake(let enabled):
+            defaults.set(enabled, forKey: keepDisplayAwakeKey)
+        case .activateOnLaunch(let enabled):
+            defaults.set(enabled, forKey: activateOnLaunchKey)
+        case .defaultDuration(let seconds):
+            defaults.set(seconds, forKey: defaultDurationSecondsKey)
+        case .automaticAgentAwake(let enabled):
+            defaults.set(enabled, forKey: automaticAgentAwakeKey)
+            if !enabled { clearAgentIdleGrace() }
+        case .historyEnabled(let enabled):
+            insightsRecorder.setHistoryEnabled(enabled)
+        case .launchAtLogin:
+            toggleLaunchAtLogin()
+            return
+        case .lidClosedMinimumBatteryPercent(let percent):
+            defaults.set(min(max(percent, 1), 50), forKey: SleepSwitchPreferenceKey.lidClosedMinimumBatteryPercent)
+        case .lidClosedRequiresExternalPower(let required):
+            defaults.set(required, forKey: SleepSwitchPreferenceKey.lidClosedRequiresExternalPower)
+        case .agentTriggers(let configuration):
+            defaults.set(configuration.isEnabled, forKey: SleepSwitchPreferenceKey.agentTriggerEnabled)
+            defaults.set(configuration.whenAgentsStartCommand, forKey: SleepSwitchPreferenceKey.agentStartedTriggerCommand)
+            defaults.set(configuration.whenAgentsFinishCommand, forKey: SleepSwitchPreferenceKey.agentFinishedTriggerCommand)
+        case .diagnosticsEnabled(let enabled):
+            defaults.set(enabled, forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled)
+        }
+        _ = reconcilePowerAssertion(forceRestart: true)
+        reconcileAndUpdatePresentation()
+        companionBridge.publishStatusChange()
+    }
+
+    private func showAgentDiagnostics() {
+        requestAgentScan()
+        if agentDiagnosticsWindowController == nil {
+            agentDiagnosticsWindowController = AgentDiagnosticsWindowController { [weak self] in
+                guard let self else {
+                    return AgentDetectionSnapshot(scannedAt: nil, agents: [], codexSessionCount: nil, note: "Sleep Switch is no longer running.")
+                }
+                return AgentDetectionSnapshot(
+                    scannedAt: self.lastAgentScanAt,
+                    agents: self.detectedAgents,
+                    codexSessionCount: self.lastCodexSessionCount,
+                    note: "The next automatic scan runs within 15 seconds."
+                )
+            }
+        }
+        agentDiagnosticsWindowController?.show()
+    }
+
+    private func showCoolingDetailsFromPreferences() {
+#if !APP_STORE
+        showCoolingDetails()
+#endif
+    }
+
     @objc private func toggleHistorySaving() {
         insightsRecorder.setHistoryEnabled(!insightsRecorder.historyEnabled)
         updateSettingsPresentation()
@@ -1650,7 +1844,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         do {
-            switch selectedAwakeMode {
+            switch effectiveAwakeMode {
             case .preventSleep:
                 try lidClosedSleep.stop(waitForRestoration: false)
             case .lidClosed:

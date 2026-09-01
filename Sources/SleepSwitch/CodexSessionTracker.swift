@@ -12,7 +12,11 @@ struct CodexSessionTracker {
 
     init(
         sessionsDirectory: URL = CodexSessionTracker.defaultSessionsDirectory,
-        activeFileWindow: TimeInterval = 12 * 60 * 60,
+        // A task log can remain incomplete after a crash. Treating every log
+        // touched in the last half-day as live kept Macs awake long after
+        // Codex had finished. Fifteen minutes leaves room for a quiet tool
+        // call while making a stale log self-clearing.
+        activeFileWindow: TimeInterval = 15 * 60,
         tailByteCount: Int = 512 * 1024,
         now: @escaping () -> Date = Date.init
     ) {

@@ -192,7 +192,6 @@ final class CompanionMacBridge {
             }
             commandTask?.cancel()
             commandTask = nil
-            diagnostics.stalledSyncRecoveryCount += 1
             diagnostics.lastWarning =
                 "A stalled remote-command poll was cancelled and restarted."
             Self.logger.error(

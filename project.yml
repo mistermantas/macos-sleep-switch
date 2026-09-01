@@ -55,6 +55,8 @@ targets:
       - path: Sources/SleepSwitch/AppLinks.swift
       - path: Sources/SleepSwitch/CompanionCloudStore.swift
         buildPhase: sources
+      - path: Sources/Shared/CompanionWidgetShared.swift
+      - path: Sources/Shared/ManualSessionActivityAttributes.swift
       - path: Companion/Assets.xcassets
         buildPhase: resources
       - path: Companion/PrivacyInfo.xcprivacy
@@ -62,12 +64,12 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 28
+        CURRENT_PROJECT_VERSION: 29
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Companion/Info.plist
-        MARKETING_VERSION: 2.3.7
+        MARKETING_VERSION: 2.4.0
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion
         PRODUCT_NAME: Sleep Switch
         SWIFT_VERSION: "5.0"
@@ -79,6 +81,30 @@ targets:
           CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.Debug.entitlements
         Release:
           CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
+    dependencies:
+      - target: SleepSwitchCompanionWidgets
+
+  SleepSwitchCompanionWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/SleepSwitchCompanionWidgets
+      - path: Sources/Shared/CompanionWidgetShared.swift
+      - path: Sources/Shared/ManualSessionActivityAttributes.swift
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
+        DEVELOPMENT_TEAM: C43F5MKJF2
+        CURRENT_PROJECT_VERSION: 29
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: CompanionWidgets/Info.plist
+        MARKETING_VERSION: 2.4.0
+        PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.widgets
+        PRODUCT_NAME: Sleep Switch Widgets
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
 schemes:
   SleepSwitch:

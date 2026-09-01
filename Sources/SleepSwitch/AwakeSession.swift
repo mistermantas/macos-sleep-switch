@@ -39,6 +39,59 @@ enum AwakePolicy {
     }
 }
 
+/// The direct build can temporarily suppress normal lid sleep. Keep that
+/// privilege behind a small, deterministic policy so the decision is the same
+/// in the menu, settings window, and companion status.
+enum LidClosedSafetyPolicy {
+    static let defaultMinimumBatteryPercent = 11
+
+    enum Decision: Equatable {
+        case allowed
+        case blockedLowBattery(percent: Int)
+        case blockedOnBattery
+
+        var message: String? {
+            switch self {
+            case .allowed:
+                return nil
+            case .blockedLowBattery(let percent):
+                return "Lid-closed mode paused at \(percent)% battery"
+            case .blockedOnBattery:
+                return "Lid-closed mode waits for external power"
+            }
+        }
+    }
+
+    static func decision(
+        batteryPercent: Double?,
+        isOnExternalPower: Bool,
+        minimumBatteryPercent: Int,
+        requiresExternalPower: Bool
+    ) -> Decision {
+        let floor = min(max(minimumBatteryPercent, 1), 100)
+        if let batteryPercent, batteryPercent.isFinite,
+           Int(batteryPercent.rounded(.down)) <= floor {
+            return .blockedLowBattery(percent: Int(batteryPercent.rounded(.down)))
+        }
+        if requiresExternalPower && !isOnExternalPower {
+            return .blockedOnBattery
+        }
+        return .allowed
+    }
+}
+
+struct AgentTriggerConfiguration: Codable, Equatable {
+    var isEnabled: Bool
+    var whenAgentsStartCommand: String
+    var whenAgentsFinishCommand: String
+
+    static let disabled = AgentTriggerConfiguration(
+        isEnabled: false,
+        whenAgentsStartCommand: "",
+        whenAgentsFinishCommand: ""
+    )
+}
+
 enum AgentIdleGracePolicy {
     static let duration: TimeInterval = 5 * 60
 

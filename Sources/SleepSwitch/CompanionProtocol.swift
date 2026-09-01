@@ -44,6 +44,7 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     case startManualSession
     case stopManualSession
     case setCoolingProfile
+    case setSafetyPreferences
     case panicStop
 
     var title: String {
@@ -72,6 +73,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "Stop Manual Session"
         case .setCoolingProfile:
             return "Set Cooling Profile"
+        case .setSafetyPreferences:
+            return "Update Safety Settings"
         case .panicStop:
             return "Stop Sleep Switch Controls"
         }
@@ -86,7 +89,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
         case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .lockMac:
             return true
         case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake,
-             .startManualSession, .stopManualSession, .setCoolingProfile, .panicStop:
+             .startManualSession, .stopManualSession, .setCoolingProfile,
+             .setSafetyPreferences, .panicStop:
             return false
         }
     }
@@ -117,6 +121,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "stop.circle.fill"
         case .setCoolingProfile:
             return "fan"
+        case .setSafetyPreferences:
+            return "shield.checkered"
         case .panicStop:
             return "stop.circle"
         }
@@ -184,6 +190,7 @@ struct CompanionMacCapabilities: Codable, Equatable {
     var canControlManualSession: Bool? = nil
     var canSetCoolingProfile: Bool? = nil
     var canPreventSleepWithLidClosed: Bool? = nil
+    var canSetSafetyPreferences: Bool? = nil
 
     var availableActions: [CompanionRemoteAction] {
         CompanionRemoteAction.allCases.filter { action in
@@ -210,6 +217,8 @@ struct CompanionMacCapabilities: Codable, Equatable {
                 canControlManualSession == true
             case .setCoolingProfile:
                 canSetCoolingProfile == true
+            case .setSafetyPreferences:
+                canSetSafetyPreferences == true
             case .panicStop:
                 true
             }
@@ -228,6 +237,13 @@ struct CompanionManualSessionStatus: Codable, Equatable {
     let endsAt: Date?
 
     var isActive: Bool { endsAt.map { $0 > Date() } ?? true }
+}
+
+struct CompanionSafetySettings: Codable, Equatable {
+    let lidClosedMinimumBatteryPercent: Int
+    let lidClosedRequiresExternalPower: Bool
+    let lidClosedAllowedNow: Bool
+    let lidClosedBlockReason: String?
 }
 
 struct CompanionFanStatus: Codable, Equatable, Identifiable {
@@ -337,6 +353,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let agents: [CompanionAgentStatus]?
     let manualSession: CompanionManualSessionStatus?
     let cooling: CompanionCoolingStatus?
+    var safety: CompanionSafetySettings? = nil
 
     init(
         deviceID: String,
@@ -363,7 +380,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         capabilities: CompanionMacCapabilities,
         agents: [CompanionAgentStatus]? = nil,
         manualSession: CompanionManualSessionStatus? = nil,
-        cooling: CompanionCoolingStatus? = nil
+        cooling: CompanionCoolingStatus? = nil,
+        safety: CompanionSafetySettings? = nil
     ) {
         self.deviceID = deviceID
         self.displayName = displayName
@@ -390,6 +408,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.agents = agents
         self.manualSession = manualSession
         self.cooling = cooling
+        self.safety = safety
     }
 
     var id: String { deviceID }
@@ -452,7 +471,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             capabilities: capabilities,
             agents: agents,
             manualSession: manualSession,
-            cooling: cooling
+            cooling: cooling,
+            safety: safety
         )
     }
 
@@ -488,7 +508,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             capabilities: capabilities,
             agents: agents,
             manualSession: manualSession,
-            cooling: cooling
+            cooling: cooling,
+            safety: safety
         )
     }
 }
@@ -592,6 +613,8 @@ struct CompanionCommandPolicy {
             capabilities.canControlManualSession == true
         case .setCoolingProfile:
             capabilities.canSetCoolingProfile == true
+        case .setSafetyPreferences:
+            capabilities.canSetSafetyPreferences == true
         case .sleepDisplayUntilAgentsFinish:
             capabilities.canSleepDisplayUntilAgentsFinish
         case .panicStop:

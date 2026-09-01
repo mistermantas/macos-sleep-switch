@@ -1,15 +1,37 @@
 import CloudKit
 import Charts
 import SwiftUI
+import UIKit
+import WidgetKit
+
+extension Notification.Name {
+    static let sleepSwitchStatusPush = Notification.Name("sleepSwitchStatusPush")
+}
 
 @main
 struct SleepSwitchCompanionApp: App {
+    @UIApplicationDelegateAdaptor(CompanionAppDelegate.self) private var appDelegate
     @StateObject private var model = CompanionAppModel()
 
     var body: some Scene {
         WindowGroup {
             CompanionDashboardRoot(model: model)
         }
+    }
+}
+
+final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        application.registerForRemoteNotifications()
+        return true
+    }
+
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        NotificationCenter.default.post(name: .sleepSwitchStatusPush, object: nil)
+        return .newData
     }
 }
 
@@ -30,6 +52,8 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var commandProgress: CompanionCommandProgress?
 
     private lazy var cloud = CompanionCloudClient()
+    let heatNotifications = CompanionHeatNotificationManager()
+    private let liveActivity = CompanionLiveActivityController()
     private let requesterDeviceID = CompanionDeviceIdentity.load(key: "companionIOSDeviceID")
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
@@ -42,6 +66,13 @@ final class CompanionAppModel: ObservableObject {
     #endif
 
     init() {
+        NotificationCenter.default.addObserver(
+            forName: .sleepSwitchStatusPush,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
         #if DEBUG
         if isScreenshotDemo {
             let demo = CompanionScreenshotDemo.make()
@@ -143,9 +174,12 @@ final class CompanionAppModel: ObservableObject {
                 return
             }
 
+            try? await cloud.ensureStatusSubscription()
+
             syncStage = "Loading Macs"
             let fetchedMacs = try await cloud.fetchMacs()
             macs = fetchedMacs
+            publishCompanionSurfaces(for: fetchedMacs)
             syncStage = "Loading history"
             let historyResults = await fetchHistories(for: fetchedMacs)
             histories = historyResults.histories
@@ -174,6 +208,33 @@ final class CompanionAppModel: ObservableObject {
             lastSyncAt = Date()
             syncStage = "Connection failed"
             message = connectionError.userMessage
+        }
+    }
+
+    private func publishCompanionSurfaces(for macs: [CompanionMacStatus]) {
+        let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
+        let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
+        if let mac = selected {
+            CompanionWidgetStore.save(CompanionWidgetSnapshot(
+                macName: mac.displayName,
+                batteryPercent: mac.batteryPercent,
+                temperatureCelsius: mac.cooling?.temperatureCelsius,
+                isCharging: mac.isCharging,
+                activeSessionCount: mac.activeSessionCount,
+                thermalState: mac.thermalState,
+                updatedAt: mac.lastSeen
+            ))
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+        liveActivity.synchronize(with: selected)
+        heatNotifications.evaluate(macs)
+    }
+
+    func enableHeatNotifications() {
+        Task { [weak self] in
+            guard let self else { return }
+            let granted = await heatNotifications.requestAuthorization()
+            if !granted { message = "Notifications are disabled in iPhone Settings." }
         }
     }
 
@@ -433,7 +494,7 @@ final class CompanionAppModel: ObservableObject {
             if let result = try await cloud.fetchResult(for: commandID) {
                 return result
             }
-            try await Task.sleep(nanoseconds: 500_000_000)
+            try await Task.sleep(nanoseconds: 250_000_000)
         }
         return nil
     }

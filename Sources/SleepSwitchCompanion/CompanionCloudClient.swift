@@ -12,6 +12,10 @@ struct CompanionCloudClient {
         try await store.accountStatus()
     }
 
+    func ensureStatusSubscription() async throws {
+        try await store.ensureStatusSubscription()
+    }
+
     func fetchMacs() async throws -> [CompanionMacStatus] {
         try await store.fetchMacs()
     }

@@ -5,6 +5,7 @@ struct CompanionDashboardRoot: View {
     @ObservedObject var model: CompanionAppModel
     @AppStorage("selectedMacDeviceID") private var selectedMacDeviceID = ""
     @State private var showingSettings = false
+    @State private var showingPairingHelp = false
     @State private var pendingAction: CompanionRemoteAction?
 
     private var selectedMac: CompanionMacStatus? {
@@ -75,6 +76,9 @@ struct CompanionDashboardRoot: View {
                     showingSettings = false
                 }
             }
+            .sheet(isPresented: $showingPairingHelp) {
+                PairingHelpView()
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let progress = model.commandProgress {
                     CommandProgressBar(progress: progress)
@@ -117,6 +121,18 @@ struct CompanionDashboardRoot: View {
                 }
                 .buttonStyle(.plain)
                 ManualSessionCard(mac: mac, model: model)
+                if mac.capabilities.canSetSafetyPreferences == true, let safety = mac.safety {
+                    NavigationLink {
+                        CompanionSafetyScreen(mac: mac, safety: safety, model: model)
+                    } label: {
+                        NavigationRow(
+                            title: "Lid-closed safety",
+                            value: safety.lidClosedAllowedNow ? "Protected" : (safety.lidClosedBlockReason ?? "Paused"),
+                            symbol: "shield.checkered"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
                 PrimaryRemoteControls(
                     mac: mac,
                     model: model,
@@ -189,6 +205,10 @@ struct CompanionDashboardRoot: View {
                 showingSettings = true
             }
             .buttonStyle(.bordered)
+            Button("How pairing works", systemImage: "questionmark.circle") {
+                showingPairingHelp = true
+            }
+            .buttonStyle(.bordered)
         }
     }
 }
@@ -245,15 +265,21 @@ private struct DeviceAndRefreshHeader: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Menu {
-                ForEach(macs) { mac in
-                    Button {
-                        selectedDeviceID = mac.deviceID
-                    } label: {
-                        Label(mac.displayName, systemImage: mac.id == selectedMac.id ? "checkmark" : "laptopcomputer")
+            if macs.count > 1 {
+                Menu {
+                    ForEach(macs) { mac in
+                        Button {
+                            selectedDeviceID = mac.deviceID
+                        } label: {
+                            Label(mac.displayName, systemImage: mac.id == selectedMac.id ? "checkmark" : "laptopcomputer")
+                        }
                     }
+                } label: {
+                    Label(selectedMac.displayName, systemImage: "laptopcomputer")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
                 }
-            } label: {
+            } else {
                 Label(selectedMac.displayName, systemImage: "laptopcomputer")
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
@@ -611,9 +637,17 @@ private struct ManualSessionCard: View {
                 Label("Manual session", systemImage: "cup.and.saucer.fill")
                     .font(.headline)
                 Spacer()
-                Text(mac.manualSession?.isActive == true ? remainingText : "Off")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(mac.manualSession?.isActive == true ? Color.green : Color.secondary)
+                if mac.manualSession?.isActive == true {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Text(remainingText(at: context.date))
+                            .font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(.green)
+                    }
+                } else {
+                    Text("Off")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if mac.manualSession?.isActive == true {
@@ -677,9 +711,13 @@ private struct ManualSessionCard: View {
         }
     }
 
-    private var remainingText: String {
+    private func remainingText(at date: Date) -> String {
         guard let end = mac.manualSession?.endsAt else { return "Running" }
-        return end.formatted(.relative(presentation: .named))
+        let seconds = max(0, Int(end.timeIntervalSince(date)))
+        guard seconds > 0 else { return "Finishing" }
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        return hours > 0 ? "\(hours)h \(minutes)m left" : "\(max(1, minutes))m left"
     }
 
     private var manualSessionAvailable: Bool {
@@ -816,6 +854,12 @@ private struct CoolingControlCard: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+            DisclosureGroup("What does Aggressive do?") {
+                Text("Aggressive starts above macOS’s baseline: 50% fan demand near 50°C, rising toward full speed by 60°C. It gives control back to macOS if readings are unreliable, thermal pressure becomes critical, or a verified maximum profile remains at 80°C or higher for 30 seconds.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
             }
         }
         .cardStyle()
@@ -1436,6 +1480,21 @@ private struct CompanionRemoteControlsScreen: View {
 
     var body: some View {
         List {
+            Section("Command feedback") {
+                LabeledContent("Last request", value: model.lastCommandStatus)
+                if let progress = model.commandProgress {
+                    HStack(spacing: 10) {
+                        ProgressView(value: progress.fraction)
+                        Text(progress.statusText)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("Every action waits for this Mac to acknowledge it. A result stays here after the banner closes.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             Section("Available actions") {
                 ForEach(order.filter { mac.capabilities.availableActions.contains($0) }, id: \.rawValue) { action in
                     Button {
@@ -1465,10 +1524,80 @@ private struct CompanionRemoteControlsScreen: View {
     }
 }
 
+private struct CompanionSafetyScreen: View {
+    let mac: CompanionMacStatus
+    let safety: CompanionSafetySettings
+    @ObservedObject var model: CompanionAppModel
+    @State private var floor: Int
+    @State private var externalPowerOnly: Bool
+
+    init(mac: CompanionMacStatus, safety: CompanionSafetySettings, model: CompanionAppModel) {
+        self.mac = mac
+        self.safety = safety
+        self.model = model
+        _floor = State(initialValue: safety.lidClosedMinimumBatteryPercent)
+        _externalPowerOnly = State(initialValue: safety.lidClosedRequiresExternalPower)
+    }
+
+    var body: some View {
+        Form {
+            Section("Lid-closed protection") {
+                Stepper("Pause at or below \(floor)% battery", value: $floor, in: 1...50)
+                Toggle("Only allow while plugged in", isOn: $externalPowerOnly)
+                Text(safety.lidClosedAllowedNow ? "Lid-closed operation is currently allowed." : (safety.lidClosedBlockReason ?? "Lid-closed operation is currently paused."))
+                    .font(.footnote)
+                    .foregroundStyle(safety.lidClosedAllowedNow ? .green : .orange)
+            }
+            Section {
+                Button("Save safety settings") {
+                    model.send(.setSafetyPreferences, to: mac, parameters: [
+                        "lidClosedMinimumBatteryPercent": String(floor),
+                        "lidClosedRequiresExternalPower": String(externalPowerOnly)
+                    ])
+                }
+                .disabled(mac.isStale || model.commandInFlight)
+            } footer: {
+                Text("When protection pauses lid-closed mode, Sleep Switch returns to normal lid behavior and keeps only ordinary idle-sleep prevention for an active session.")
+            }
+        }
+        .navigationTitle("Lid-closed safety")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct PairingHelpView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Before a Mac can appear") {
+                    Label("Use the same Apple Account on the iPhone and Mac", systemImage: "person.crop.circle.badge.checkmark")
+                    Label("Turn on iCloud Drive and iCloud for Sleep Switch", systemImage: "icloud")
+                    Label("Open Sleep Switch on the Mac and leave it running", systemImage: "menubar.rectangle")
+                    Label("Keep the Mac online; it must be awake to receive a command", systemImage: "wifi")
+                }
+                Section("Versions") {
+                    Text("The Mac needs Sleep Switch 2.4 or later and the iPhone needs the matching 2.4 companion. Older Macs can appear, but newer safety controls and command acknowledgement require the update.")
+                }
+                Section("Still missing?") {
+                    Text("Open Settings on both devices and check the iCloud account. Then reopen Sleep Switch on the Mac and tap Refresh here. The companion uses your private iCloud database, so there is no pairing code or public server.")
+                }
+            }
+            .navigationTitle("Pair a Mac")
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+}
+
 private struct CompanionPreferencesView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: CompanionAppModel
     let onDone: () -> Void
+    @AppStorage(CompanionHeatNotificationManager.enabledKey) private var heatNotificationsEnabled = false
+    @AppStorage(CompanionHeatNotificationManager.thresholdKey) private var heatNotificationThreshold = 85
+    @AppStorage(CompanionHeatNotificationManager.thirtyMinuteKey) private var thirtyMinuteAlert = true
+    @AppStorage(CompanionHeatNotificationManager.sixtyMinuteKey) private var sixtyMinuteAlert = true
 
     var body: some View {
         NavigationStack {
@@ -1479,6 +1608,22 @@ private struct CompanionPreferencesView: View {
                     ShareLink(item: model.diagnosticsReport) {
                         Label("Share Diagnostics", systemImage: "square.and.arrow.up")
                     }
+                }
+
+                Section("Heat alerts") {
+                    Toggle("Time-sensitive heat alerts", isOn: Binding(
+                        get: { heatNotificationsEnabled },
+                        set: { enabled in
+                            if enabled { model.enableHeatNotifications() }
+                            else { heatNotificationsEnabled = false }
+                        }
+                    ))
+                    Stepper("Alert at \(heatNotificationThreshold)°C or hotter", value: $heatNotificationThreshold, in: 70...100)
+                    Toggle("After 30 minutes", isOn: $thirtyMinuteAlert)
+                    Toggle("After 60 minutes", isOn: $sixtyMinuteAlert)
+                    Text("Smart defaults alert at 85°C only while a non-system cooling profile is active. The iPhone needs a recent status from the Mac to evaluate the timer.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Uncascade") {

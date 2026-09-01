@@ -9,21 +9,27 @@
 /* Begin PBXBuildFile section */
 		00E7BA1F1C2D0B8AA3DA5F2B /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
 		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
+		0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */; };
 		16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
+		19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
 		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
 		213204C2ADD3B76D7DE8742F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6B98ED0F17BA35EEE482C2 /* main.swift */; };
 		2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */; };
 		267D942E2D1DFF995D3E37D4 /* CompanionProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */; };
+		2FA386B6714BBC7073002D81 /* ManualSessionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */; };
 		3B09BCF73D5956DCB96B594A /* CompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2282BCEAA5D823FC6501E481 /* CompanionApp.swift */; };
 		3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */; };
+		412354E09F182CF7E04FF9C6 /* SleepSwitchCompanionWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 51D051FFE7023221C57D874E /* SleepSwitchCompanionWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */; };
 		464678BC2FE3991DABF9F4A6 /* EnergyTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */; };
 		476EA4624D25306D3BFB0276 /* CompanionCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */; };
+		481D0399CA0321685DFD616F /* CompanionHeatNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */; };
 		4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */; };
 		5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C543EF1E4134BFDE371CDA /* AppDistribution.swift */; };
 		606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */; };
 		657C4AB0D22BAB6F2DD23DF0 /* CoolingHelperMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */; };
 		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
+		7410E02D038E6FBB19237A79 /* AgentDiagnosticsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */; };
 		75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */; };
 		7AABA5734225BD94304A755D /* CompanionMacBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CFEE29F34D59DE73254521F /* CompanionMacBridge.swift */; };
 		7F5038F0F50B74DDEA53576C /* CoolingDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */; };
@@ -33,19 +39,48 @@
 		9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */; };
 		A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */; };
 		A3492B708CAD0FB57A0702EB /* FanHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A571FED9A9C619EEF25422 /* FanHelperClient.swift */; };
+		A41FED9EA4F4788B8A8AC110 /* SleepSwitchCompanionWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F0B3C9E16AB85496BE3734 /* SleepSwitchCompanionWidgets.swift */; };
 		B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */; };
 		B0C5069F91B1923252C16426 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 74FE798BF3CE08268A12E2C7 /* Assets.xcassets */; };
 		B27DCFCFD166836698364F75 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1C738315AD299CAE5C654F6 /* PrivacyInfo.xcprivacy */; };
+		B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */; };
 		BD3C96E2DFFF7DE7D1E56535 /* InsightsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69027F0007898B8B4E9DA966 /* InsightsWindowController.swift */; };
 		C24E65C8BC13D90C4597D682 /* CoolingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */; };
 		C4D5A70D1B843B7A80159E0C /* CompanionCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */; };
 		C4F2D1925A01AAB159F6B7F6 /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
 		C5D2973FB812637BC5932FA7 /* CompanionCloudClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */; };
 		C6C5580CEE420A00E5F4BD47 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */; };
+		D9707F1CE16F3DB1FAE4087D /* ManualSessionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */; };
 		E34744DF20DC68FE344DFE94 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AD8AD96FB0F225E8E18AB4 /* HistoryStore.swift */; };
+		F06B3A7E0EB84CFEADEBFB38 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
 		F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */; };
+		F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */; };
 		FD7519E58AA5A2850D032CAE /* InsightsRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89A622C3214E67FE53DD4124 /* InsightsRecorder.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2F64CCD5EC48B3334BC5FEB7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 15E5BFD70B8DBE0CEA563CD5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A41701D266909C966F510BA8;
+			remoteInfo = SleepSwitchCompanionWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4A4050F7C797BC4FBCF0D781 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				412354E09F182CF7E04FF9C6 /* SleepSwitchCompanionWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		00AD8AD96FB0F225E8E18AB4 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
@@ -54,25 +89,31 @@
 		09C8FEC6CC81B7403F577C86 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCloudClient.swift; sourceTree = "<group>"; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
+		21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHeatNotifications.swift; sourceTree = "<group>"; };
 		2282BCEAA5D823FC6501E481 /* CompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionApp.swift; sourceTree = "<group>"; };
 		240B255155829F9D001C6E38 /* SleepSwitchCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SleepSwitchCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
 		3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDashboard.swift; sourceTree = "<group>"; };
 		3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDiagnostics.swift; sourceTree = "<group>"; };
 		434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwakeSession.swift; sourceTree = "<group>"; };
+		4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesWindowController.swift; sourceTree = "<group>"; };
 		4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingPolicy.swift; sourceTree = "<group>"; };
+		51D051FFE7023221C57D874E /* SleepSwitchCompanionWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SleepSwitchCompanionWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTracker.swift; sourceTree = "<group>"; };
 		674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerAssertionController.swift; sourceTree = "<group>"; };
 		69027F0007898B8B4E9DA966 /* InsightsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsWindowController.swift; sourceTree = "<group>"; };
 		6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingTelemetry.swift; sourceTree = "<group>"; };
 		6CFEE29F34D59DE73254521F /* CompanionMacBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMacBridge.swift; sourceTree = "<group>"; };
 		74FE798BF3CE08268A12E2C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDiagnosticsWindowController.swift; sourceTree = "<group>"; };
 		7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionTracker.swift; sourceTree = "<group>"; };
 		888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCloudStore.swift; sourceTree = "<group>"; };
 		89A622C3214E67FE53DD4124 /* InsightsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsRecorder.swift; sourceTree = "<group>"; };
+		90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWidgetShared.swift; sourceTree = "<group>"; };
 		93A571FED9A9C619EEF25422 /* FanHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanHelperClient.swift; sourceTree = "<group>"; };
 		94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessInfoThermalMonitor.swift; sourceTree = "<group>"; };
 		990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionProtocol.swift; sourceTree = "<group>"; };
+		9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSwitchPreferences.swift; sourceTree = "<group>"; };
 		9E6B98ED0F17BA35EEE482C2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1C738315AD299CAE5C654F6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -82,8 +123,11 @@
 		CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayPowerController.swift; sourceTree = "<group>"; };
 		CE73E3A9B401E2143B487793 /* InsightsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
 		D49B9470119D7821941D59F0 /* CoolingDetailsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDetailsWindowController.swift; sourceTree = "<group>"; };
+		D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionLiveActivity.swift; sourceTree = "<group>"; };
 		D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SleepSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1F0B3C9E16AB85496BE3734 /* SleepSwitchCompanionWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSwitchCompanionWidgets.swift; sourceTree = "<group>"; };
 		F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualSessionActivityAttributes.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -93,6 +137,8 @@
 				2282BCEAA5D823FC6501E481 /* CompanionApp.swift */,
 				0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */,
 				3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */,
+				21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */,
+				D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */,
 			);
 			name = SleepSwitchCompanion;
 			path = Sources/SleepSwitchCompanion;
@@ -107,9 +153,19 @@
 			path = AppStore;
 			sourceTree = "<group>";
 		};
+		2667DF28621D8182FB8374E9 /* SleepSwitchCompanionWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				E1F0B3C9E16AB85496BE3734 /* SleepSwitchCompanionWidgets.swift */,
+			);
+			name = SleepSwitchCompanionWidgets;
+			path = Sources/SleepSwitchCompanionWidgets;
+			sourceTree = "<group>";
+		};
 		6F1C8ED6E19F8623D4A372BC /* SleepSwitch */ = {
 			isa = PBXGroup;
 			children = (
+				75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */,
 				5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */,
 				11C543EF1E4134BFDE371CDA /* AppDistribution.swift */,
 				09C8FEC6CC81B7403F577C86 /* AppLinks.swift */,
@@ -135,11 +191,23 @@
 				69027F0007898B8B4E9DA966 /* InsightsWindowController.swift */,
 				9E6B98ED0F17BA35EEE482C2 /* main.swift */,
 				674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */,
+				4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */,
 				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
 				BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */,
+				9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */,
 			);
 			name = SleepSwitch;
 			path = Sources/SleepSwitch;
+			sourceTree = "<group>";
+		};
+		81FF919351B7D63DBA48E2A8 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */,
+				F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */,
+			);
+			name = Shared;
+			path = Sources/Shared;
 			sourceTree = "<group>";
 		};
 		8841C9979F5E0779E1FA4F2D = {
@@ -147,8 +215,10 @@
 			children = (
 				11958F9140D296B85D6DCE9B /* AppStore */,
 				EE29DA3B06895B4A4FDAEE00 /* Companion */,
+				81FF919351B7D63DBA48E2A8 /* Shared */,
 				6F1C8ED6E19F8623D4A372BC /* SleepSwitch */,
 				0F6728E4CF67347EC54F3B2C /* SleepSwitchCompanion */,
+				2667DF28621D8182FB8374E9 /* SleepSwitchCompanionWidgets */,
 				B31E40FEDFE40FBFAD8AB1FF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -158,6 +228,7 @@
 			children = (
 				D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */,
 				240B255155829F9D001C6E38 /* SleepSwitchCompanion.app */,
+				51D051FFE7023221C57D874E /* SleepSwitchCompanionWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -180,10 +251,12 @@
 			buildPhases = (
 				A7E54FF2F73E0337B00E18ED /* Sources */,
 				40CB1D19866BD5AD87574871 /* Resources */,
+				4A4050F7C797BC4FBCF0D781 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F61869D26CF2E8AC4DD859CE /* PBXTargetDependency */,
 			);
 			name = SleepSwitchCompanion;
 			packageProductDependencies = (
@@ -210,6 +283,23 @@
 			productReference = D6D3A6000E53E3EE4F0184FE /* SleepSwitch.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A41701D266909C966F510BA8 /* SleepSwitchCompanionWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F66A4A194ADCF4255FF73F23 /* Build configuration list for PBXNativeTarget "SleepSwitchCompanionWidgets" */;
+			buildPhases = (
+				5F9F48B7625278450C917CBA /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SleepSwitchCompanionWidgets;
+			packageProductDependencies = (
+			);
+			productName = SleepSwitchCompanionWidgets;
+			productReference = 51D051FFE7023221C57D874E /* SleepSwitchCompanionWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -224,6 +314,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					70E308924FC60B1F1498ABAB = {
+						DevelopmentTeam = C43F5MKJF2;
+						ProvisioningStyle = Automatic;
+					};
+					A41701D266909C966F510BA8 = {
 						DevelopmentTeam = C43F5MKJF2;
 						ProvisioningStyle = Automatic;
 					};
@@ -245,6 +339,7 @@
 			targets = (
 				70E308924FC60B1F1498ABAB /* SleepSwitch */,
 				2DA19D727C5BBDF5145BAF6E /* SleepSwitchCompanion */,
+				A41701D266909C966F510BA8 /* SleepSwitchCompanionWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -271,6 +366,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5F9F48B7625278450C917CBA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F06B3A7E0EB84CFEADEBFB38 /* CompanionWidgetShared.swift in Sources */,
+				D9707F1CE16F3DB1FAE4087D /* ManualSessionActivityAttributes.swift in Sources */,
+				A41FED9EA4F4788B8A8AC110 /* SleepSwitchCompanionWidgets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A7E54FF2F73E0337B00E18ED /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -280,8 +385,12 @@
 				C5D2973FB812637BC5932FA7 /* CompanionCloudClient.swift in Sources */,
 				C4D5A70D1B843B7A80159E0C /* CompanionCloudStore.swift in Sources */,
 				3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */,
+				481D0399CA0321685DFD616F /* CompanionHeatNotifications.swift in Sources */,
+				0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */,
 				839C3B3CA1F5B7BB2C00760B /* CompanionProtocol.swift in Sources */,
+				19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */,
 				16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */,
+				2FA386B6714BBC7073002D81 /* ManualSessionActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -289,6 +398,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7410E02D038E6FBB19237A79 /* AgentDiagnosticsWindowController.swift in Sources */,
 				B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */,
 				5A91C1EDD68DD9A69E43D2CC /* AppDistribution.swift in Sources */,
 				1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */,
@@ -313,13 +423,23 @@
 				FD7519E58AA5A2850D032CAE /* InsightsRecorder.swift in Sources */,
 				BD3C96E2DFFF7DE7D1E56535 /* InsightsWindowController.swift in Sources */,
 				606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */,
+				F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */,
 				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
 				9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */,
+				B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */,
 				213204C2ADD3B76D7DE8742F /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F61869D26CF2E8AC4DD859CE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A41701D266909C966F510BA8 /* SleepSwitchCompanionWidgets */;
+			targetProxy = 2F64CCD5EC48B3334BC5FEB7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1E8086CC5B16F58CAD6B81B5 /* Debug */ = {
@@ -421,7 +541,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -429,7 +549,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.7;
+				MARKETING_VERSION = 2.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion;
 				PRODUCT_NAME = "Sleep Switch";
 				SDKROOT = iphoneos;
@@ -437,6 +557,54 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
+		};
+		4FB639B73432AB8C5FC01D54 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CompanionWidgets/SleepSwitchCompanionWidgets.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 29;
+				DEVELOPMENT_TEAM = C43F5MKJF2;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CompanionWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion.widgets;
+				PRODUCT_NAME = "Sleep Switch Widgets";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		665A07E1B3C02E581F5E42A2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CompanionWidgets/SleepSwitchCompanionWidgets.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 29;
+				DEVELOPMENT_TEAM = C43F5MKJF2;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CompanionWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion.widgets;
+				PRODUCT_NAME = "Sleep Switch Widgets";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		7CAA3AA97D57880EDA73EE30 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -502,7 +670,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 28;
+				CURRENT_PROJECT_VERSION = 29;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -510,7 +678,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.3.7;
+				MARKETING_VERSION = 2.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = lt.mantas.sleepswitch.companion;
 				PRODUCT_NAME = "Sleep Switch";
 				SDKROOT = iphoneos;
@@ -573,6 +741,15 @@
 			buildConfigurations = (
 				1E8086CC5B16F58CAD6B81B5 /* Debug */,
 				AABB1044521512A13B3B16FB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F66A4A194ADCF4255FF73F23 /* Build configuration list for PBXNativeTarget "SleepSwitchCompanionWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				665A07E1B3C02E581F5E42A2 /* Debug */,
+				4FB639B73432AB8C5FC01D54 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

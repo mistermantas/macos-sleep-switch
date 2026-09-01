@@ -473,9 +473,18 @@ private struct EnergyInsightsView: View {
 private struct AgentInsightsView: View {
     @ObservedObject var viewModel: InsightsViewModel
     @State private var focusedIntervalID: UUID?
+    @State private var selectedAgentID = "all"
 
     private var intervals: [AgentActivityInterval] {
-        AgentActivityWindow.overnight(viewModel.snapshot.activities)
+        let all = AgentActivityWindow.overnight(viewModel.snapshot.activities)
+        guard selectedAgentID != "all" else { return all }
+        return all.filter { $0.agentID == selectedAgentID }
+    }
+
+    private var availableAgents: [(id: String, name: String)] {
+        Dictionary(grouping: AgentActivityWindow.overnight(viewModel.snapshot.activities), by: \.agentID)
+            .compactMap { id, intervals in intervals.first.map { (id, $0.agentName) } }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private var agentNames: [String] {
@@ -498,6 +507,14 @@ private struct AgentInsightsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Picker("Agent", selection: $selectedAgentID) {
+                    Text("All agents").tag("all")
+                    ForEach(availableAgents, id: \.id) { agent in
+                        Text(agent.name).tag(agent.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 150)
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(summaryText)
                         .font(.subheadline.weight(.semibold))

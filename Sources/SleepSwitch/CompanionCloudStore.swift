@@ -96,6 +96,23 @@ final class CompanionCloudStore: CompanionCloudStoring {
         try await container.accountStatus()
     }
 
+    /// A private-database subscription wakes the companion for fresh Mac
+    /// telemetry. It contains no status payload; the app always refetches the
+    /// record from the signed-in user's private database.
+    func ensureStatusSubscription() async throws {
+        let subscriptionID = "sleep-switch-mac-status-v1"
+        let subscription = CKQuerySubscription(
+            recordType: Self.statusRecordType,
+            predicate: NSPredicate(value: true),
+            subscriptionID: subscriptionID,
+            options: [.firesOnRecordCreation, .firesOnRecordUpdate]
+        )
+        let info = CKSubscription.NotificationInfo()
+        info.shouldSendContentAvailable = true
+        subscription.notificationInfo = info
+        try await database.save(subscription)
+    }
+
     func fetchMacs() async throws -> [CompanionMacStatus] {
         let records = try await fetchRecords(
             type: Self.statusRecordType,

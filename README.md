@@ -66,7 +66,7 @@ Click the menu-bar icon once to open Sleep Switch. A checkmark means that an opt
 | **Sleep Until Agents Finish** is chosen | The display turns off while agents work and wakes when the final detected session finishes. |
 | No agent or manual session is active | Sleep Switch holds no power assertion and the Mac follows its macOS Lock Screen and Energy settings. |
 
-Automatic agent sleep is deliberate and independent of the normal macOS idle-sleep timer, so it also works when automatic sleep is disabled on AC power. It never ends or overrides a manual session. The default **Prevent Sleep** mode leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins.
+Automatic agent sleep is deliberate and independent of the normal macOS idle-sleep timer, so it also works when automatic sleep is disabled on AC power. It never ends or overrides a manual session. The default **Prevent Sleep** mode leaves normal lid behavior unchanged. The direct GitHub build can keep the Mac running with its lid closed; that mode asks for administrator approval when an awake session begins. By default, Sleep Switch pauses lid-closed operation at or below **11% battery** and requires external power. Both safeguards are adjustable in Settings; when either applies, it immediately returns to normal lid behavior and retains only ordinary idle-sleep prevention for an active session.
 
 On macOS versions that reject the public IOKit sleep request, the direct build falls back to the built-in `pmset sleepnow` action. A failed automatic request is logged instead of repeatedly interrupting the desktop with an alert.
 
@@ -88,7 +88,7 @@ On macOS versions that reject the public IOKit sleep request, the direct build f
 - Qwen Code
 - Pi
 
-Sleep Switch checks local activity every ten seconds. Most harnesses are recognized by exact process and runtime-launcher signatures. Codex uses its local `task_started` and `task_complete` markers instead, so open but idle desktop tasks do not count as running sessions. Quiet network waits remain covered without relying on CPU usage.
+Sleep Switch checks local activity every ten seconds. Most harnesses are recognized by exact process and runtime-launcher signatures. Codex uses its local `task_started` and `task_complete` markers instead, so open but idle desktop tasks do not count as running sessions. Its active-log window is fifteen minutes to avoid stale unfinished logs keeping a Mac awake indefinitely. Settings includes an on-device detection report and optional zero-to-nonzero custom shell triggers for debugging a local setup.
 
 Tracking is local-only. No process or session information leaves your Mac, and Sleep Switch does not install hooks or edit any agent’s configuration.
 
@@ -112,7 +112,7 @@ In its default Prevent Sleep mode, Sleep Switch uses Apple’s native power-mana
 
 The assertions belong to the app process. Agent sessions retain only the system assertion during their completion cooldown. After both the agent-free and user-idle windows reach five minutes, Sleep Switch releases the assertion and requests system sleep. Manual-session assertions are released only when the session ends; all assertions are also released when automatic agent awake is paused or the app quits.
 
-The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Lid mode does not install a persistent helper or retain administrator credentials.
+The optional **Prevent Sleep Even With Lid Closed** mode in the GitHub download temporarily runs `pmset disablesleep 1` after standard macOS administrator approval. A short-lived privileged watcher restores `pmset disablesleep 0` when the awake session ends or the app exits—even after a crash. Lid mode does not install a persistent helper or retain administrator credentials. Its battery floor and external-power requirement are safety rails, not an attempt to change macOS’s normal sleep policy globally.
 
 The direct build’s optional cooling feature uses a separately signed macOS
 background helper because current macOS versions restrict AppleSMC access. The
@@ -252,11 +252,13 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.3.7 (28)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record with the same Mac name instead of remaining pinned to the stale one. It never silently retargets remote controls to a different Mac.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.4.0 (29)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record with the same Mac name instead of remaining pinned to the stale one. It never silently retargets remote controls to a different Mac.
 
 ### Companion actions
 
 The iOS dashboard shows the Mac's online/stale state, uptime, thermal state, power source, estimated watts, battery, agent count, keep-awake state, and bounded history. The History view shows five-minute kWh buckets for the last 24 hours, or daily kWh and agent activity hours for the last 7 or 30 days. Actions are limited by the Mac's advertised capabilities and require confirmation for sleep, lock, restart, and shutdown:
+
+Manual sessions have a live countdown in the app and a Live Activity; Home Screen and Lock Screen widgets show the selected Mac’s battery, temperature, and active agent sessions. Optional heat alerts use conservative defaults: 85°C while a non-system cooling profile is active, with separate 30- and 60-minute milestones. Alert permission and every threshold are controlled in the iPhone settings screen.
 
 - **Sleep Mac** — puts the whole Mac to sleep.
 - **Sleep Display** — turns off only the display in the direct-download Mac build; agents keep running.

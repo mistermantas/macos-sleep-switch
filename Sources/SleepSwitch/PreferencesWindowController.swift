@@ -13,6 +13,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var lidClosedMinimumBatteryPercent: Int
     var lidClosedRequiresExternalPower: Bool
     var lidClosedSafetyMessage: String?
+    var lidClosedDiagnostics: String
     var agentTriggers: AgentTriggerConfiguration
     var diagnosticsEnabled: Bool
     var codexActiveWindowSeconds: Int
@@ -25,7 +26,9 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         automaticAgentAwake: true, launchAtLoginTitle: "Enable Launch at Login",
         historyEnabled: true, companionStatus: "Unavailable", isDirectBuild: false,
         lidClosedMinimumBatteryPercent: 11, lidClosedRequiresExternalPower: true,
-        lidClosedSafetyMessage: nil, agentTriggers: .disabled,
+        lidClosedSafetyMessage: nil,
+        lidClosedDiagnostics: "Lid-closed diagnostics are unavailable.",
+        agentTriggers: .disabled,
         diagnosticsEnabled: false, codexActiveWindowSeconds: 180, coolingDescription: nil,
         aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil
     )
@@ -117,6 +120,14 @@ private final class PreferencesViewModel: ObservableObject {
 
     func showDiagnostics() { showDiagnosticsAction() }
     func showCoolingDetails() { showCoolingDetailsAction() }
+
+    func copyLidClosedDiagnostics() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(
+            snapshot.lidClosedDiagnostics,
+            forType: .string
+        )
+    }
 }
 
 private struct PreferencesWindowView: View {
@@ -248,6 +259,16 @@ private struct PreferencesWindowView: View {
                     Text("When this protection applies, Sleep Switch immediately restores normal lid behavior and keeps only standard idle-sleep prevention if a session is active.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Divider()
+                    Text("Lid-closed diagnostics")
+                        .font(.subheadline.weight(.semibold))
+                    Text(viewModel.snapshot.lidClosedDiagnostics)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                        .lineLimit(8)
+                    Button("Copy Lid-Closed Diagnostics") {
+                        viewModel.copyLidClosedDiagnostics()
+                    }
                 }
 
                 Section("Cooling") {

@@ -1762,6 +1762,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lidClosedMinimumBatteryPercent: lidClosedSafetyConfiguration.minimumBatteryPercent,
             lidClosedRequiresExternalPower: lidClosedSafetyConfiguration.requiresExternalPower,
             lidClosedSafetyMessage: lidClosedSafetyDecision.message,
+            lidClosedDiagnostics: lidClosedSleep.diagnosticReport,
             agentTriggers: agentTriggerConfiguration,
             diagnosticsEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
             codexActiveWindowSeconds: codexActiveWindowSeconds,

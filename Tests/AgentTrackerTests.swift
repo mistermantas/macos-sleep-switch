@@ -102,6 +102,8 @@ struct AgentTrackerTests {
         testKeepAwakeModes()
         testAgentIdleGrace()
         testLidClosedSleepControllerHelpers()
+        testDirectLidRestoration()
+        testDirectLidRestorationFailureDiagnostics()
         testNonBlockingLidRestoration()
         testDisplayPowerCommand()
         testUnsignedCoolingHelperGate()
@@ -518,9 +520,11 @@ struct AgentTrackerTests {
         let marker = URL(fileURLWithPath: "/private/tmp/sleep-switch-test-marker")
         let watcherLabel =
             "lt.mantas.sleepswitch.lidwatcher.test"
+        let watcherLog = URL(fileURLWithPath: "/private/tmp/sleep-switch-test-watcher.log")
         let command = LidClosedSleepController.enableCommand(
             markerURL: marker,
-            watcherLabel: watcherLabel
+            watcherLabel: watcherLabel,
+            watcherLogURL: watcherLog
         )
         for fragment in [
             "/usr/bin/pmset disablesleep 1",
@@ -533,7 +537,8 @@ struct AgentTrackerTests {
             "/bin/launchctl remove",
             "system/\(watcherLabel)",
             marker.path,
-            watcherLabel
+            watcherLabel,
+            watcherLog.path
         ] {
             expect(
                 command.contains(fragment),
@@ -544,6 +549,16 @@ struct AgentTrackerTests {
             !command.contains("/usr/bin/nohup")
                 && !command.contains("/bin/kill -0"),
             "uses a launchd-owned heartbeat watcher instead of a detached child process"
+        )
+        let restore = LidClosedSleepController.restoreCommand(
+            watcherLabel: watcherLabel
+        )
+        expect(
+            restore.contains("/usr/bin/pmset disablesleep 0")
+                && restore.contains("/bin/launchctl remove")
+                && restore.contains("|| exit 1; /bin/launchctl remove")
+                && shellSyntaxIsValid(restore),
+            "keeps a direct, verifiable normal-sleep restoration command"
         )
         let watcher = LidClosedSleepController.restoreWatcherCommand(
             markerURL: marker,
@@ -646,6 +661,96 @@ struct AgentTrackerTests {
             fatalError(
                 "Test failed: non-blocking lid transition returned \(error)"
             )
+        }
+    }
+
+    private static func testDirectLidRestoration() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "sleep-switch-direct-restore-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var sleepDisabled = false
+        var directRestoreCommand: String?
+        let controller = LidClosedSleepController(
+            markerDirectory: root,
+            readSleepDisabled: { sleepDisabled },
+            waitForSleepDisabled: { expected in sleepDisabled == expected },
+            runAdministratorCommand: { command in
+                if command.contains("/bin/launchctl submit") {
+                    sleepDisabled = true
+                } else if command.contains("/usr/bin/pmset disablesleep 0") {
+                    directRestoreCommand = command
+                    sleepDisabled = false
+                }
+            }
+        )
+
+        do {
+            try controller.start()
+            try controller.stop()
+            expect(
+                directRestoreCommand != nil,
+                "runs a direct privileged restore instead of relying only on the watcher"
+            )
+            expect(
+                controller.diagnosticReport.contains("restored directly and verified"),
+                "records a verifiable direct-restoration diagnostic"
+            )
+        } catch {
+            fatalError("Test failed: direct lid restore returned \(error)")
+        }
+    }
+
+    private static func testDirectLidRestorationFailureDiagnostics() {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "sleep-switch-direct-restore-failure-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        try? FileManager.default.createDirectory(
+            at: root,
+            withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        var sleepDisabled = false
+        let controller = LidClosedSleepController(
+            markerDirectory: root,
+            readSleepDisabled: { sleepDisabled },
+            waitForSleepDisabled: { expected in sleepDisabled == expected },
+            runAdministratorCommand: { command in
+                if command.contains("/bin/launchctl submit") {
+                    sleepDisabled = true
+                    return
+                }
+                throw NSError(
+                    domain: "SleepSwitchTests",
+                    code: 42,
+                    userInfo: [NSLocalizedDescriptionKey: "simulated restore failure"]
+                )
+            }
+        )
+
+        do {
+            try controller.start()
+            do {
+                try controller.stop()
+                fatalError("Test failed: direct restore should have failed")
+            } catch {
+                expect(
+                    controller.diagnosticReport.contains("simulated restore failure"),
+                    "retains the privileged restore failure in lid-closed diagnostics"
+                )
+            }
+        } catch {
+            fatalError("Test failed: failure diagnostic setup returned \(error)")
         }
     }
 

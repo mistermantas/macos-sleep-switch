@@ -185,6 +185,9 @@ enum LidClosedSleepError: Error, LocalizedError {
 final class LidClosedSleepController {
     var isActive: Bool { false }
     var isRestoring: Bool { false }
+    var diagnosticReport: String {
+        "Lid-closed mode is unavailable in the App Store build."
+    }
     var onRestorationFailure: ((Error) -> Void)?
     var onRestorationFinished: (() -> Void)?
 
@@ -206,6 +209,7 @@ final class LidClosedSleepController {
     private(set) var isActive = false
     private(set) var ownsSystemSetting = false
     private(set) var isRestoring = false
+    private(set) var lastDiagnostic = "Lid-closed mode has not changed in this app session."
     var onRestorationFailure: ((Error) -> Void)?
     var onRestorationFinished: (() -> Void)?
 
@@ -214,6 +218,8 @@ final class LidClosedSleepController {
     private let waitForSleepDisabled: (Bool) -> Bool
     private let runAdministratorCommand: (String) throws -> Void
     private var markerURL: URL?
+    private var watcherLabel: String?
+    private var watcherLogURL: URL?
     private var restorationFailed = false
     private var restorationAttemptID: UUID?
     private let heartbeatQueue = DispatchQueue(
@@ -269,21 +275,34 @@ final class LidClosedSleepController {
             throw LidClosedSleepError.markerCreationFailed
         }
 
-        self.markerURL = markerURL
-        startHeartbeat(for: markerURL)
         let watcherLabel = Self.makeWatcherLabel()
+        let watcherLogURL = markerDirectory
+            .appendingPathComponent("\(watcherLabel).log")
+        _ = FileManager.default.createFile(
+            atPath: watcherLogURL.path,
+            contents: Data(),
+            attributes: [.posixPermissions: 0o600]
+        )
+        self.markerURL = markerURL
+        self.watcherLabel = watcherLabel
+        self.watcherLogURL = watcherLogURL
+        lastDiagnostic = "Preparing the privileged lid-closed watcher."
+        startHeartbeat(for: markerURL)
 
         do {
             try runAdministratorCommand(
                 Self.enableCommand(
                     markerURL: markerURL,
-                    watcherLabel: watcherLabel
+                    watcherLabel: watcherLabel,
+                    watcherLogURL: watcherLogURL
                 )
             )
             guard waitForSleepDisabled(true) else {
                 throw LidClosedSleepError.stateChangeTimedOut(true)
             }
+            lastDiagnostic = "Lid-closed mode enabled and verified.\n\(watcherLogSummary())"
         } catch {
+            lastDiagnostic = "Lid-closed enable failed: \(diagnosticDescription(for: error)).\n\(watcherLogSummary())"
             try? FileManager.default.removeItem(at: markerURL)
             clearState()
             _ = waitForSleepDisabled(false)
@@ -298,9 +317,9 @@ final class LidClosedSleepController {
         guard isActive else {
             guard isRestoring || restorationFailed else { return }
             if waitForRestoration {
-                try verifyRestoration()
+                try restoreSystemSleepNow(watcherLabel: watcherLabel)
             } else if !isRestoring {
-                verifyRestorationWithoutBlocking()
+                verifyRestorationWithoutBlocking(watcherLabel: watcherLabel)
             }
             return
         }
@@ -309,6 +328,7 @@ final class LidClosedSleepController {
             clearState()
             return
         }
+        let watcherLabel = self.watcherLabel
 
         if FileManager.default.fileExists(atPath: markerURL.path) {
             try FileManager.default.removeItem(at: markerURL)
@@ -320,9 +340,9 @@ final class LidClosedSleepController {
         isActive = false
 
         if waitForRestoration {
-            try verifyRestoration()
+            try restoreSystemSleepNow(watcherLabel: watcherLabel)
         } else {
-            verifyRestorationWithoutBlocking()
+            verifyRestorationWithoutBlocking(watcherLabel: watcherLabel)
         }
     }
 
@@ -349,10 +369,12 @@ final class LidClosedSleepController {
 
     static func enableCommand(
         markerURL: URL,
-        watcherLabel: String
+        watcherLabel: String,
+        watcherLogURL: URL
     ) -> String {
         let marker = shellQuote(markerURL.path)
         let label = shellQuote(watcherLabel)
+        let log = shellQuote(watcherLogURL.path)
         let serviceTarget = shellQuote("system/\(watcherLabel)")
         let watcher = restoreWatcherCommand(
             markerURL: markerURL,
@@ -366,7 +388,7 @@ final class LidClosedSleepController {
             + "fi; "
             + "exit $status"
 
-        return "/bin/launchctl submit -l \(label) -- "
+        return "/bin/launchctl submit -l \(label) -o \(log) -e \(log) -- "
             + "/bin/sh -c \(shellQuote(watcher)) "
             + "|| { /bin/rm -f \(marker); exit 1; }; "
             + "/bin/launchctl print \(serviceTarget) >/dev/null 2>&1 "
@@ -407,6 +429,29 @@ final class LidClosedSleepController {
             + "exit 0"
     }
 
+    static func restoreCommand(watcherLabel: String?) -> String {
+        let verification = "\(pmsetPath) -g | /usr/bin/awk "
+            + shellQuote(
+                "$1 == \"SleepDisabled\" && $2 == \"0\" "
+                    + "{ restored = 1 } END { exit restored ? 0 : 1 }"
+            )
+        let unload = watcherLabel.map {
+            "/bin/launchctl remove \(shellQuote($0)) >/dev/null 2>&1 || true"
+        } ?? "true"
+        return "\(pmsetPath) disablesleep 0 >/dev/null 2>&1; "
+            + "\(verification) || exit 1; \(unload); exit 0"
+    }
+
+    var diagnosticReport: String {
+        """
+        Lid-closed mode: \(isActive ? "active" : "inactive")
+        Restoration: \(isRestoring ? "in progress" : "idle")
+        Owns SleepDisabled: \(ownsSystemSetting ? "yes" : "no")
+        \(lastDiagnostic)
+        \(watcherLogSummary())
+        """
+    }
+
     deinit {
         stopHeartbeat()
         if let markerURL {
@@ -417,6 +462,7 @@ final class LidClosedSleepController {
     private func clearState() {
         stopHeartbeat()
         markerURL = nil
+        watcherLabel = nil
         ownsSystemSetting = false
         isActive = false
         isRestoring = false
@@ -453,26 +499,47 @@ final class LidClosedSleepController {
         heartbeatTimer = nil
     }
 
-    private func verifyRestoration() throws {
+    private func restoreSystemSleepNow(watcherLabel: String?) throws {
         restorationAttemptID = nil
         isRestoring = false
+        do {
+            try runAdministratorCommand(Self.restoreCommand(watcherLabel: watcherLabel))
+        } catch {
+            restorationFailed = true
+            lastDiagnostic = "Direct normal-sleep restore failed: \(diagnosticDescription(for: error)).\n\(watcherLogSummary())"
+            throw error
+        }
         guard waitForSleepDisabled(false) else {
             restorationFailed = true
+            lastDiagnostic = "Direct normal-sleep restore did not verify.\n\(watcherLogSummary())"
             throw LidClosedSleepError.stateChangeTimedOut(false)
         }
         restorationFailed = false
+        lastDiagnostic = "Normal lid sleep restored directly and verified.\n\(watcherLogSummary())"
     }
 
-    private func verifyRestorationWithoutBlocking() {
+    private func verifyRestorationWithoutBlocking(watcherLabel: String?) {
         guard !isRestoring else { return }
         let attemptID = UUID()
         restorationAttemptID = attemptID
         isRestoring = true
         restorationFailed = false
         let waitForSleepDisabled = waitForSleepDisabled
+        let runAdministratorCommand = runAdministratorCommand
 
         restorationQueue.async { [weak self] in
-            let restored = waitForSleepDisabled(false)
+            var restored = waitForSleepDisabled(false)
+            var fallbackError: Error?
+            if !restored {
+                do {
+                    try runAdministratorCommand(
+                        Self.restoreCommand(watcherLabel: watcherLabel)
+                    )
+                    restored = waitForSleepDisabled(false)
+                } catch {
+                    fallbackError = error
+                }
+            }
             DispatchQueue.main.async { [weak self] in
                 guard let self,
                       self.restorationAttemptID == attemptID
@@ -482,6 +549,13 @@ final class LidClosedSleepController {
                 self.restorationAttemptID = nil
                 self.isRestoring = false
                 self.restorationFailed = !restored
+                if restored {
+                    self.lastDiagnostic = "Normal lid sleep restored and verified.\n\(self.watcherLogSummary())"
+                } else if let fallbackError {
+                    self.lastDiagnostic = "Watcher and direct normal-sleep restore both failed: \(self.diagnosticDescription(for: fallbackError)).\n\(self.watcherLogSummary())"
+                } else {
+                    self.lastDiagnostic = "Watcher did not restore normal sleep; direct restore did not verify.\n\(self.watcherLogSummary())"
+                }
                 self.onRestorationFinished?()
                 if !restored {
                     self.onRestorationFailure?(
@@ -573,6 +647,25 @@ final class LidClosedSleepController {
 
     private static func shellQuote(_ value: String) -> String {
         "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
+    }
+
+    private func watcherLogSummary() -> String {
+        guard let watcherLogURL,
+              let text = try? String(contentsOf: watcherLogURL, encoding: .utf8),
+              !text.isEmpty else {
+            return "Watcher log: no output."
+        }
+        let tail = text.split(separator: "\n").suffix(12).joined(separator: "\n")
+        return "Watcher log:\n\(tail)"
+    }
+
+    private func diagnosticDescription(for error: Error) -> String {
+        guard case let LidClosedSleepError.commandFailed(status, message) = error else {
+            return error.localizedDescription
+        }
+        return message.isEmpty
+            ? "command exited with status \(status)"
+            : "command exited with status \(status): \(message)"
     }
 }
 #endif

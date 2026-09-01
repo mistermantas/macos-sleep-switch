@@ -2,6 +2,7 @@ import Charts
 import SwiftUI
 
 struct CompanionDashboardRoot: View {
+    @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var model: CompanionAppModel
     @AppStorage("selectedMacDeviceID") private var selectedMacDeviceID = ""
     @State private var showingSettings = false
@@ -71,6 +72,13 @@ struct CompanionDashboardRoot: View {
             }
             .refreshable { await model.refreshAndWait() }
             .task { await model.refreshAndWait() }
+            .task(id: scenePhase) {
+                guard scenePhase == .active else { return }
+                while !Task.isCancelled {
+                    await model.refreshAndWait()
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
             .sheet(isPresented: $showingSettings) {
                 CompanionPreferencesView(model: model) {
                     showingSettings = false
@@ -842,7 +850,7 @@ private struct CoolingControlCard: View {
 
             if let cooling = mac.cooling {
                 HStack(spacing: 16) {
-                    if let temperature = cooling.temperatureCelsius {
+                if let temperature = cooling.temperatureCelsius {
                         Label("\(Int(temperature.rounded()))°C", systemImage: "thermometer.medium")
                     }
                     if !cooling.fans.isEmpty {
@@ -855,6 +863,11 @@ private struct CoolingControlCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
+            Text(mac.isStale
+                ? "Thermals last updated \(CompanionTimeText.elapsed(since: mac.lastSeen))"
+                : "Thermals updated \(CompanionTimeText.elapsed(since: mac.lastSeen))")
+                .font(.caption2)
+                .foregroundStyle(mac.isStale ? .orange : .secondary)
             DisclosureGroup("What does Aggressive do?") {
                 Text("Aggressive gives the fans a brief high-response boost, then follows the Mac’s live temperature every three seconds with a smooth comfort curve. It eases down around the Mac’s chosen comfort target and climbs back to full demand as heat rises. It gives control back to macOS if readings are unreliable, thermal pressure becomes critical, or a verified maximum profile remains at 80°C or higher for 30 seconds.")
                     .font(.footnote)

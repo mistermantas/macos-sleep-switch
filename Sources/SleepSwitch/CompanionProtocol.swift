@@ -76,21 +76,21 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
         case .setSafetyPreferences:
             return "Update Safety Settings"
         case .panicStop:
-            return "Stop Sleep Switch Controls"
+            return "Stop Sleep Switch"
         }
     }
 
     var isDestructive: Bool {
-        self == .restartMac || self == .shutdownMac
+        self == .restartMac || self == .shutdownMac || self == .panicStop
     }
 
     var requiresConfirmation: Bool {
         switch self {
-        case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .lockMac:
+        case .sleepMac, .sleepDisplay, .restartMac, .shutdownMac, .lockMac, .panicStop:
             return true
         case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake,
              .startManualSession, .stopManualSession, .setCoolingProfile,
-             .setSafetyPreferences, .panicStop:
+             .setSafetyPreferences:
             return false
         }
     }

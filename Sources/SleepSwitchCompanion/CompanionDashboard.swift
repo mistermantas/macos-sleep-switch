@@ -1522,10 +1522,11 @@ private struct CompanionRemoteControlsScreen: View {
     @ObservedObject var model: CompanionAppModel
     @State private var pendingAction: CompanionRemoteAction?
 
-    private let order: [CompanionRemoteAction] = [
-        .sleepDisplay, .wakeDisplay, .sleepDisplayUntilAgentsFinish,
-        .sleepMac, .lockMac, .restartMac, .shutdownMac, .panicStop
+    private let displayActions: [CompanionRemoteAction] = [
+        .sleepDisplay, .wakeDisplay, .sleepDisplayUntilAgentsFinish
     ]
+    private let macActions: [CompanionRemoteAction] = [.sleepMac, .lockMac]
+    private let dangerActions: [CompanionRemoteAction] = [.restartMac, .shutdownMac, .panicStop]
 
     var body: some View {
         List {
@@ -1544,14 +1545,25 @@ private struct CompanionRemoteControlsScreen: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("Available actions") {
-                ForEach(order.filter { mac.capabilities.availableActions.contains($0) }, id: \.rawValue) { action in
-                    Button {
-                        if action.requiresConfirmation { pendingAction = action } else { model.send(action, to: mac) }
-                    } label: {
-                        Label(action.title, systemImage: action.symbolName)
+            controlSection("Display", actions: displayActions)
+            controlSection("This Mac", actions: macActions)
+
+            let availableDangerActions = supported(dangerActions)
+            if !availableDangerActions.isEmpty {
+                Section {
+                    ForEach(availableDangerActions, id: \.rawValue) { action in
+                        Button(role: .destructive) {
+                            pendingAction = action
+                        } label: {
+                            Label(action.title, systemImage: action.symbolName)
+                        }
+                        .disabled(mac.isStale || model.commandInFlight)
                     }
-                    .disabled(mac.isStale || model.commandInFlight)
+                } header: {
+                    Label("Danger zone", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                } footer: {
+                    Text("These actions interrupt work. Stop Sleep Switch ends its awake, display, and cooling control immediately.")
                 }
             }
         }
@@ -1569,7 +1581,53 @@ private struct CompanionRemoteControlsScreen: View {
                 }
             }
             Button("Cancel", role: .cancel) { pendingAction = nil }
+        } message: {
+            if let action = pendingAction {
+                Text(confirmationMessage(for: action))
+            }
         }
+    }
+
+    private func confirmationMessage(for action: CompanionRemoteAction) -> String {
+        switch action {
+        case .panicStop:
+            return "This immediately ends Sleep Switch’s awake, display, and cooling controls on this Mac."
+        case .shutdownMac:
+            return "The Mac will shut down. Make sure any work is saved first."
+        case .restartMac:
+            return "The Mac will restart. Make sure any work is saved first."
+        case .sleepMac:
+            return "The Mac will sleep and will not receive commands until it wakes."
+        case .lockMac:
+            return "The current macOS session will lock."
+        default:
+            return action.title
+        }
+    }
+
+    @ViewBuilder
+    private func controlSection(_ title: String, actions: [CompanionRemoteAction]) -> some View {
+        let availableActions = supported(actions)
+        if !availableActions.isEmpty {
+            Section(title) {
+                ForEach(availableActions, id: \.rawValue) { action in
+                    Button {
+                        if action.requiresConfirmation {
+                            pendingAction = action
+                        } else {
+                            model.send(action, to: mac)
+                        }
+                    } label: {
+                        Label(action.title, systemImage: action.symbolName)
+                    }
+                    .disabled(mac.isStale || model.commandInFlight)
+                }
+            }
+        }
+    }
+
+    private func supported(_ actions: [CompanionRemoteAction]) -> [CompanionRemoteAction] {
+        actions.filter { mac.capabilities.availableActions.contains($0) }
     }
 }
 

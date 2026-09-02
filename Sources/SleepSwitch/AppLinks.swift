@@ -49,9 +49,23 @@ enum AppLinks {
         url: URL(string: "https://uncascade.com/contact/")!,
         symbolName: "envelope"
     )
+    static let githubSponsors = AppLink(
+        title: "Sponsor Sleep Switch",
+        url: URL(string: "https://github.com/mistermantas/sponsors")!,
+        symbolName: "heart.circle"
+    )
 
     static let groups: [[AppLink]] = [
         [uncascadeWebsite, uncascadeYouTube],
         [reportFeedback, contactUncascade]
     ]
+
+    static func groups(includingSponsor: Bool) -> [[AppLink]] {
+        guard includingSponsor else { return groups }
+        return [
+            [uncascadeWebsite, uncascadeYouTube],
+            [githubSponsors],
+            [reportFeedback, contactUncascade]
+        ]
+    }
 }

@@ -1,5 +1,8 @@
 import AppKit
 import ServiceManagement
+#if APP_STORE
+import StoreKit
+#endif
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -74,6 +77,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     )
     private let settingsMenu = NSMenu(title: "Settings")
     private let supportMenu = NSMenu(title: AppLinks.menuTitle)
+#if APP_STORE
+    private var isUSStorefront = false
+    private var storefrontObservationTask: Task<Void, Never>?
+#endif
     private let keepDisplayAwakeItem = NSMenuItem(
         title: "Manual Sessions Keep Display Awake",
         action: #selector(toggleKeepDisplayAwake),
@@ -195,6 +202,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         codexDirectoryAccess.restoreAccess()
 #endif
         configureMenu()
+#if APP_STORE
+        observeStorefrontForSupportLinks()
+#endif
         insightsRecorder.start()
         observeDisplayWake()
         companionBridge.onDiagnosticsChange = { [weak self] diagnostics in
@@ -606,7 +616,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func configureSupportMenu() {
-        for (groupIndex, group) in AppLinks.groups.enumerated() {
+        supportMenu.removeAllItems()
+        let groups: [[AppLink]]
+#if APP_STORE
+        groups = AppLinks.groups(includingSponsor: isUSStorefront)
+#else
+        groups = AppLinks.groups
+#endif
+        for (groupIndex, group) in groups.enumerated() {
             if groupIndex > 0 {
                 supportMenu.addItem(.separator())
             }
@@ -640,6 +657,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         supportMenu.addItem(versionItem)
     }
+
+#if APP_STORE
+    private func observeStorefrontForSupportLinks() {
+        storefrontObservationTask?.cancel()
+        storefrontObservationTask = Task { [weak self] in
+            let currentStorefront = await Storefront.current
+            self?.setUSStorefront(currentStorefront?.countryCode == "USA")
+
+            for await storefront in Storefront.updates {
+                guard !Task.isCancelled else { return }
+                self?.setUSStorefront(storefront.countryCode == "USA")
+            }
+        }
+    }
+
+    private func setUSStorefront(_ isUSStorefront: Bool) {
+        guard self.isUSStorefront != isUSStorefront else { return }
+        self.isUSStorefront = isUSStorefront
+        configureSupportMenu()
+    }
+#endif
 
     private func configureDefaultDurationMenu() {
         let durations: [Int?] = [nil] + AwakeTimeText.presetSeconds.map(Optional.some)

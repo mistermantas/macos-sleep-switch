@@ -889,6 +889,14 @@ struct AgentTrackerTests {
         )
         expect(links.count == 4, "keeps the support menu concise")
         expect(
+            AppLinks.groups(includingSponsor: false).flatMap { $0 } == links,
+            "keeps sponsor links out of the default support menu"
+        )
+        expect(
+            AppLinks.groups(includingSponsor: true).flatMap { $0 }.contains(AppLinks.githubSponsors),
+            "includes the sponsor link only when the storefront allows it"
+        )
+        expect(
             links.allSatisfy { $0.url.scheme == "https" },
             "opens every external link over HTTPS"
         )
@@ -911,6 +919,11 @@ struct AgentTrackerTests {
             AppLinks.contactUncascade.url.absoluteString
                 == "https://uncascade.com/contact/",
             "links to a functional support page"
+        )
+        expect(
+            AppLinks.githubSponsors.url.absoluteString
+                == "https://github.com/mistermantas/sponsors",
+            "links to the creator's GitHub Sponsors page"
         )
     }
 

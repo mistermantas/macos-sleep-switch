@@ -100,7 +100,7 @@ The repository also contains the MB Uncascade companion target `SleepSwitchCompa
 
 The companion's History view is intentionally bounded: it shows daily kWh and agent-hours for up to 30 days, plus up to 24 hours of five-minute energy buckets. It does not receive prompts, output, file names, process names, or raw command lines.
 
-The **Support & Creator** menu in this App Store build contains no donation or sponsorship action. It links to the public bug/feedback form and Uncascade contact support. The Mac app has no app accounts, subscriptions, payments, or in-app purchases; the optional companion uses the user's existing private iCloud account.
+The **Support & Creator** menu links to the public bug/feedback form and Uncascade contact support. For the United States storefront only, it also offers **Sponsor Sleep Switch**, which opens `github.com/mistermantas/sponsors` in the default browser. The app reads the current StoreKit storefront when displaying this item and removes it immediately if the storefront changes. The Mac app has no app accounts, subscriptions, payments, or in-app purchases; the optional companion uses the user's existing private iCloud account.
 
 ## Assets
 

@@ -112,6 +112,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(deleteHistory),
         keyEquivalent: ""
     )
+    private let remoteInboxItem = NSMenuItem(
+        title: "Open Remote Inbox",
+        action: #selector(openRemoteInbox),
+        keyEquivalent: ""
+    )
     private let companionStatusItem = NSMenuItem(
         title: "iCloud Companion · Checking…",
         action: nil,
@@ -476,6 +481,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: "gearshape",
             accessibilityDescription: "Sleep Switch settings"
         )
+        remoteInboxItem.target = self
+        remoteInboxItem.image = NSImage(
+            systemSymbolName: "tray.and.arrow.down",
+            accessibilityDescription: "Open the Remote Inbox folder"
+        )
         configureSettingsMenu()
 
 #if APP_STORE
@@ -536,6 +546,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(toggleItem)
         menu.addItem(durationItem)
         menu.addItem(.separator())
+        menu.addItem(remoteInboxItem)
         menu.addItem(settingsItem)
         menu.addItem(refreshItem)
         menu.addItem(supportItem)
@@ -2966,6 +2977,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func openAppLink(_ sender: NSMenuItem) {
         guard let link = sender.representedObject as? AppLink else { return }
         NSWorkspace.shared.open(link.url)
+    }
+
+    @objc private func openRemoteInbox() {
+        do {
+            try FileManager.default.createDirectory(
+                at: remoteContextInbox.rootURL,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            NSWorkspace.shared.activateFileViewerSelecting([remoteContextInbox.rootURL])
+        } catch {
+            NSSound.beep()
+        }
     }
 
     @objc private func connectCodex() {

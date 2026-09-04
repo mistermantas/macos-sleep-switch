@@ -219,6 +219,14 @@ enum CompanionProtocolTests {
                 == now.addingTimeInterval(5),
             "refreshes a status heartbeat without changing its payload"
         )
+        expect(
+            status.refreshingLastSeen(at: now.addingTimeInterval(5)).network == .constrained,
+            "preserves coarse network state while refreshing a heartbeat"
+        )
+        expect(
+            status.applyingKeepAwake(parameters: ["enabled": "false"]).network == .constrained,
+            "preserves coarse network state during an optimistic awake update"
+        )
         let encodedStatus = try! CompanionJSON.encoder.encode(status)
         let decodedStatus = try! CompanionJSON.decoder.decode(
             CompanionMacStatus.self,

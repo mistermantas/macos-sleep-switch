@@ -170,14 +170,6 @@ struct CompanionDashboardRoot: View {
             } message: { draft in
                 Text("Send \(draft.filename) to the selected Mac’s private Remote Inbox?")
             }
-            .fileImporter(
-                isPresented: $showingContextImporter,
-                allowedContentTypes: [.item],
-                allowsMultipleSelection: false
-            ) { result in
-                guard let mac = selectedMac else { return }
-                model.handleContextImportResult(result, for: mac)
-            }
         }
     }
 

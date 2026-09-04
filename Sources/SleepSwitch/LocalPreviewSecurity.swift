@@ -279,7 +279,9 @@ enum LocalPreviewFrame {
     static func decode(from buffer: inout Data) throws -> [Data] {
         var frames: [Data] = []
         while buffer.count >= 4 {
-            let length = buffer.prefix(4).withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+            let length = buffer.prefix(4).reduce(UInt32(0)) { partial, byte in
+                (partial << 8) | UInt32(byte)
+            }
             guard length > 0 else { throw Error.invalidLength }
             guard length <= UInt32(maximumPayloadBytes) else { throw Error.oversized }
             let total = 4 + Int(length)

@@ -67,6 +67,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/SleepSwitch/RemoteContextInbox.swift" \
   "$script_dir/Sources/Shared/CompanionWidgetShared.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionCloudStore.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionMacBridge.swift" \
@@ -102,6 +103,7 @@ xcrun swiftc \
   "$script_dir/Tests/CoolingDiagnosticsTests.swift" \
   "$script_dir/Tests/InsightsHistoryTests.swift" \
   "$script_dir/Tests/CompanionProtocolTests.swift" \
+  "$script_dir/Tests/RemoteContextInboxTests.swift" \
   "$script_dir/Tests/CompanionMacBridgeTests.swift" \
   -o "$test_binary"
 

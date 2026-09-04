@@ -128,6 +128,7 @@ struct AgentTrackerTests {
         CoolingDiagnosticsTests.run()
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
+        RemoteContextInboxTests.run()
         await CompanionMacBridgeTests.run()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {

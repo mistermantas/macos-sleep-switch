@@ -16,6 +16,10 @@ struct RemoteContextInbox {
             .appendingPathComponent("Remote Inbox", isDirectory: true)
     }
 
+    init(rootURL: URL) {
+        self.rootURL = rootURL
+    }
+
     func receive(
         _ transfer: CompanionContextTransfer,
         assetURL: URL,

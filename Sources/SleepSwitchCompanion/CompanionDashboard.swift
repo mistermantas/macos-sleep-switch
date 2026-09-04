@@ -838,16 +838,17 @@ private struct RemoteInboxCard: View {
             }
 
             HStack(spacing: 12) {
-                Button("Send context", systemImage: "paperclip") {
+                Button("Send file", systemImage: "paperclip") {
                     sendFile()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.commandInFlight)
 
-                Button("Add note", systemImage: "square.and.pencil") {
+                Button("Note", systemImage: "square.and.pencil") {
                     addFollowUp()
                 }
                 .buttonStyle(.bordered)
+                .accessibilityLabel("Add follow-up note")
                 .disabled(model.commandInFlight)
 
                 Spacer()

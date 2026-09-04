@@ -29,7 +29,7 @@ enum RemoteWorkProjection {
                     ),
                     harnessID: "codex",
                     harnessName: "Codex",
-                    state: state(for: thread),
+                    state: thread.remoteWorkState(now: now),
                     startedAt: thread.startedAt ?? thread.updatedAt,
                     updatedAt: thread.completedAt ?? thread.updatedAt,
                     durationSeconds: max(
@@ -70,7 +70,7 @@ enum RemoteWorkProjection {
             ),
             harnessID: session.harnessID,
             harnessName: session.harnessName,
-            state: state(for: session),
+            state: session.remoteWorkState(now: now),
             startedAt: session.startedAt,
             updatedAt: updatedAt,
             durationSeconds: max(0, (session.endedAt ?? now).timeIntervalSince(session.startedAt)),
@@ -78,31 +78,6 @@ enum RemoteWorkProjection {
             // other than the user’s explicit Codex mirror opt-in.
             title: nil
         )
-    }
-
-    private static func state(for session: OperatorSession) -> CompanionWorkState {
-        return switch session.state {
-        case .running: .active
-        case .finished: .finished
-        case .aborted: .stopped
-        case .unknown: .unknown
-        }
-    }
-
-    private static func state(for thread: CodexThreadMirror) -> CompanionWorkState {
-        if let errorCode = thread.latestTurnErrorCode?.lowercased() {
-            if errorCode.contains("usagelimitexceeded") || errorCode.contains("rate") {
-                return .rateLimited
-            }
-        }
-
-        return switch thread.status {
-        case .running: .active
-        case .waiting: .waiting
-        case .finished: .finished
-        case .stopped: thread.latestTurnErrorCode == nil ? .stopped : .failed
-        case .unknown: .unknown
-        }
     }
 
     private static func nonEmpty(_ text: String) -> String? {

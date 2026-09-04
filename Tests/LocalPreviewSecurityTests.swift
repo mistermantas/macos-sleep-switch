@@ -84,5 +84,18 @@ enum LocalPreviewSecurityTests {
         } catch {
             expect(false, "reports expiry distinctly")
         }
+
+        do {
+            let first = try LocalPreviewFrame.encode(Data("first".utf8))
+            let second = try LocalPreviewFrame.encode(Data("second".utf8))
+            var fragmented = Data(first.prefix(5))
+            expect(try LocalPreviewFrame.decode(from: &fragmented).isEmpty, "retains an incomplete preview frame")
+            fragmented += first.dropFirst(5) + second
+            let frames = try LocalPreviewFrame.decode(from: &fragmented)
+            expect(frames == [Data("first".utf8), Data("second".utf8)], "decodes bounded preview frames in order")
+            expect(fragmented.isEmpty, "consumes complete preview frames")
+        } catch {
+            expect(false, "frames encrypted preview data: \(error)")
+        }
     }
 }

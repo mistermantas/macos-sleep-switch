@@ -258,3 +258,35 @@ enum LocalPreviewSecurity {
         }
     }
 }
+
+/// Length framing for encrypted local-preview messages. Network.framework can
+/// deliver arbitrary chunks; this keeps a malicious peer from making the app
+/// buffer an unbounded request before authentication or decryption.
+enum LocalPreviewFrame {
+    static let maximumPayloadBytes = 1_048_576
+
+    enum Error: Swift.Error, Equatable { case invalidLength, oversized }
+
+    static func encode(_ payload: Data) throws -> Data {
+        guard !payload.isEmpty else { throw Error.invalidLength }
+        guard payload.count <= maximumPayloadBytes else { throw Error.oversized }
+        var length = UInt32(payload.count).bigEndian
+        return withUnsafeBytes(of: &length) { Data($0) } + payload
+    }
+
+    /// Returns all complete frames while retaining an incomplete tail for a
+    /// later receive. Callers should drop the connection on any thrown error.
+    static func decode(from buffer: inout Data) throws -> [Data] {
+        var frames: [Data] = []
+        while buffer.count >= 4 {
+            let length = buffer.prefix(4).withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+            guard length > 0 else { throw Error.invalidLength }
+            guard length <= UInt32(maximumPayloadBytes) else { throw Error.oversized }
+            let total = 4 + Int(length)
+            guard buffer.count >= total else { break }
+            frames.append(Data(buffer[4..<total]))
+            buffer.removeSubrange(0..<total)
+        }
+        return frames
+    }
+}

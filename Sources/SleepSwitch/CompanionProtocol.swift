@@ -207,6 +207,8 @@ struct CompanionMacCapabilities: Codable, Equatable {
     var canSetCoolingProfile: Bool? = nil
     var canPreventSleepWithLidClosed: Bool? = nil
     var canSetSafetyPreferences: Bool? = nil
+    /// Optional so companions can safely decode status from older Mac builds.
+    var canReceiveContextTransfers: Bool? = nil
 
     var availableActions: [CompanionRemoteAction] {
         CompanionRemoteAction.allCases.filter { action in

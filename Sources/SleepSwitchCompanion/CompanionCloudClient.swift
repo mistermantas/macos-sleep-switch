@@ -36,6 +36,10 @@ struct CompanionCloudClient {
         try await store.fetchResult(for: commandID)
     }
 
+    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
+        try await store.fetchResult(for: transferID)
+    }
+
     func consumeLastIssue() -> String? {
         store.consumeLastIssue()
     }

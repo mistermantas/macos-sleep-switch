@@ -1,13 +1,14 @@
-# Execution contract — Operator
+# Execution contract — remote AI-agent supervision
 
-Continue through the Operator milestones without pausing for routine design approval. `plans.md` is authoritative.
+Continue through `plans.md` without waiting for routine product approval, but do not blur product boundaries to make a demo appear more complete.
 
-- Build the data contract and deterministic adapters before UI. Use fixtures and tests for every external harness format.
-- Keep adapter code read-only and failure-tolerant. A denied directory, unavailable Hermes database, or malformed record must produce an explicit diagnostic state rather than fabricated empty data.
-- Maintain a local SQLite-backed Operator store for user metadata and derived activity. It owns tags, favourites, and use counts; it must never modify a source `SKILL.md`.
-- Send only compact, purpose-limited summaries to the existing private CloudKit model. Do not add a developer server or transfer prompts, raw event details, skills, or filesystem paths.
-- Before editing a user-facing surface, inspect its current visual state and validate revised Mac and iPhone layouts through builds/screenshots as appropriate.
-- Validate after every milestone. Add focused tests before fixing adapter/storage bugs when practical.
-- Keep `plans.md` and `documentation.md` aligned with implemented behavior. Do not commit secrets, local databases, cached harness data, or product-strategy artifacts.
+- Treat the Mac as the execution-side authority. Keep all existing power, cooling, lid, battery, and finish-action protections intact.
+- Implement state only when an adapter or observer has direct evidence. `unknown` is a valid and safer outcome than a guess.
+- Build cross-device operations as explicit, bounded contracts: named record, direction, expiry, size limit, validation, result, cleanup, user feedback.
+- Receive phone-originated data into a private Mac inbox only. Do not choose a repository, alter files, run a command, or send an agent a message without a separate user action.
+- Keep raw prompts, transcript content, paths, commands, logs, credentials, and source files local unless a future feature has a separately designed, opt-in contract.
+- Before changing a user-facing surface, inspect its current state; after a meaningful change, build and visually validate the relevant Mac/iPhone surface.
+- Add focused tests for external record parsing, expiry, retry, deduplication, and privacy redaction before or alongside implementation.
+- Keep `plans.md` checkboxes and `documentation.md` factual. Do not commit user data, CloudKit assets, local inboxes, credentials, or strategy attachments.
 
-Completion means Codex and Hermes data can be safely observed; the Mac Operator window and iPhone summaries are usable and truthful; the skills browser operates on local metadata without touching source skills; and all applicable tests/builds pass.
+Completion means the tested, releasable milestones in `plans.md` are genuinely complete—not merely represented by UI placeholders.

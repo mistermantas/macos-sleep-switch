@@ -1,104 +1,93 @@
-# Operator implementation plan
+# Remote AI-agent supervision plan
 
 ## Verification checklist
 
-- [x] Operator scope, privacy boundary, and source-of-truth rules recorded.
-- [x] Normalized Operator models and durable local metadata store are implemented and migration-safe.
-- [x] Codex adapter reads task/session metadata—including available `tokens_used`—without reading or retaining prompts.
-- [x] Hermes adapter reads its documented local data defensively and exposes availability/capabilities.
-- [x] Adapter fixtures and store tests pass, including denied/malformed data states.
-- [x] Mac Operator window exposes Overview, Sessions, Skills, Machine, and Automations with truthful freshness/empty states.
-- [x] Skills browser supports filtering, local tags, favourites, use counts, copy/reveal/export/share without mutating source skills.
-- [x] Private iCloud summaries reach the iPhone without raw skills, paths, prompts, or detailed events.
-- [ ] macOS/iOS builds and final privacy review pass.
+- [x] Product boundary, privacy model, and evidence-only lifecycle vocabulary are recorded.
+- [x] Bounded remote-work projection reaches iPhone through the private CloudKit status channel.
+- [x] Codex structured state maps rate limits, errors, stopped, waiting, active, and finished without fabricated stalls.
+- [x] Explicit context-transfer record and Mac-side private inbox foundation are implemented.
+- [ ] iPhone/iPad can intentionally select and send a bounded context item, with clear pending/received/error feedback.
+- [ ] Mac exposes received context safely and offers an explicit user-chosen handoff action—never automatic repository or agent injection.
+- [ ] Artifact offers support explicit Mac-to-mobile delivery, Quick Look, save, and share.
+- [ ] Attention events and notifications distinguish useful attention from required action.
+- [ ] Session/machine relationship and power consequence are understandable on mobile.
+- [ ] Local-preview discovery and access design is opt-in, network-safe, and separately reviewed.
+- [ ] Approval and follow-up flows have a narrow, evidence-backed command model.
+- [ ] Full privacy audit, recovery limits, macOS/iOS builds, and release notes pass.
 
 ## Architecture
 
-`OperatorAdapter` is a read-only boundary over a harness. It emits normalized records into `OperatorStore`: `OperatorSession`, `OperatorMetric`, `OperatorEvent`, `HarnessCapability`, `OperatorSkill`, local `SkillTag`, and `SkillUseEvent`. The store derives lightweight totals and expiry-aware snapshots.
+The Mac is authoritative for local observation and controls. `RemoteWorkProjection` produces a compact, pseudonymous summary for the existing private CloudKit status channel. User-visible titles are a separate opt-in; raw transcript data never crosses this boundary.
 
-The Mac window reads the store directly. The companion receives a separate `CompanionOperatorSummary` produced from the store and sent through the existing private CloudKit channel. That summary contains only session counts, harness labels, token/duration deltas, machine state, alert state, and existing finish-action state.
+Explicit cross-device handoff uses a short-lived `RemoteContextTransfer` record and a bounded private-CloudKit asset. The phone copies a user-picked item before upload. The Mac validates expiry and size, copies it into `Application Support/Sleep Switch/Remote Inbox`, clears the cloud asset, and never selects a project, opens a terminal, or informs an agent automatically. A future Share extension is merely another intake front end for this same transfer contract.
+
+Artifacts, previews, and approvals are separate contracts. They must not piggyback on status snapshots or acquire a generic file-manager/remote-desktop scope.
 
 ## Milestones
 
-### 1. Contract and local store [x]
+### 1. Evidence-backed operational state [done]
 
-Scope: define stable normalized models, adapter protocol, privacy redaction boundary, and a durable local store for derived records plus user metadata.
+Scope: private status projection, safe Codex lifecycle mapping, iPhone agent-work view.
 
-Key files/modules: new `Sources/SleepSwitch/Operator*` models/store, tests, project target configuration.
+Acceptance: unavailable data is `unknown`; no inactivity timer labels work stalled; titles are independently opt-in; no prompt/message/path/log leaves the Mac.
 
-Acceptance: tags/favourites/use events are stored locally by skill fingerprint; re-indexing a skill never changes its source; unavailable adapters are distinguishable from empty results.
+Verify: `RemoteWorkProjectionTests`, protocol tests, macOS and iOS builds.
 
-Verify: focused unit tests for encoding, deduplication, expiry, redaction, and migration.
+### 2. Explicit context intake [in progress]
 
-### 2. Codex adapter [x]
+Scope: phone file-picker intake, bounded transfer/upload, Mac private inbox, visible receipt/error state, and Mac-side reveal/review.
 
-Scope: adapt local Codex task/session records to normalized sessions/events/metrics. Read only the fields needed for identity, lifecycle, duration, and token totals.
+Acceptance: a user intentionally chooses a file and a target Mac; transfer size/expiry are enforced; duplicate/replayed/malformed assets cannot escape the inbox; no content is injected into a workspace/agent.
 
-Acceptance: active and completed tasks are deduplicated across refreshes; `tokens_used` is recorded when present; prompt and tool content is discarded before persistence.
+Key modules: `CompanionProtocol`, `CompanionCloudStore`, `CompanionMacBridge`, `RemoteContextInbox`, `CompanionAppModel`, dashboard and Settings UI.
 
-Verify: fixtures for live, complete, aborted, stale, partial, and malformed session logs.
+Verify: inbox unit tests, bridge transfer test, private schema documentation, iOS simulator build, macOS build.
 
-### 3. Hermes adapter [x]
+### 3. Explicit result handoff [planned]
 
-Scope: discover the documented Hermes local session store and capabilities; layer it over the existing active-lease tracker without assuming its schema is always available.
+Scope: Mac-side artifact offer flow, bounded private asset delivery, iOS Quick Look/save/share, expiry and revocation.
 
-Acceptance: Hermes sessions/metrics are represented when readable; schema or permission problems show a diagnostic availability state and never affect awake-session detection.
+Acceptance: only user-selected Mac outputs are sent; iPhone can preview, save, or share; paths and generic browsing are never exposed.
 
-Verify: database/JSON fixtures and no-file/no-permission paths.
+### 4. Attention and review [planned]
 
-### 4. Mac Operator window [x]
+Scope: evidence-backed attention events, notification routing, completed-work summary, follow-up/approval contract.
 
-Scope: add a native window with Overview, Sessions, Skills, Machine, and Automations. Reuse existing power, thermal, history, and finish-action models rather than creating duplicate control paths.
+Acceptance: active work does not spam; action-required events name a session/project only when titles are opted in; approval execution remains narrow, explicit, and auditable.
 
-Acceptance: each surface has useful loading, empty, stale, and unavailable states; sessions show current state/duration/tokens where supported; Machine and Automations surface existing truth.
+### 5. Preview access [planned]
 
-Verify: macOS build, view-model tests, desktop visual review.
+Scope: opt-in same-network preview registration/discovery and direct secure opening.
 
-### 5. Skills browser and metadata actions [x]
+Acceptance: no hidden relay, correct local-network permission disclosure, clear unavailable/offline feedback, and no arbitrary localhost tunnelling.
 
-Scope: index readable skills, expose filters/tags/favourites/use counts, and provide copy/reveal/export/share actions.
+### 6. Hardening and release [planned]
 
-Acceptance: tags never touch `SKILL.md`; copy/export/share disclose the chosen source only on user action; unavailable folders are explicit; skill use is recorded locally via normalized events.
+Scope: CloudKit migration/recovery, bounded cleanup, App Store review notes, tests/builds, and hands-on Mac/iPhone review.
 
-Verify: store tests, source-integrity tests, UI action tests where possible.
+Acceptance: malformed/expired records fail safely, data is deleted or expires predictably, release metadata matches actual behavior, and no private test data or credentials enter git.
 
-### 6. iPhone summary [x]
+## Risk register
 
-Scope: extend shared CloudKit records and companion UI with compact Operator summaries, current alerts, and finish-action visibility.
-
-Acceptance: iPhone refresh states remain accurate; summaries contain no raw prompt, path, skill-body, or event-detail fields; offline/stale Mac state is unambiguous.
-
-Verify: shared protocol tests, iOS build, simulator visual review.
-
-### 7. Hardening and release [ ]
-
-Scope: privacy audit, migration/recovery paths, performance limits, documentation, full validation, and release readiness.
-
-Acceptance: a corrupted external record cannot crash the menu app; indexing is bounded; no Operator database/cache/fixture data is committed accidentally.
-
-Verify: `./test.sh`, `./test-direct.sh`, macOS build, iOS simulator build, clean-repo secret/data scan.
-
-## Risks and mitigations
-
-1. **Harness formats change.** Version adapters independently, parse defensively, keep raw payloads out of the store, and advertise explicit capabilities/failures.
-2. **Codex task logs can contain sensitive content.** Extract only whitelisted lifecycle/token fields and never persist original JSON lines.
-3. **Hermes database schema is unknown or locked.** Research against its public documentation/source before implementation; fall back to its existing active-lease information only.
-4. **iCloud records grow too large.** Publish deltas and bounded summaries, not a history mirror; retain detailed data on the Mac.
-5. **Skills can come from arbitrary folders.** Require existing scoped access where needed; fingerprint only metadata/content on demand and never write into source directories.
-6. **Operator duplicates existing controls.** Keep all energy/cooling/power execution in their established coordinators; Operator is a read model and presenter.
+| Risk | Mitigation |
+| --- | --- |
+| A status summary implies more certainty than the Mac has | Use explicit source evidence and `unknown`; never infer lifecycle state from silence. |
+| CloudKit becomes an opaque file store | Hard size/lifetime limits, explicit direction-specific records, an inbox/offer model, and no recursive browsing. |
+| Phone content lands in an agent workspace unexpectedly | Receive only into a private Mac inbox; require a later explicit placement or agent-facing action. |
+| iCloud/account/network fails | Preserve local truth, show stale/offline state, and make transfers retryable/expirable rather than pretending delivery. |
+| Preview scope expands into remote desktop | Same-network, opt-in, named preview registration only; no arbitrary port relay. |
+| Notifications become noisy | Notify only on state transitions that need review or action; let users tune attention policies. |
 
 ## Acceptance flow
 
-1. Start a Codex task, open Operator, and see an active session plus truthful token/duration fields when local records provide them.
-2. End the task; confirm the session is finished once, duration stops, and no task content is visible in Operator storage.
-3. Make a Hermes session available; confirm it appears with its declared capabilities or an explicit unavailable diagnostic.
-4. Browse a skill, favourite/tag it, copy or reveal it, then prove the original `SKILL.md` was unchanged.
-5. Pair iPhone, observe a compact live summary and a clearly stale/offline state, then exercise an existing finish action through its normal safety mechanism.
+1. A Codex task runs, reaches a usage limit, stops, or finishes; iPhone shows the supported state with no transcript content.
+2. A user selects a small PDF from iPhone and chooses a paired Mac; the Mac receives it in its private inbox after validating it, without altering a project.
+3. The user explicitly acts on that inbox item, then can see the local destination and handoff outcome.
+4. A user explicitly offers a Mac-generated artifact; iPhone previews it, saves it, or shares it without generic Mac file access.
+5. An important state change surfaces one actionable notification; offline and stale states remain distinguishable.
 
 ## Implementation notes
 
-- 2026-09-04: Added a SQLite-backed local `OperatorStore`. It persists only normalized session counters/lifecycle events and local skill metadata/use events. It contains no raw task JSON, prompt, tool content, skill body, or source-file mutation path.
-- 2026-09-04: Added bounded Codex rollout and Hermes SQLite adapters. Hermes selects only fixed session lifecycle/token columns and never reads its `messages`/FTS tables, titles, paths, or prompt fields.
-- 2026-09-04: Operator now refreshes on the existing utility queue at most once per minute. Its private-CloudKit extension is a grouped harness summary with active counts, token/duration deltas, static alert codes, and the existing queued finish-action identifier.
-- 2026-09-04: Added the native macOS Operator window from the status menu. Overview, Sessions, Skills, Machine, and Automations all read existing truth; none create new power/cooling execution paths.
-- 2026-09-04: Added iPhone Operator summary card and simulator review fixture. The card displays grouped harness state, deltas, safe alert state, and queued finish action; the parent Mac status continues to supply machine state.
+- 2026-09-04: Operator remains the read-only local data layer. This plan builds on it but does not turn Operator into an agent runner.
+- 2026-09-04: Remote work status is opt-in. Titles are separately opt-in. The first projection includes only evidence-backed active, waiting, rate-limited, failed, stopped, finished, and unknown states.
+- 2026-09-04: Context transfer uses an explicit 25 MB, 24-hour private-CloudKit asset handoff. This is a small, deliberate context path—not a bulk artifact transport or file browser.

@@ -167,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var companionDeviceManagerWindowController: CompanionDeviceManagerWindowController?
     private var agentDiagnosticsWindowController: AgentDiagnosticsWindowController?
     private var companionBridgeEnabled = true
+    private let remoteContextInbox = RemoteContextInbox()
     private lazy var companionBridge = CompanionMacBridge(
         statusProvider: { [weak self] in
             self?.companionStatus() ?? CompanionMacStatus.unavailable
@@ -182,6 +183,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     executed: false,
                     completedAt: Date(),
                     message: "Sleep Switch is no longer running."
+                )
+        },
+        contextTransferHandler: { [weak self] transfer, assetURL in
+            self?.remoteContextInbox.receive(transfer, assetURL: assetURL)
+                ?? CompanionContextTransferResult(
+                    transferID: transfer.id,
+                    accepted: false,
+                    deliveredAt: Date(),
+                    message: "Sleep Switch could not access its Remote Inbox."
                 )
         }
     )
@@ -875,6 +885,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         capabilities.canSetCoolingProfile = (coolingStatus?.availableProfiles?.count ?? 0) > 1
 #endif
         capabilities.canSetSafetyPreferences = AppDistribution.supportsLidClosedAwake
+        capabilities.canReceiveContextTransfers = capabilities.supportsCloudKit
         let thermalState: String = switch ProcessInfo.processInfo.thermalState {
         case .nominal:
             "nominal"

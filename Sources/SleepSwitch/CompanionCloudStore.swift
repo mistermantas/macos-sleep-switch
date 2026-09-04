@@ -54,6 +54,7 @@ protocol CompanionCloudStoring: AnyObject {
     func deleteDeviceData(for deviceID: String) async throws
     func send(_ command: CompanionRemoteCommand) async throws
     func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult?
+    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult?
     func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand]
     func finish(
         command: CompanionPendingCommand,
@@ -399,6 +400,40 @@ final class CompanionCloudStore: CompanionCloudStoring {
             accepted: accepted,
             executed: executed,
             completedAt: completedAt,
+            message: message
+        )
+    }
+
+    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
+        let recordID = CKRecord.ID(recordName: transferID.uuidString)
+        let records = try await database.records(for: [recordID])
+        guard let result = records[recordID] else { return nil }
+        let record: CKRecord
+        switch result {
+        case .success(let value):
+            record = value
+        case .failure:
+            noteIssue("CloudKit could not read the remote context result.")
+            return nil
+        }
+
+        guard let state = record["state"] as? String,
+              state != Self.contextStatePending,
+              let completedAt = record["processedAt"] as? Date
+        else {
+            return nil
+        }
+
+        let accepted = (record["accepted"] as? NSNumber)?.boolValue
+            ?? (record["accepted"] as? Bool)
+            ?? (state == Self.contextStateDelivered)
+        let message = (record["resultMessage"] as? String).flatMap {
+            $0.isEmpty ? nil : $0
+        }
+        return CompanionContextTransferResult(
+            transferID: transferID,
+            accepted: accepted,
+            deliveredAt: completedAt,
             message: message
         )
     }

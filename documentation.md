@@ -1,8 +1,8 @@
-# Sleep Switch Operator runbook
+# Sleep Switch runbook
 
 ## What Operator is
 
-Operator is the read-only operations layer inside Sleep Switch. On the Mac it makes local agent sessions, skills, machine state, and existing automations observable in one place. On iPhone it sends only compact private-iCloud summaries and never executes a new control path.
+Operator is the read-only operations layer inside Sleep Switch. On the Mac it makes local agent sessions, skills, machine state, and existing automations observable in one place. The remote-work layer adds a deliberately narrow private bridge: compact state reaches iPhone/iPad, and explicit phone-originated context can arrive in a private Mac inbox. It is not remote desktop, a remote shell, a full IDE, or a generic file manager.
 
 ## Privacy and ownership
 
@@ -11,6 +11,7 @@ Operator is the read-only operations layer inside Sleep Switch. On the Mac it ma
 - A source `SKILL.md` is never changed by Operator. Copy, reveal, export, and share happen only after a user action.
 - iCloud summaries are bounded and private: live counts, safe token/duration deltas, machine state, alert state, and existing finish actions. They exclude raw skills, file paths, prompts, and event details.
 - **Remote Work** is separately opt-in in Mac Settings → Data & iPhone. It adds a bounded per-work-item operational projection. Local IDs are pseudonymized; titles have their own off-by-default switch. Prompts, excerpts, paths, commands, artifacts, and logs never enter this projection.
+- Phone-to-Mac context is an explicit, short-lived, 25 MB maximum transfer. The Mac validates and copies it into a private `Application Support/Sleep Switch/Remote Inbox` directory; it never chooses a project or feeds an agent automatically.
 
 ## Current sources
 
@@ -53,21 +54,20 @@ Remote Work is the first remote-supervision increment. It is an opt-in private-C
 
 ## Remote supervision foundation — 2026-09-04
 
-Sleep Switch’s next layer should stay privacy-first and App Store-safe by treating the Mac as the execution-side observer and the iPhone/iPad as a concise review-and-control surface. The existing private CloudKit bridge remains the right backbone for compact state, but not for moving large artifacts or pretending to be a remote desktop.
+Sleep Switch’s next layer stays privacy-first and App Store-safe by treating the Mac as the execution-side observer and the iPhone/iPad as a concise review-and-control surface. The existing private CloudKit bridge remains the right backbone for compact state and a deliberately small, explicit context handoff—not a remote desktop or a generic file service.
 
 - Safe foundation now:
-  - private CloudKit status and history records, plus optional encrypted private-database fields, for bounded machine/session summaries;
-  - CloudKit subscriptions and push for important state changes;
-  - app groups plus a Share extension for inbound files, links, screenshots, and other phone-originating context;
-  - Quick Look on iOS/iPadOS for reviewing transferred artifacts already made locally available by the Mac;
-  - local-network discovery and direct preview only when the user explicitly enables it and the app declares Bonjour/local-network usage clearly.
+  - private CloudKit status and history records for bounded machine/session summaries;
+  - an explicit, small, 24-hour CloudKit-asset context transfer to the Mac’s private inbox;
+  - an iOS/iPadOS file-picker intake path; a Share extension can reuse the same contract later;
+  - Quick Look, artifact offers, push, preview access, and approvals remain planned rather than implied.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;
-  - do not rely on CloudKit as a large-file transport.
+  - do not rely on CloudKit as bulk storage or generic file transfer; the current asset path is deliberately small, explicit, and short-lived.
 - Recommended phases:
   1. richer remote-work state and attention classification over the current private CloudKit bridge;
-  2. Share extension + app-group inbox on iPhone/iPad, with Mac-side intake into approved project drop zones;
+  2. file-picker/Share-extension intake on iPhone/iPad, with Mac-side receipt into a private inbox and a separate explicit placement action;
   3. artifact handoff as explicit “give me the result” transfers, with Quick Look and share/save actions on iPhone;
   4. opt-in local preview relay using Network framework + Bonjour on the same network;
   5. optional user-controlled external relay only for away-from-home preview access, documented as a separate trust boundary.

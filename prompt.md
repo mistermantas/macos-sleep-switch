@@ -1,26 +1,27 @@
-# Sleep Switch — Operator implementation brief
+# Sleep Switch — remote AI-agent supervision
 
-Act as the product engineer shipping Operator: a calm, private operations layer for people running coding agents on their own Macs. It must turn local harness data into useful, trustworthy sessions, activity, skills, and machine context without becoming a new agent runner or collecting prompts.
+Build the next Sleep Switch layer: a private, trustworthy way to supervise AI-agent work running on a user’s own Mac from iPhone or iPad. The Mac remains the execution-side observer and safety authority; mobile is a concise surface for understanding work, supplying context, reviewing results, and making consequential decisions.
 
-## Goals
+## Product intent
 
-- Establish a read-only Operator data layer with normalized sessions, metric samples, events, harness capabilities, skills, user-owned tags, favourites, and skill-use events.
-- Ship Codex and Hermes adapters first. Codex may read local task `tokens_used`; Hermes may read its documented local session database. Never write to either harness.
-- Add a native Mac Operator window with Overview, Sessions, Skills, Machine, and Automations surfaces.
-- Extend the private iCloud companion with compact summaries only: live session state, token and duration deltas, machine state, alert state, and finish actions.
-- Add a Skills browser that can filter, tag, favourite, count use, copy, reveal, export, and share skills. Tags and use history belong to Operator’s local store only; source `SKILL.md` files remain untouched.
+- Show operational work state, not a second chat transcript or remote desktop.
+- Keep the Mac available only while useful work needs it, and make the reason legible on mobile.
+- Let a user explicitly hand a small piece of context from iPhone/iPad to a Mac without silently placing it into a repository or agent session.
+- Let the Mac explicitly offer artifacts, previews, and requests for attention to the user’s own devices.
+- Keep iCloud data compact, private, purpose-limited, and honest about freshness.
 
-## Hard requirements
+## Hard boundaries
 
-- Read-only adapters. No prompt content, tool payloads, credentials, source-file mutation, or developer-operated server.
-- Be explicit about freshness and adapter availability. Missing permission or an unknown database schema must present as unavailable, never as zero activity.
-- Use stable local identifiers and privacy-preserving CloudKit summaries. iPhone receives no raw skill text, prompts, filesystem paths, or detailed event payloads.
-- Preserve the existing Mac-as-executor power/cooling model. Operator can show or schedule existing finish actions but never bypasses their confirmation/safety rules.
+- Do not build a remote shell, desktop, IDE, generic file browser, or competing agent chat client.
+- Never sync raw prompts, messages, commands, paths, tool payloads, logs, credentials, or source trees by default.
+- Never infer a stalled, blocked, or review-ready state merely from elapsed time. Each lifecycle state must have evidence.
+- Never silently inject phone-originated content into a project or agent. The Mac must receive it into a private inbox and require an explicit next action.
+- Preserve existing awake, lid, cooling, battery, and finish-action safeguards.
 
 ## Deliverable
 
-A tested Operator implementation for macOS and its private iPhone summary surfaces, documented well enough for another engineer to add an adapter without reverse-engineering the app.
+Ship the private supervision foundations incrementally across the macOS and companion apps, with evidence-backed state, an explicit context/artifact handoff flow, actionable attention states, and tested/releasable builds. Keep the implementation modular so previews, approvals, and harness-specific signals can follow without weakening the privacy boundary.
 
 ## Process
 
-Plan before coding. Work milestone by milestone from `plans.md`; validate every layer before exposing it. Start now. Do NOT begin broad UI work until the Operator data contract and adapter boundaries are coherent.
+Plan before broad coding. Work milestone by milestone from `plans.md`, validate every layer, update the runbook as reality changes, and continue without routine approval pauses. Start now.

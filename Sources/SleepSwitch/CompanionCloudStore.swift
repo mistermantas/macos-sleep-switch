@@ -97,6 +97,9 @@ protocol CompanionCloudStoring: AnyObject {
     ) async throws
     func send(_ offer: CompanionArtifactOffer, assetURL: URL) async throws
     func fetchArtifactOffers(for sourceDeviceID: String) async throws -> [CompanionPendingArtifactOffer]
+    /// Resolves an already-offered asset only after the companion user asks to
+    /// receive it. Listing offers must stay metadata-only.
+    func fetchArtifactAsset(for recordName: String) async throws -> URL?
     func consumeLastIssue() -> String?
 }
 
@@ -362,7 +365,6 @@ final class CompanionCloudStore: CompanionCloudStoring {
                 return CompanionPendingArtifactOffer(
                     recordName: record.recordID.recordName,
                     offer: offer,
-                    assetURL: (record["asset"] as? CKAsset)?.fileURL,
                     record: record
                 )
             } catch {
@@ -371,6 +373,19 @@ final class CompanionCloudStore: CompanionCloudStoring {
             }
         }
         .sorted { ($0.offer?.createdAt ?? .distantPast) > ($1.offer?.createdAt ?? .distantPast) }
+    }
+
+    func fetchArtifactAsset(for recordName: String) async throws -> URL? {
+        let recordID = CKRecord.ID(recordName: recordName)
+        let results = try await database.records(for: [recordID])
+        guard case .success(let record)? = results[recordID],
+              record["state"] as? String == Self.artifactStateOffered,
+              let expiresAt = record["expiresAt"] as? Date,
+              expiresAt > Date()
+        else {
+            return nil
+        }
+        return (record["asset"] as? CKAsset)?.fileURL
     }
 
     func fetchPendingContextTransfers(

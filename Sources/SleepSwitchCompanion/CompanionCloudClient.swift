@@ -36,6 +36,10 @@ struct CompanionCloudClient {
         try await store.fetchArtifactOffers(for: sourceDeviceID)
     }
 
+    func fetchArtifactAsset(for recordName: String) async throws -> URL? {
+        try await store.fetchArtifactAsset(for: recordName)
+    }
+
     func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
         try await store.fetchCommandResult(for: commandID)
     }

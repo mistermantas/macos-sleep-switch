@@ -12,6 +12,7 @@ Operator is the read-only operations layer inside Sleep Switch. On the Mac it ma
 - iCloud summaries are bounded and private: live counts, safe token/duration deltas, machine state, alert state, and existing finish actions. They exclude raw skills, file paths, prompts, and event details.
 - **Remote Work** is separately opt-in in Mac Settings → Data & iPhone. It adds a bounded per-work-item operational projection. Local IDs are pseudonymized; titles have their own off-by-default switch. Prompts, excerpts, paths, commands, artifacts, and logs never enter this projection.
 - Phone-to-Mac context is an explicit, short-lived, 25 MB maximum transfer. The Mac validates and copies it into a private `Application Support/Sleep Switch/Remote Inbox` directory; it never chooses a project or feeds an agent automatically.
+- Mac-to-phone results are equally explicit: a Mac owner chooses one file to offer, and the companion shows only its name, size, and age until the user taps **Get**. The downloaded copy lives privately in the companion’s Application Support directory before Quick Look or the system share sheet opens it.
 
 ## Current sources
 
@@ -61,11 +62,15 @@ Sleep Switch’s next layer stays privacy-first and App Store-safe by treating t
   - private CloudKit status and history records for bounded machine/session summaries;
 - an explicit, small, 24-hour CloudKit-asset context transfer to the Mac’s private inbox;
   - an iOS/iPadOS file-picker intake path; a Share extension can reuse the same contract later;
-  - Quick Look, artifact offers, push, preview access, and approvals remain planned rather than implied.
+- Quick Look result handoff is implemented. Push, preview access, attention routing, and approvals remain planned rather than implied.
 
 ### Current context handoff
 
 On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator both show only those completed inbox receipts and offer an explicit **Reveal** action. They never choose a repository, run a command, or contact an agent.
+
+### Current result handoff
+
+On the Mac, **Share Result…** offers one user-selected file through a short-lived private CloudKit asset. The companion’s **Results** card appears only when offers exist. It displays the offered filename, size, and age, and uses an explicit **Get** step before a private local copy becomes available to Quick Look or the system share sheet. There is no directory listing, project path, automatic download, or raw agent output summary.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;

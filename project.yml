@@ -58,6 +58,8 @@ targets:
         buildPhase: sources
       - path: Sources/SleepSwitch/CompanionContextTransferHistory.swift
         buildPhase: sources
+      - path: Sources/SleepSwitch/RemoteArtifactDownloadStore.swift
+        buildPhase: sources
       - path: Sources/Shared/CompanionWidgetShared.swift
       - path: Sources/Shared/ManualSessionActivityAttributes.swift
       - path: Companion/Assets.xcassets

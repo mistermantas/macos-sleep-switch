@@ -102,6 +102,9 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var macs: [CompanionMacStatus] = []
     @Published private(set) var histories: [String: CompanionHistorySnapshot] = [:]
     @Published private(set) var artifactOffersByDeviceID: [String: [CompanionPendingArtifactOffer]] = [:]
+    @Published private(set) var artifactDownloadURLs: [UUID: URL] = [:]
+    @Published private(set) var artifactDownloadIDs: Set<UUID> = []
+    @Published private(set) var artifactDownloadIssuesByRecordName: [String: String] = [:]
     @Published private(set) var message: String?
     @Published private(set) var isLoading = false
     @Published private(set) var commandInFlight = false
@@ -119,6 +122,7 @@ final class CompanionAppModel: ObservableObject {
     let heatNotifications = CompanionHeatNotificationManager()
     private let liveActivity = CompanionLiveActivityController()
     private let contextTransferHistory = CompanionContextTransferHistoryStore()
+    private let artifactDownloadStore = RemoteArtifactDownloadStore()
     private let requesterDeviceID = CompanionDeviceIdentity.load(key: "companionIOSDeviceID")
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
@@ -144,6 +148,7 @@ final class CompanionAppModel: ObservableObject {
             let demo = CompanionScreenshotDemo.make()
             macs = [demo.mac]
             histories = [demo.mac.deviceID: demo.history]
+            artifactOffersByDeviceID = demo.artifactOffersByDeviceID
             message = "Demo data · connected to your private iCloud"
             lastSyncAt = Date()
             lastSuccessfulSyncAt = lastSyncAt
@@ -417,6 +422,51 @@ final class CompanionAppModel: ObservableObject {
         (artifactOffersByDeviceID[mac.deviceID] ?? [])
             .prefix(max(0, limit))
             .map { $0 }
+    }
+
+    func artifactDownloadURL(for pending: CompanionPendingArtifactOffer) -> URL? {
+        guard let offer = pending.offer else { return nil }
+        return artifactDownloadURLs[offer.id] ?? artifactDownloadStore.existingFile(for: offer)
+    }
+
+    func artifactDownloadIssue(for pending: CompanionPendingArtifactOffer) -> String? {
+        artifactDownloadIssuesByRecordName[pending.recordName]
+    }
+
+    func isDownloadingArtifact(_ pending: CompanionPendingArtifactOffer) -> Bool {
+        guard let offer = pending.offer else { return false }
+        return artifactDownloadIDs.contains(offer.id)
+    }
+
+    func downloadArtifact(_ pending: CompanionPendingArtifactOffer) {
+        guard let offer = pending.offer,
+              !offer.isExpired,
+              !artifactDownloadIDs.contains(offer.id),
+              artifactDownloadURL(for: pending) == nil
+        else {
+            return
+        }
+
+        artifactDownloadIDs.insert(offer.id)
+        artifactDownloadIssuesByRecordName.removeValue(forKey: pending.recordName)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.artifactDownloadIDs.remove(offer.id) }
+            do {
+                let assetURL = try await cloud.fetchArtifactAsset(for: pending.recordName)
+                let receivedURL = try artifactDownloadStore.store(assetAt: assetURL, for: offer)
+                artifactDownloadURLs[offer.id] = receivedURL
+                artifactDownloadIssuesByRecordName.removeValue(forKey: pending.recordName)
+                message = "\(offer.filename) is ready on this iPhone."
+            } catch is CancellationError {
+                return
+            } catch {
+                let issue = (error as? LocalizedError)?.errorDescription
+                    ?? "Sleep Switch could not get this result."
+                artifactDownloadIssuesByRecordName[pending.recordName] = issue
+                message = issue
+            }
+        }
     }
 
     var connectionTitle: String {
@@ -980,6 +1030,7 @@ private enum CompanionScreenshotDemo {
     struct Snapshot {
         let mac: CompanionMacStatus
         let history: CompanionHistorySnapshot
+        let artifactOffersByDeviceID: [String: [CompanionPendingArtifactOffer]]
     }
 
     static func make(now: Date = Date()) -> Snapshot {
@@ -1182,7 +1233,28 @@ private enum CompanionScreenshotDemo {
             ],
             storageBytes: 92_160
         )
-        return Snapshot(mac: mac, history: history)
+        let artifactOffer = CompanionArtifactOffer(
+            id: UUID(uuidString: "DEBADC0D-0000-4000-8000-000000000001")!,
+            sourceDeviceID: deviceID,
+            filename: "checkout-review.pdf",
+            typeIdentifier: "com.adobe.pdf",
+            byteCount: 2_482_900,
+            createdAt: now.addingTimeInterval(-95),
+            expiresAt: now.addingTimeInterval(60 * 60)
+        )
+
+        return Snapshot(
+            mac: mac,
+            history: history,
+            artifactOffersByDeviceID: [
+                deviceID: [
+                    CompanionPendingArtifactOffer(
+                        recordName: "demo-artifact-offer",
+                        offer: artifactOffer
+                    )
+                ]
+            ]
+        )
     }
 }
 #endif

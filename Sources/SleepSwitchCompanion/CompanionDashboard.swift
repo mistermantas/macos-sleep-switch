@@ -168,7 +168,8 @@ struct CompanionDashboardRoot: View {
                 if !model.artifactOffers(for: mac).isEmpty {
                     ArtifactOffersCard(
                         mac: mac,
-                        model: model
+                        model: model,
+                        getArtifact: model.downloadArtifact
                     )
                 }
                 NavigationLink {
@@ -826,6 +827,7 @@ private func contextTransferColor(_ state: CompanionContextTransferActivityState
 private struct ArtifactOffersCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
+    let getArtifact: (CompanionPendingArtifactOffer) -> Void
     @State private var previewURL: URL?
 
     private var offers: [CompanionPendingArtifactOffer] {
@@ -835,7 +837,7 @@ private struct ArtifactOffersCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Results", systemImage: "doc.badge.arrow.up")
+                Label("Results", systemImage: "doc.badge.arrow.down")
                     .font(.headline)
                 Spacer()
                 Text(offers.count == 1 ? "1 file" : "\(offers.count) files")
@@ -861,30 +863,47 @@ private struct ArtifactOffersCard: View {
     @ViewBuilder
     private func artifactRow(_ pending: CompanionPendingArtifactOffer) -> some View {
         if let offer = pending.offer {
-            HStack(spacing: 10) {
-                Image(systemName: pending.assetURL == nil ? "doc.badge.exclamationmark" : "doc.fill")
-                    .foregroundStyle(pending.assetURL == nil ? .orange : .blue)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(offer.filename)
-                        .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
-                    Text("\(ByteCountFormatter.string(fromByteCount: offer.byteCount, countStyle: .file)) · \(CompanionTimeText.elapsed(since: offer.createdAt))")
+            let downloadedURL = model.artifactDownloadURL(for: pending)
+            let downloadIssue = model.artifactDownloadIssue(for: pending)
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: downloadedURL == nil ? "doc.badge.arrow.down" : "doc.badge.checkmark")
+                        .foregroundStyle(downloadedURL == nil ? .blue : .green)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(offer.filename)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Text("\(ByteCountFormatter.string(fromByteCount: offer.byteCount, countStyle: .file)) · \(CompanionTimeText.elapsed(since: offer.createdAt))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let assetURL = downloadedURL {
+                        Button("Preview") { previewURL = assetURL }
+                            .buttonStyle(.bordered)
+                        ShareLink(item: assetURL, preview: SharePreview(offer.filename)) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                    } else if model.isDownloadingArtifact(pending) {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button("Get") { getArtifact(pending) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+
+                if let downloadIssue {
+                    Label(downloadIssue, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if downloadedURL == nil {
+                    Text("Fetch on demand")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let assetURL = pending.assetURL {
-                    Button("Preview") { previewURL = assetURL }
-                        .buttonStyle(.bordered)
-                    ShareLink(item: assetURL, preview: SharePreview(offer.filename)) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.bordered)
-                } else {
-                    Text("Unavailable")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.orange)
                 }
             }
         } else {

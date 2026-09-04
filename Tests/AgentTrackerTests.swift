@@ -129,6 +129,11 @@ struct AgentTrackerTests {
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
         RemoteContextInboxTests.run()
+        do {
+            try RemoteArtifactDownloadStoreTests.run()
+        } catch {
+            fatalError("Remote artifact download tests failed: \(error)")
+        }
         await CompanionMacBridgeTests.run()
 
         if ProcessInfo.processInfo.environment["SLEEP_SWITCH_LIVE_CHECK"] == "1" {

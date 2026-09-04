@@ -8,7 +8,7 @@
 - [x] Explicit context-transfer record and Mac-side private inbox foundation are implemented.
 - [ ] iPhone/iPad can intentionally select and send a bounded context item, with clear pending/received/error feedback.
 - [ ] Mac exposes received context safely and offers an explicit user-chosen handoff action—never automatic repository or agent injection.
-- [ ] Artifact offers support explicit Mac-to-mobile delivery, Quick Look, save, and share.
+- [x] Artifact offers support explicit Mac-to-mobile delivery, Quick Look, save, and share.
 - [ ] Attention events and notifications distinguish useful attention from required action.
 - [ ] Session/machine relationship and power consequence are understandable on mobile.
 - [ ] Local-preview discovery and access design is opt-in, network-safe, and separately reviewed.
@@ -43,11 +43,11 @@ Key modules: `CompanionProtocol`, `CompanionCloudStore`, `CompanionMacBridge`, `
 
 Verify: inbox unit tests, bridge transfer test, private schema documentation, iOS simulator build, macOS build.
 
-### 3. Explicit result handoff [planned]
+### 3. Explicit result handoff [done]
 
 Scope: Mac-side artifact offer flow, bounded private asset delivery, iOS Quick Look/save/share, expiry and revocation.
 
-Acceptance: only user-selected Mac outputs are sent; iPhone can preview, save, or share; paths and generic browsing are never exposed.
+Acceptance: only user-selected Mac outputs are offered; the companion lists metadata only, then explicitly gets a bounded asset into private local storage before previewing or sharing it; paths and generic browsing are never exposed.
 
 ### 4. Attention and review [planned]
 
@@ -92,3 +92,4 @@ Acceptance: malformed/expired records fail safely, data is deleted or expires pr
 - 2026-09-04: Remote work status is opt-in. Titles are separately opt-in. The first projection includes only evidence-backed active, waiting, rate-limited, failed, stopped, finished, and unknown states.
 - 2026-09-04: Context transfer uses an explicit 25 MB, 24-hour private-CloudKit asset handoff. This is a small, deliberate context path—not a bulk artifact transport or file browser.
 - 2026-09-04: The Mac now exposes received context as bounded inbox receipts in both its menu window and Operator. Reveal remains a user action; project placement and agent handoff remain deliberately separate.
+- 2026-09-04: Result handoff mirrors intake in the opposite direction. The Mac offers only a user-picked file; the companion sees the name, size, and age first, then explicitly gets a 25 MB/24-hour asset into private local storage before Quick Look or the system share sheet. Offer listing does not retain a CloudKit asset URL.

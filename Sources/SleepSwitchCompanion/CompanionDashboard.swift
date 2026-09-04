@@ -723,6 +723,10 @@ private struct RemoteInboxCard: View {
     @ObservedObject var model: CompanionAppModel
     let sendFile: () -> Void
 
+    private var recentTransfers: [CompanionContextTransferActivity] {
+        model.contextTransfers(for: mac)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -751,6 +755,32 @@ private struct RemoteInboxCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+
+            if !recentTransfers.isEmpty {
+                Divider()
+
+                VStack(spacing: 9) {
+                    ForEach(recentTransfers) { transfer in
+                        HStack(spacing: 10) {
+                            Image(systemName: contextTransferSymbol(transfer.state))
+                                .foregroundStyle(contextTransferColor(transfer.state))
+                                .frame(width: 18)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(transfer.filename)
+                                    .font(.subheadline.weight(.medium))
+                                    .lineLimit(1)
+                                Text("\(ByteCountFormatter.string(fromByteCount: transfer.byteCount, countStyle: .file)) · \(CompanionTimeText.elapsed(since: transfer.updatedAt))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(transfer.state.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(contextTransferColor(transfer.state))
+                        }
+                    }
+                }
+            }
         }
         .cardStyle()
     }
@@ -759,6 +789,30 @@ private struct RemoteInboxCard: View {
         model.lastContextTransferStatus == "Never"
             ? "No recent transfers"
             : model.lastContextTransferStatus
+    }
+}
+
+private func contextTransferSymbol(_ state: CompanionContextTransferActivityState) -> String {
+    switch state {
+    case .sending: "arrow.up.circle"
+    case .waitingForMac: "clock.arrow.circlepath"
+    case .delivered: "checkmark.circle.fill"
+    case .rejected: "xmark.octagon.fill"
+    case .pending: "clock.fill"
+    case .failed: "exclamationmark.triangle.fill"
+    }
+}
+
+private func contextTransferColor(_ state: CompanionContextTransferActivityState) -> Color {
+    switch state {
+    case .sending, .waitingForMac:
+        .blue
+    case .delivered:
+        .green
+    case .pending:
+        .orange
+    case .rejected, .failed:
+        .red
     }
 }
 

@@ -37,6 +37,7 @@
 		657C4AB0D22BAB6F2DD23DF0 /* CoolingHelperMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */; };
 		687ACFDFB3455DD2FF40F6DA /* CodexThreadMirrorAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227EC5C9C7AEA6D82C5B3022 /* CodexThreadMirrorAdapter.swift */; };
 		68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */; };
+		6917142B577724F91E20811F /* CompanionContextTransferHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC67023AEFEFA987749933D0 /* CompanionContextTransferHistory.swift */; };
 		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
 		7410E02D038E6FBB19237A79 /* AgentDiagnosticsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */; };
 		75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */; };
@@ -69,6 +70,7 @@
 		D9707F1CE16F3DB1FAE4087D /* ManualSessionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */; };
 		E34744DF20DC68FE344DFE94 /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AD8AD96FB0F225E8E18AB4 /* HistoryStore.swift */; };
 		F06B3A7E0EB84CFEADEBFB38 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
+		F2D713E5FD927C8AE0A5B679 /* CompanionContextTransferHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC67023AEFEFA987749933D0 /* CompanionContextTransferHistory.swift */; };
 		F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */; };
 		F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */; };
 		F97904FDEE29B8DBFB4C361F /* StatusBarAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */; };
@@ -145,6 +147,7 @@
 		A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1C738315AD299CAE5C654F6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingProfile.swift; sourceTree = "<group>"; };
+		BC67023AEFEFA987749933D0 /* CompanionContextTransferHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionContextTransferHistory.swift; sourceTree = "<group>"; };
 		BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteEnergyController.swift; sourceTree = "<group>"; };
 		BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyTelemetry.swift; sourceTree = "<group>"; };
 		C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWorkProjection.swift; sourceTree = "<group>"; };
@@ -210,6 +213,7 @@
 				227EC5C9C7AEA6D82C5B3022 /* CodexThreadMirrorAdapter.swift */,
 				D44DFE26BF3D329DF6349F46 /* CodexThreadSectionController.swift */,
 				888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */,
+				BC67023AEFEFA987749933D0 /* CompanionContextTransferHistory.swift */,
 				E8986F5AE5B6C474EC0CA791 /* CompanionDeviceManagerWindowController.swift */,
 				6CFEE29F34D59DE73254521F /* CompanionMacBridge.swift */,
 				D4650FE425A0CE21672B5AA5 /* CompanionMachineFingerprint.swift */,
@@ -444,6 +448,7 @@
 				3B09BCF73D5956DCB96B594A /* CompanionApp.swift in Sources */,
 				C5D2973FB812637BC5932FA7 /* CompanionCloudClient.swift in Sources */,
 				C4D5A70D1B843B7A80159E0C /* CompanionCloudStore.swift in Sources */,
+				6917142B577724F91E20811F /* CompanionContextTransferHistory.swift in Sources */,
 				3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */,
 				481D0399CA0321685DFD616F /* CompanionHeatNotifications.swift in Sources */,
 				0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */,
@@ -469,6 +474,7 @@
 				687ACFDFB3455DD2FF40F6DA /* CodexThreadMirrorAdapter.swift in Sources */,
 				25E56F321CD2F28AA460E2E5 /* CodexThreadSectionController.swift in Sources */,
 				476EA4624D25306D3BFB0276 /* CompanionCloudStore.swift in Sources */,
+				F2D713E5FD927C8AE0A5B679 /* CompanionContextTransferHistory.swift in Sources */,
 				928E8E4BF4459EEA3A104297 /* CompanionDeviceManagerWindowController.swift in Sources */,
 				7AABA5734225BD94304A755D /* CompanionMacBridge.swift in Sources */,
 				2B4EC032EA843678A27E5049 /* CompanionMachineFingerprint.swift in Sources */,

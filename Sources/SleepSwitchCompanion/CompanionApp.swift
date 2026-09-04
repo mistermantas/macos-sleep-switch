@@ -111,11 +111,13 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var syncStage = "Not checked"
     @Published private(set) var lastCommandStatus = "Never"
     @Published private(set) var lastContextTransferStatus = "Never"
+    @Published private(set) var contextTransferActivities: [CompanionContextTransferActivity]
     @Published private(set) var commandProgress: CompanionCommandProgress?
 
     private lazy var cloud = CompanionCloudClient()
     let heatNotifications = CompanionHeatNotificationManager()
     private let liveActivity = CompanionLiveActivityController()
+    private let contextTransferHistory = CompanionContextTransferHistoryStore()
     private let requesterDeviceID = CompanionDeviceIdentity.load(key: "companionIOSDeviceID")
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
@@ -128,6 +130,7 @@ final class CompanionAppModel: ObservableObject {
     #endif
 
     init() {
+        contextTransferActivities = contextTransferHistory.items
         NotificationCenter.default.addObserver(
             forName: .sleepSwitchStatusPush,
             object: nil,
@@ -362,6 +365,13 @@ final class CompanionAppModel: ObservableObject {
         histories[mac.deviceID]
     }
 
+    func contextTransfers(for mac: CompanionMacStatus, limit: Int = 3) -> [CompanionContextTransferActivity] {
+        contextTransferActivities
+            .filter { $0.targetDeviceID == mac.deviceID }
+            .prefix(max(0, limit))
+            .map { $0 }
+    }
+
     var connectionTitle: String {
         if lastConnectionError != nil || accountStatus != .available {
             return "iCloud connection unavailable"
@@ -503,6 +513,13 @@ final class CompanionAppModel: ObservableObject {
 
 #if targetEnvironment(simulator)
         lastContextTransferStatus = "Simulated — \(sourceURL.lastPathComponent)"
+        recordContextTransfer(
+            transferID: UUID(),
+            filename: sourceURL.lastPathComponent,
+            byteCount: Int64((try? sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0),
+            mac: mac,
+            state: .delivered
+        )
         message = "Simulated sending \(sourceURL.lastPathComponent) to \(mac.displayName)."
 #else
         do {
@@ -510,6 +527,13 @@ final class CompanionAppModel: ObservableObject {
             commandInFlight = true
             message = nil
             lastContextTransferStatus = "Waiting — \(draft.transfer.filename)"
+            recordContextTransfer(
+                transferID: draft.transfer.id,
+                filename: draft.transfer.filename,
+                byteCount: draft.transfer.byteCount,
+                mac: mac,
+                state: .sending
+            )
             progressDismissTask?.cancel()
             commandProgress = CompanionCommandProgress(
                 commandID: draft.transfer.id,
@@ -529,6 +553,13 @@ final class CompanionAppModel: ObservableObject {
                 do {
                     try await self.cloud.send(draft.transfer, assetURL: draft.stagingFileURL)
                     self.commandProgress = self.commandProgress?.withStage(.waitingForMac)
+                    self.recordContextTransfer(
+                        transferID: draft.transfer.id,
+                        filename: draft.transfer.filename,
+                        byteCount: draft.transfer.byteCount,
+                        mac: mac,
+                        state: .waitingForMac
+                    )
                     self.message = "\(draft.transfer.filename) is queued for \(mac.displayName)."
                     let result = try await self.waitForTransferResult(draft.transfer.id)
                     let completionMessage: String
@@ -540,12 +571,26 @@ final class CompanionAppModel: ObservableObject {
                         self.lastContextTransferStatus = result.accepted
                             ? "Delivered — \(draft.transfer.filename)"
                             : "Rejected — \(draft.transfer.filename)"
+                        self.recordContextTransfer(
+                            transferID: draft.transfer.id,
+                            filename: draft.transfer.filename,
+                            byteCount: draft.transfer.byteCount,
+                            mac: mac,
+                            state: result.accepted ? .delivered : .rejected
+                        )
                         self.commandProgress = self.commandProgress?.withStage(
                             result.accepted ? .completed : .failed
                         )
                     } else {
                         completionMessage = "\(draft.transfer.filename) is still queued. The Mac may be offline."
                         self.lastContextTransferStatus = "Pending — \(draft.transfer.filename)"
+                        self.recordContextTransfer(
+                            transferID: draft.transfer.id,
+                            filename: draft.transfer.filename,
+                            byteCount: draft.transfer.byteCount,
+                            mac: mac,
+                            state: .pending
+                        )
                         self.commandProgress = self.commandProgress?.withStage(.failed)
                     }
                     await self.refreshAndWait()
@@ -556,6 +601,13 @@ final class CompanionAppModel: ObservableObject {
                 } catch {
                     let issue = CompanionConnectionError(error: error)
                     self.lastContextTransferStatus = "Failed — \(draft.transfer.filename)"
+                    self.recordContextTransfer(
+                        transferID: draft.transfer.id,
+                        filename: draft.transfer.filename,
+                        byteCount: draft.transfer.byteCount,
+                        mac: mac,
+                        state: .failed
+                    )
                     self.lastSyncIssue = issue.userMessage
                     self.message = "Could not send \(draft.transfer.filename). \(issue.recovery)"
                     self.commandProgress = self.commandProgress?.withStage(.failed)
@@ -733,6 +785,27 @@ final class CompanionAppModel: ObservableObject {
         let transfer: CompanionContextTransfer
         let stagingDirectoryURL: URL
         let stagingFileURL: URL
+    }
+
+    private func recordContextTransfer(
+        transferID: UUID,
+        filename: String,
+        byteCount: Int64,
+        mac: CompanionMacStatus,
+        state: CompanionContextTransferActivityState,
+        updatedAt: Date = .now
+    ) {
+        contextTransferActivities = contextTransferHistory.record(
+            CompanionContextTransferActivity(
+                transferID: transferID,
+                targetDeviceID: mac.deviceID,
+                targetDisplayName: mac.displayName,
+                filename: filename,
+                byteCount: byteCount,
+                updatedAt: updatedAt,
+                state: state
+            )
+        )
     }
 
     private enum CompanionContextTransferPreparationError: LocalizedError {

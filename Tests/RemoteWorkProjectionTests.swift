@@ -26,7 +26,8 @@ enum RemoteWorkProjectionTests {
             updatedAt: now,
             startedAt: now.addingTimeInterval(-600),
             completedAt: nil,
-            messages: []
+            messages: [],
+            recentActivity: .editingFiles
         )
 
         let privateProjection = RemoteWorkProjection.make(
@@ -46,6 +47,7 @@ enum RemoteWorkProjectionTests {
         expect(privateProjection.items.first?.title == nil, "does not share Codex titles by default")
         expect(privateProjection.items.first?.projectName == nil, "does not share project labels by default")
         expect(privateProjection.items.first?.attentionSummary == nil, "does not invent an attention summary for active work")
+        expect(privateProjection.items.first?.activity == .editingFiles, "shares an app-authored activity category without enabling titles")
         expect(titledProjection.items.first?.title == "Private redesign discussion", "shares a title only after opt-in")
         expect(titledProjection.items.first?.projectName == "Private project", "shares a project label only after separate opt-in")
         expect(

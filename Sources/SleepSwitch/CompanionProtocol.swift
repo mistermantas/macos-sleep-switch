@@ -324,6 +324,29 @@ enum CompanionWorkState: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A compact, app-authored category for the latest observed unit of Codex
+/// work. It deliberately excludes the command, tool, path, query, output, and
+/// message that produced the observation.
+enum CompanionWorkActivity: String, Codable, CaseIterable, Equatable {
+    case reasoning
+    case commandRunning
+    case commandFinished
+    case editingFiles
+    case usingTool
+    case webSearch
+
+    var title: String {
+        switch self {
+        case .reasoning: "Reasoning"
+        case .commandRunning: "Command running"
+        case .commandFinished: "Ran command"
+        case .editingFiles: "Edited files"
+        case .usingTool: "Used tool"
+        case .webSearch: "Web search"
+        }
+    }
+}
+
 struct CompanionWorkStateCount: Codable, Equatable, Identifiable {
     let state: CompanionWorkState
     let count: Int
@@ -347,6 +370,9 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
     let title: String?
     /// A user-approved project label, never a directory or workspace path.
     let projectName: String?
+    /// A fixed activity category for an actively running task. It excludes the
+    /// command, tool payload, path, output, and all transcript content.
+    let activity: CompanionWorkActivity?
     /// A fixed app-authored explanation of an actionable state. It is never a
     /// raw provider error, command, prompt, or transcript excerpt.
     let attentionSummary: String?
@@ -361,6 +387,7 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
         durationSeconds: TimeInterval,
         title: String?,
         projectName: String? = nil,
+        activity: CompanionWorkActivity? = nil,
         attentionSummary: String? = nil
     ) {
         self.id = id
@@ -372,6 +399,7 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
         self.durationSeconds = durationSeconds
         self.title = title
         self.projectName = projectName
+        self.activity = activity
         self.attentionSummary = attentionSummary
     }
 }

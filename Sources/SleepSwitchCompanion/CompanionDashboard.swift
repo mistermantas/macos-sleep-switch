@@ -1203,9 +1203,16 @@ private struct CompanionRemoteWorkRow: View {
                 }
             }
             Spacer()
-            Text(item.state.title)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(stateColor(item.state))
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(item.state.title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(stateColor(item.state))
+                if let activity = item.activity {
+                    Text(activity.title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .padding(.vertical, 3)
     }

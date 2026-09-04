@@ -13,7 +13,8 @@ enum OperatorSessionState: String, Codable, CaseIterable {
 /// A local-only view of the Codex desktop thread catalog. Unlike the compact
 /// Operator session metrics, this intentionally includes titles and message
 /// excerpts so the Mac can act as a useful mirror. It is never persisted by
-/// `OperatorStore` and is never included in the iCloud companion summary.
+/// `OperatorStore`. Only a fixed, non-sensitive activity category may enter
+/// the opt-in iCloud companion summary; titles remain separately opt-in.
 enum CodexThreadStatus: String, Codable, CaseIterable {
     case running
     case finished
@@ -51,6 +52,45 @@ struct CodexThreadMirror: Equatable, Identifiable {
     let startedAt: Date?
     let completedAt: Date?
     let messages: [CodexThreadMessage]
+    let recentActivity: CompanionWorkActivity?
+
+    init(
+        id: String,
+        title: String,
+        preview: String,
+        cwd: String,
+        projectName: String?,
+        sectionID: String?,
+        sectionName: String?,
+        sectionPosition: Int?,
+        isPinned: Bool,
+        isArchived: Bool,
+        status: CodexThreadStatus,
+        latestTurnErrorCode: String?,
+        updatedAt: Date,
+        startedAt: Date?,
+        completedAt: Date?,
+        messages: [CodexThreadMessage],
+        recentActivity: CompanionWorkActivity? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.preview = preview
+        self.cwd = cwd
+        self.projectName = projectName
+        self.sectionID = sectionID
+        self.sectionName = sectionName
+        self.sectionPosition = sectionPosition
+        self.isPinned = isPinned
+        self.isArchived = isArchived
+        self.status = status
+        self.latestTurnErrorCode = latestTurnErrorCode
+        self.updatedAt = updatedAt
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.messages = messages
+        self.recentActivity = recentActivity
+    }
 
     var boardLane: String { sectionName ?? "No section" }
 }

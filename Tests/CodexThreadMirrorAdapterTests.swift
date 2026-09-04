@@ -33,6 +33,7 @@ enum CodexThreadMirrorAdapterTests {
         expect(running?.projectName == "Sleep Switch", "uses Codex project names")
         expect(running?.isPinned == true, "uses Codex pin state")
         expect(running?.status == .running, "maps active turn progress to running")
+        expect(running?.recentActivity == .commandRunning, "reads only a running-command category from active local work")
         expect(running?.latestTurnErrorCode == nil, "keeps empty error state absent")
         expect(running?.messages.map(\.text) == ["Show actual tasks", "I am reading the local catalog."], "keeps recent local messages in display memory")
 
@@ -139,7 +140,8 @@ enum CodexThreadMirrorAdapterTests {
           ('failed', 'x1', 1, 'failed', '{"codexErrorInfo":"usageLimitExceeded","message":"limit"}', 1788200000000, 1788200100000);
         INSERT INTO thread_items VALUES
           ('running', 'r1', 'm1', 1, 1788500000000, '{"type":"userMessage","text":"Show actual tasks"}', 'userMessage'),
-          ('running', 'r1', 'm2', 2, 1788500001000, '{"type":"agentMessage","text":"I am reading the local catalog."}', 'agentMessage');
+          ('running', 'r1', 'm2', 2, 1788500001000, '{"type":"agentMessage","text":"I am reading the local catalog."}', 'agentMessage'),
+          ('running', 'r1', 'work1', 3, 1788500002000, '{"type":"commandExecution","status":"inProgress","command":"private command"}', 'commandExecution');
         """
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
             throw NSError(domain: "CodexMirrorTest", code: 4)

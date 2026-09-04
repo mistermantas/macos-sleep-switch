@@ -1255,7 +1255,8 @@ private enum CompanionScreenshotDemo {
                         updatedAt: now.addingTimeInterval(-10),
                         durationSeconds: 2_760,
                         title: "Refine checkout review",
-                        projectName: "Storefront"
+                        projectName: "Storefront",
+                        activity: .editingFiles
                     ),
                     CompanionWorkItemSummary(
                         id: "demo-codex-waiting",

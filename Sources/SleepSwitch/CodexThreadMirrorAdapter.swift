@@ -58,7 +58,11 @@ struct CodexThreadMirrorAdapter {
             guard !id.isEmpty else { continue }
             let latestTurn = history.flatMap { latestTurn(for: id, database: $0) }
             let completedAt = latestTurn?.completedAt
+            let threadStatus = status(latestTurn?.status, completedAt: completedAt)
             let messages = history.map { recentMessages(for: id, database: $0) } ?? []
+            let recentActivity = threadStatus == .running
+                ? history.flatMap { recentActivity(for: id, database: $0) }
+                : nil
             threads.append(CodexThreadMirror(
                 id: id,
                 title: nonEmpty(text(statement, 1), fallback: nonEmpty(text(statement, 3), fallback: "Untitled chat")),
@@ -70,12 +74,13 @@ struct CodexThreadMirrorAdapter {
                 sectionPosition: optionalInt(statement, 9),
                 isPinned: sqlite3_column_int(statement, 6) != 0,
                 isArchived: sqlite3_column_int(statement, 5) != 0,
-                status: status(latestTurn?.status, completedAt: completedAt),
+                status: threadStatus,
                 latestTurnErrorCode: latestTurn.flatMap(errorCode),
                 updatedAt: date(statement, 11) ?? Date.distantPast,
                 startedAt: latestTurn?.startedAt,
                 completedAt: completedAt,
-                messages: messages
+                messages: messages,
+                recentActivity: recentActivity
             ))
         }
         return CodexMirrorSnapshot(isAvailable: true, threads: threads, issue: nil)
@@ -135,6 +140,59 @@ struct CodexThreadMirrorAdapter {
             optionalDate(statement, 2),
             optionalDate(statement, 3)
         )
+    }
+
+    /// Reads only stable item type/status metadata for an in-progress turn.
+    /// The command/tool body, output, file path, and message content are never
+    /// decoded into this activity category.
+    private func recentActivity(
+        for threadID: String,
+        database: OpaquePointer
+    ) -> CompanionWorkActivity? {
+        let sql = """
+        SELECT item_type, item_json
+        FROM thread_items
+        WHERE thread_id = ?
+          AND item_type IN ('reasoning', 'commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'webSearch')
+        ORDER BY rollout_ordinal DESC LIMIT 8;
+        """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else { return nil }
+        defer { sqlite3_finalize(statement) }
+        bind(statement, 1, threadID)
+
+        var fallback: CompanionWorkActivity?
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let type = text(statement, 0)
+            switch type {
+            case "commandExecution":
+                if commandIsRunning(text(statement, 1)) { return .commandRunning }
+                fallback = fallback ?? .commandFinished
+            case "fileChange":
+                fallback = fallback ?? .editingFiles
+            case "mcpToolCall", "dynamicToolCall":
+                fallback = fallback ?? .usingTool
+            case "webSearch":
+                fallback = fallback ?? .webSearch
+            case "reasoning":
+                fallback = fallback ?? .reasoning
+            default:
+                continue
+            }
+        }
+        return fallback
+    }
+
+    private func commandIsRunning(_ raw: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any],
+              let status = dictionary["status"] as? String else {
+            return false
+        }
+        let normalized = status.lowercased()
+        return normalized.contains("progress") || normalized.contains("running")
     }
 
     private func errorCode(from latestTurn: (

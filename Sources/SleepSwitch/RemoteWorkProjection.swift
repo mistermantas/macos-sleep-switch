@@ -39,6 +39,7 @@ enum RemoteWorkProjection {
                     ),
                     title: includeTitles ? nonEmpty(thread.title) : nil,
                     projectName: includeProjectNames ? nonEmpty(thread.projectName ?? "") : nil,
+                    activity: thread.recentActivity,
                     attentionSummary: thread.remoteWorkNote
                 )
             }

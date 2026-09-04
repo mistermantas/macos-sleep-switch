@@ -17,17 +17,11 @@ struct SleepSwitchCompanionWidgets: WidgetBundle {
     }
 }
 
-private enum SleepSwitchWidgetMetric: String, AppEnum, CaseIterable {
+private enum SleepSwitchWidgetMetric {
     case overview, battery, thermal, fan, agents, power, connection
-
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Widget focus")
-    static var caseDisplayRepresentations: [SleepSwitchWidgetMetric: DisplayRepresentation] = [
-        .overview: "Overview", .battery: "Battery", .thermal: "Temperature", .fan: "Fan speed",
-        .agents: "Agent sessions", .power: "Power", .connection: "Connection"
-    ]
 }
 
-private struct SleepSwitchWidgetMac: AppEntity, Identifiable {
+struct SleepSwitchWidgetMac: AppEntity, Identifiable {
     let id: String
     let name: String
 
@@ -39,7 +33,7 @@ private struct SleepSwitchWidgetMac: AppEntity, Identifiable {
     }
 }
 
-private struct SleepSwitchWidgetMacQuery: EntityQuery {
+struct SleepSwitchWidgetMacQuery: EntityQuery {
     func entities(for identifiers: [SleepSwitchWidgetMac.ID]) async throws -> [SleepSwitchWidgetMac] {
         availableMacs.filter { identifiers.contains($0.id) }
     }
@@ -54,19 +48,20 @@ private struct SleepSwitchWidgetMacQuery: EntityQuery {
     }
 }
 
-private struct SleepSwitchWidgetConfigurationIntent: WidgetConfigurationIntent {
+struct SleepSwitchWidgetConfigurationIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Sleep Switch widget"
-    static var description = IntentDescription("Choose a Mac and decide whether its name appears.")
+    static var description = IntentDescription("Choose the Mac this widget follows and whether its name appears.")
 
-    @Parameter(title: "Mac") var mac: SleepSwitchWidgetMac?
-    @Parameter(title: "Show Mac name", default: true) var showMacName: Bool
-    @Parameter(title: "Show", default: .overview) var metric: SleepSwitchWidgetMetric
+    @Parameter(title: "Computer") var mac: SleepSwitchWidgetMac?
+    @Parameter(title: "Show computer name", default: true) var showMacName: Bool
 }
 
 private struct SleepSwitchStatusEntry: TimelineEntry {
     let date: Date
     let configuration: SleepSwitchWidgetConfigurationIntent
     let snapshot: CompanionWidgetSnapshot?
+    let freshness: CompanionWidgetRefreshPlan.Freshness
+    let freshnessLabel: String
 }
 
 private struct SleepSwitchStatusProvider: AppIntentTimelineProvider {
@@ -74,7 +69,9 @@ private struct SleepSwitchStatusProvider: AppIntentTimelineProvider {
         SleepSwitchStatusEntry(
             date: .now,
             configuration: SleepSwitchWidgetConfigurationIntent(),
-            snapshot: CompanionWidgetSnapshot(macName: "MacBook Pro", batteryPercent: 74, temperatureCelsius: 56, fanRPM: 2_100, isCharging: true, activeSessionCount: 2, thermalState: "nominal", updatedAt: .now)
+            snapshot: CompanionWidgetSnapshot(macName: "MacBook Pro", batteryPercent: 74, temperatureCelsius: 56, fanRPM: 2_100, isCharging: true, activeSessionCount: 2, thermalState: "nominal", updatedAt: .now),
+            freshness: .reporting,
+            freshnessLabel: "Mac reporting"
         )
     }
 
@@ -83,11 +80,28 @@ private struct SleepSwitchStatusProvider: AppIntentTimelineProvider {
     }
 
     func timeline(for configuration: SleepSwitchWidgetConfigurationIntent, in context: Context) async -> Timeline<SleepSwitchStatusEntry> {
-        Timeline(entries: [makeEntry(configuration: configuration)], policy: .after(.now.addingTimeInterval(15 * 60)))
+        let entry = makeEntry(configuration: configuration)
+        return Timeline(
+            entries: [entry],
+            policy: .after(entry.date.addingTimeInterval(CompanionWidgetRefreshPlan.fallbackRefreshInterval))
+        )
     }
 
     private func makeEntry(configuration: SleepSwitchWidgetConfigurationIntent) -> SleepSwitchStatusEntry {
-        SleepSwitchStatusEntry(date: .now, configuration: configuration, snapshot: CompanionWidgetStore.snapshot(for: configuration.mac?.id))
+        let now = Date()
+        let plan = CompanionWidgetRefreshPlan.make(
+            snapshots: CompanionWidgetStore.loadAll(),
+            configuredDeviceID: configuration.mac?.id,
+            defaultDeviceID: CompanionWidgetStore.defaultDeviceID(),
+            now: now
+        )
+        return SleepSwitchStatusEntry(
+            date: now,
+            configuration: configuration,
+            snapshot: plan.snapshot,
+            freshness: plan.freshness,
+            freshnessLabel: plan.freshnessLabel
+        )
     }
 }
 
@@ -133,7 +147,7 @@ private struct SleepSwitchWidgetView: View {
     let entry: SleepSwitchStatusEntry
     let fixedMetric: SleepSwitchWidgetMetric?
 
-    private var metric: SleepSwitchWidgetMetric { fixedMetric ?? entry.configuration.metric }
+    private var metric: SleepSwitchWidgetMetric { fixedMetric ?? .overview }
 
     var body: some View {
         Group {
@@ -159,7 +173,7 @@ private struct SleepSwitchWidgetView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     if entry.configuration.showMacName { Text(snapshot.macName).lineLimit(1) }
                     Text(primaryValue(snapshot)).font(.headline)
-                    Text(secondaryValue(snapshot)).font(.caption).foregroundStyle(.secondary)
+                    Text(entry.freshnessLabel).font(.caption).foregroundStyle(freshnessColor)
                 }
             }
         case .systemMedium, .systemLarge, .systemExtraLarge:
@@ -179,7 +193,7 @@ private struct SleepSwitchWidgetView: View {
             Text(primaryValue(snapshot)).font(.title3.weight(.bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
             Text(secondaryValue(snapshot)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             Spacer(minLength: 0)
-            Text(snapshot.updatedAt, style: .relative).font(.caption2).foregroundStyle(.secondary)
+            Text(entry.freshnessLabel).font(.caption2).foregroundStyle(freshnessColor).lineLimit(1)
         }
     }
 
@@ -191,6 +205,7 @@ private struct SleepSwitchWidgetView: View {
                 }
                 Text(primaryValue(snapshot)).font(.title2.weight(.bold)).monospacedDigit()
                 Text(secondaryValue(snapshot)).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                Text(entry.freshnessLabel).font(.caption2).foregroundStyle(freshnessColor).lineLimit(1)
             }
             Spacer(minLength: 0)
             Image(systemName: metricSymbol)
@@ -201,8 +216,17 @@ private struct SleepSwitchWidgetView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "icloud.slash")
-            Text("Open Sleep Switch to connect a Mac").font(.caption).multilineTextAlignment(.center)
+            Image(systemName: entry.configuration.mac == nil ? "laptopcomputer.and.iphone" : "laptopcomputer.slash")
+            Text(entry.configuration.mac == nil ? "Open Sleep Switch to choose a Mac" : "That Mac is no longer available")
+                .font(.caption)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var freshnessColor: Color {
+        switch entry.freshness {
+        case .reporting, .recent, .noData: .secondary
+        case .stale: .orange
         }
     }
 
@@ -225,7 +249,7 @@ private struct SleepSwitchWidgetView: View {
         case .fan: return snapshot.fanRPM.map { "\(Int($0.rounded())) RPM" } ?? "Fan —"
         case .agents: return "\(snapshot.activeSessionCount) \(snapshot.activeSessionCount == 1 ? "session" : "sessions")"
         case .power: return snapshot.isCharging ? "Charging" : "On battery"
-        case .connection: return snapshot.updatedAt.formatted(.relative(presentation: .named))
+        case .connection: return entry.freshness == .stale ? "Stale" : "Connected"
         }
     }
 
@@ -237,7 +261,7 @@ private struct SleepSwitchWidgetView: View {
         case .fan: return temperatureText(snapshot)
         case .agents: return snapshot.activeSessionCount == 0 ? "No active agents" : "Sleep Switch is keeping watch"
         case .power: return batteryText(snapshot)
-        case .connection: return "Last update from Mac"
+        case .connection: return "Status from your Mac"
         }
     }
 

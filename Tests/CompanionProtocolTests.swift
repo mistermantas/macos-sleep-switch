@@ -6,6 +6,7 @@ enum CompanionProtocolTests {
         testCommandProgressStages()
         testSelectsFreshReplacementForStalePersistedMac()
         testDoesNotSwitchAStaleSelectionToAnotherMac()
+        testWidgetRefreshPlan()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,
@@ -160,6 +161,23 @@ enum CompanionProtocolTests {
                 fans: [CompanionFanStatus(id: 0, actualRPM: 4_500, targetRPM: 4_600, maximumRPM: 6_000)],
                 message: nil,
                 availableProfiles: ["systemControl", "aggressive", "maximum"]
+            ),
+            operatorSummary: CompanionOperatorSummary(
+                updatedAt: now,
+                harnesses: [
+                    CompanionOperatorHarnessSummary(
+                        harnessID: "codex",
+                        harnessName: "Codex",
+                        liveSessionCount: 2,
+                        tokenDelta: 14_200,
+                        durationDeltaSeconds: 1_800
+                    )
+                ],
+                activeSessionCount: 2,
+                tokenDelta: 14_200,
+                durationDeltaSeconds: 1_800,
+                finishAction: CompanionRemoteAction.sleepMacWhenAgentsFinish.rawValue,
+                alertCodes: ["operator.hermes-agent.permission_required"]
             )
         )
         expect(
@@ -178,6 +196,7 @@ enum CompanionProtocolTests {
         legacyObject.removeValue(forKey: "agents")
         legacyObject.removeValue(forKey: "manualSession")
         legacyObject.removeValue(forKey: "cooling")
+        legacyObject.removeValue(forKey: "operatorSummary")
         if var legacyCapabilities = legacyObject["capabilities"] as? [String: Any] {
             legacyCapabilities.removeValue(forKey: "canControlManualSession")
             legacyCapabilities.removeValue(forKey: "canSetCoolingProfile")
@@ -189,6 +208,10 @@ enum CompanionProtocolTests {
             from: legacyData
         )
         expect(legacyStatus.agents == nil, "decodes status written by an older Mac build")
+        expect(
+            legacyStatus.operatorSummary == nil,
+            "decodes status written before Operator summaries existed"
+        )
 
         let projectedStatus = status.applyingKeepAwake(parameters: ["enabled": "false"])
         expect(
@@ -391,6 +414,79 @@ enum CompanionProtocolTests {
         expect(waiting.fraction < completed.fraction, "finishes progress after confirmation")
         expect(completed.isTerminal, "marks completed command progress as terminal")
         expect(completed.statusText == "Done", "uses a concise completed status")
+    }
+
+    private static func testWidgetRefreshPlan() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let studio = CompanionWidgetSnapshot(
+            deviceID: "studio-mac",
+            macName: "Studio Mac",
+            batteryPercent: 84,
+            temperatureCelsius: 48,
+            fanRPM: 1_800,
+            isCharging: true,
+            activeSessionCount: 2,
+            thermalState: "nominal",
+            updatedAt: now.addingTimeInterval(-45)
+        )
+        let travel = CompanionWidgetSnapshot(
+            deviceID: "travel-mac",
+            macName: "Travel Mac",
+            batteryPercent: 52,
+            temperatureCelsius: 61,
+            fanRPM: 2_800,
+            isCharging: false,
+            activeSessionCount: 0,
+            thermalState: "fair",
+            updatedAt: now.addingTimeInterval(-7 * 60)
+        )
+
+        let configured = CompanionWidgetRefreshPlan.make(
+            snapshots: [studio, travel],
+            configuredDeviceID: "travel-mac",
+            defaultDeviceID: "studio-mac",
+            now: now
+        )
+        expect(
+            configured.snapshot?.deviceID == "travel-mac",
+            "uses the Mac chosen in Edit Widget instead of silently falling back"
+        )
+        expect(
+            configured.freshness == .stale,
+            "marks an old Mac reading as stale"
+        )
+        expect(
+            configured.freshnessLabel == "Mac last reported 7m ago",
+            "labels stale widget data as a Mac report, not a phone refresh"
+        )
+
+        let defaulted = CompanionWidgetRefreshPlan.make(
+            snapshots: [travel, studio],
+            configuredDeviceID: nil,
+            defaultDeviceID: "studio-mac",
+            now: now
+        )
+        expect(
+            defaulted.snapshot?.deviceID == "studio-mac",
+            "uses the companion's selected Mac when Edit Widget has no choice"
+        )
+        expect(defaulted.freshness == .reporting, "recognizes a current Mac report")
+        expect(defaulted.freshnessLabel == "Mac reporting", "uses a calm current-data label")
+        expect(
+            defaulted.nextRefreshAt == now.addingTimeInterval(15 * 60),
+            "uses a documented fifteen-minute WidgetKit fallback refresh"
+        )
+
+        let missingChoice = CompanionWidgetRefreshPlan.make(
+            snapshots: [studio],
+            configuredDeviceID: "removed-mac",
+            defaultDeviceID: "studio-mac",
+            now: now
+        )
+        expect(
+            missingChoice.snapshot == nil,
+            "does not replace a removed chosen Mac with a different computer"
+        )
     }
 
     private static func expect(

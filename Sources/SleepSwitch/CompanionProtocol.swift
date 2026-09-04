@@ -251,6 +251,33 @@ struct CompanionAgentStatus: Codable, Equatable, Identifiable {
     let sessionCount: Int
 }
 
+/// Compact, privacy-preserving Operator state for the iPhone. It intentionally
+/// groups by harness; raw sessions, prompts, paths, skill text, and event
+/// payloads stay on the Mac.
+struct CompanionOperatorHarnessSummary: Codable, Equatable, Identifiable {
+    let harnessID: String
+    let harnessName: String
+    let liveSessionCount: Int
+    let tokenDelta: Int
+    let durationDeltaSeconds: TimeInterval
+
+    var id: String { harnessID }
+}
+
+struct CompanionOperatorSummary: Codable, Equatable {
+    let updatedAt: Date
+    let harnesses: [CompanionOperatorHarnessSummary]
+    let activeSessionCount: Int
+    let tokenDelta: Int
+    let durationDeltaSeconds: TimeInterval
+    /// A declared action identifier, not an instruction. Existing command
+    /// confirmation/policy remains the only way to execute it.
+    let finishAction: String?
+    /// Stable, non-sensitive diagnostic codes. Never insert an error string,
+    /// path, prompt, or raw adapter data here.
+    let alertCodes: [String]
+}
+
 struct CompanionManualSessionStatus: Codable, Equatable {
     let startedAt: Date
     let endsAt: Date?
@@ -348,6 +375,9 @@ struct CompanionCoolingStatus: Codable, Equatable {
 
 struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let deviceID: String
+    /// Stable hardware-derived value for safe same-Mac deduplication. It is
+    /// optional so older private CloudKit records remain decodable.
+    let machineFingerprint: String?
     let displayName: String
     let build: String
     let lastSeen: Date
@@ -373,9 +403,11 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let manualSession: CompanionManualSessionStatus?
     let cooling: CompanionCoolingStatus?
     var safety: CompanionSafetySettings? = nil
+    var operatorSummary: CompanionOperatorSummary? = nil
 
     init(
         deviceID: String,
+        machineFingerprint: String? = nil,
         displayName: String,
         build: String,
         lastSeen: Date,
@@ -400,9 +432,11 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         agents: [CompanionAgentStatus]? = nil,
         manualSession: CompanionManualSessionStatus? = nil,
         cooling: CompanionCoolingStatus? = nil,
-        safety: CompanionSafetySettings? = nil
+        safety: CompanionSafetySettings? = nil,
+        operatorSummary: CompanionOperatorSummary? = nil
     ) {
         self.deviceID = deviceID
+        self.machineFingerprint = machineFingerprint
         self.displayName = displayName
         self.build = build
         self.lastSeen = lastSeen
@@ -428,6 +462,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.manualSession = manualSession
         self.cooling = cooling
         self.safety = safety
+        self.operatorSummary = operatorSummary
     }
 
     var id: String { deviceID }
@@ -467,6 +502,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     func refreshingLastSeen(at date: Date = Date()) -> CompanionMacStatus {
         CompanionMacStatus(
             deviceID: deviceID,
+            machineFingerprint: machineFingerprint,
             displayName: displayName,
             build: build,
             lastSeen: date,
@@ -491,7 +527,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             agents: agents,
             manualSession: manualSession,
             cooling: cooling,
-            safety: safety
+            safety: safety,
+            operatorSummary: operatorSummary
         )
     }
 
@@ -528,7 +565,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             agents: agents,
             manualSession: manualSession,
             cooling: cooling,
-            safety: safety
+            safety: safety,
+            operatorSummary: operatorSummary
         )
     }
 }

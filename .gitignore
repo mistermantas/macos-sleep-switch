@@ -2,3 +2,9 @@
 build/
 dist/
 verification/
+
+# Local Operator metadata and harness databases are private device data.
+*.db
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

@@ -20,6 +20,8 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var coolingDescription: String?
     var aggressiveComfortTargetCelsius: Double?
     var aggressiveLaunchBoostDemand: Double?
+    var statusBarAppearance: StatusBarAppearance
+    var showsDockIcon: Bool
 
     static let empty = SleepSwitchPreferencesSnapshot(
         keepDisplayAwake: true, activateOnLaunch: false, defaultDurationSeconds: 0,
@@ -30,7 +32,9 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         lidClosedDiagnostics: "Lid-closed diagnostics are unavailable.",
         agentTriggers: .disabled,
         diagnosticsEnabled: false, codexActiveWindowSeconds: 180, coolingDescription: nil,
-        aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil
+        aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil,
+        statusBarAppearance: StatusBarAppearance(iconStyle: .adaptive, showsColoredStatusDots: true),
+        showsDockIcon: false
     )
 }
 
@@ -48,6 +52,11 @@ enum SleepSwitchPreferencesMutation {
     case codexActiveWindowSeconds(Int)
     case aggressiveComfortTarget(Double)
     case aggressiveLaunchBoost(Double)
+    case statusBarIconStyle(StatusBarIconStyle)
+    case statusBarIconScale(StatusBarIconScale)
+    case showsColoredStatusDots(Bool)
+    case statusBarDotEmphasis(StatusBarDotEmphasis)
+    case showsDockIcon(Bool)
 }
 
 @MainActor
@@ -58,13 +67,15 @@ final class SleepSwitchPreferencesWindowController: NSWindowController {
         snapshotProvider: @escaping () -> SleepSwitchPreferencesSnapshot,
         apply: @escaping (SleepSwitchPreferencesMutation) -> Void,
         showDiagnostics: @escaping () -> Void,
-        showCoolingDetails: @escaping () -> Void
+        showCoolingDetails: @escaping () -> Void,
+        showDeviceManager: @escaping () -> Void
     ) {
         viewModel = PreferencesViewModel(
             snapshotProvider: snapshotProvider,
             apply: apply,
             showDiagnostics: showDiagnostics,
-            showCoolingDetails: showCoolingDetails
+            showCoolingDetails: showCoolingDetails,
+            showDeviceManager: showDeviceManager
         )
         let host = NSHostingController(rootView: PreferencesWindowView(viewModel: viewModel))
         let window = NSWindow(contentViewController: host)
@@ -97,17 +108,20 @@ private final class PreferencesViewModel: ObservableObject {
     private let applyAction: (SleepSwitchPreferencesMutation) -> Void
     private let showDiagnosticsAction: () -> Void
     private let showCoolingDetailsAction: () -> Void
+    private let showDeviceManagerAction: () -> Void
 
     init(
         snapshotProvider: @escaping () -> SleepSwitchPreferencesSnapshot,
         apply: @escaping (SleepSwitchPreferencesMutation) -> Void,
         showDiagnostics: @escaping () -> Void,
-        showCoolingDetails: @escaping () -> Void
+        showCoolingDetails: @escaping () -> Void,
+        showDeviceManager: @escaping () -> Void
     ) {
         self.snapshotProvider = snapshotProvider
         applyAction = apply
         showDiagnosticsAction = showDiagnostics
         showCoolingDetailsAction = showCoolingDetails
+        showDeviceManagerAction = showDeviceManager
         snapshot = snapshotProvider()
     }
 
@@ -120,6 +134,7 @@ private final class PreferencesViewModel: ObservableObject {
 
     func showDiagnostics() { showDiagnosticsAction() }
     func showCoolingDetails() { showCoolingDetailsAction() }
+    func showDeviceManager() { showDeviceManagerAction() }
 
     func copyLidClosedDiagnostics() {
         NSPasteboard.general.clearContents()
@@ -135,6 +150,8 @@ private struct PreferencesWindowView: View {
 
     var body: some View {
         TabView {
+            appearanceTab
+                .tabItem { Label("Appearance", systemImage: "circle.lefthalf.filled") }
             generalTab
                 .tabItem { Label("General", systemImage: "gearshape") }
             automationTab
@@ -146,6 +163,117 @@ private struct PreferencesWindowView: View {
         }
         .padding(20)
         .frame(minWidth: 560, minHeight: 530)
+    }
+
+    private var appearanceTab: some View {
+        Form {
+            Section("Menu bar") {
+                ForEach(StatusBarIconStyle.galleryGroups) { group in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(group.title)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        LazyVGrid(
+                            columns: Array(
+                                repeating: GridItem(.flexible(), spacing: 8),
+                                count: 6
+                            ),
+                            spacing: 8
+                        ) {
+                            ForEach(group.styles, id: \.self) { style in
+                                iconChoice(style)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 3)
+                }
+                Picker("Icon scale", selection: binding(
+                    get: { viewModel.snapshot.statusBarAppearance.iconScale },
+                    set: { .statusBarIconScale($0) }
+                )) {
+                    ForEach(StatusBarIconScale.allCases, id: \.self) { scale in
+                        Text(scale.title).tag(scale)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Status dots") {
+                Toggle("Show colored status dots", isOn: binding(
+                    get: { viewModel.snapshot.statusBarAppearance.showsColoredStatusDots },
+                    set: { .showsColoredStatusDots($0) }
+                ))
+                Picker("Dot emphasis", selection: binding(
+                    get: { viewModel.snapshot.statusBarAppearance.dotEmphasis },
+                    set: { .statusBarDotEmphasis($0) }
+                )) {
+                    ForEach(StatusBarDotEmphasis.allCases, id: \.self) { emphasis in
+                        Text(emphasis.title).tag(emphasis)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(!viewModel.snapshot.statusBarAppearance.showsColoredStatusDots)
+
+                HStack(spacing: 14) {
+                    statusDotPreview("Timed", color: .red)
+                    statusDotPreview("Agents", color: .blue)
+                    statusDotPreview("Manual", color: .yellow)
+                }
+            }
+
+            Section("Dock") {
+                Toggle("Show Sleep Switch in the Dock", isOn: binding(
+                    get: { viewModel.snapshot.showsDockIcon },
+                    set: { .showsDockIcon($0) }
+                ))
+                Text("When off, Sleep Switch stays a menu-bar app, including while Operator and Settings are open.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func iconChoice(_ style: StatusBarIconStyle) -> some View {
+        let isSelected = viewModel.snapshot.statusBarAppearance.iconStyle == style
+        return Button {
+            viewModel.apply(.statusBarIconStyle(style))
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: style.previewSymbolName)
+                    .font(.system(size: 17, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                Text(style.title)
+                    .font(.caption2)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.045),
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(
+                        isSelected ? Color.accentColor.opacity(0.75) : Color.clear,
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Use \(style.title) menu bar icon")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func statusDotPreview(_ title: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            Text(title)
+                .font(.caption)
+        }
     }
 
     private var generalTab: some View {
@@ -332,6 +460,7 @@ private struct PreferencesWindowView: View {
             }
             Section("iPhone companion") {
                 LabeledContent("Connection", value: viewModel.snapshot.companionStatus)
+                Button("Manage Macs…") { viewModel.showDeviceManager() }
                 Text("The iPhone must use the same Apple Account with iCloud enabled. A Mac must be awake, online, and running Sleep Switch to receive remote actions.")
                     .font(.caption)
                     .foregroundStyle(.secondary)

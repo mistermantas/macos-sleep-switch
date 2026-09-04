@@ -304,6 +304,7 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     func publish(status: CompanionMacStatus) async throws { statusPublishCount += 1 }
     func publish(history: CompanionHistorySnapshot) async throws { historyPublishCount += 1 }
     func fetchHistory(for deviceID: String) async throws -> CompanionHistorySnapshot? { nil }
+    func deleteDeviceData(for deviceID: String) async throws {}
     func send(_ command: CompanionRemoteCommand) async throws {}
     func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? { nil }
     func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand] {

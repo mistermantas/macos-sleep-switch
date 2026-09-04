@@ -17,6 +17,13 @@ final class CodexDirectoryAccess {
         }
     }
 
+    /// The user-selected `.codex` root, used only while its read-only
+    /// security-scoped bookmark is active. Operator uses it to mirror the
+    /// local thread catalog; it never uploads raw thread content.
+    var rootDirectory: URL? {
+        lock.withLock { grantedDirectory }
+    }
+
     func restoreAccess() {
 #if APP_STORE
         guard let bookmark = UserDefaults.standard.data(forKey: bookmarkKey) else {

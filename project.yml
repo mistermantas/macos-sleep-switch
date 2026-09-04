@@ -16,6 +16,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources/SleepSwitch
+      - path: Sources/SleepSwitchFanProtocol
       - path: AppStore/Assets.xcassets
         buildPhase: resources
       - path: AppStore/PrivacyInfo.xcprivacy
@@ -64,7 +65,7 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 32
+        CURRENT_PROJECT_VERSION: 33
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
@@ -96,7 +97,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 32
+        CURRENT_PROJECT_VERSION: 33
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionWidgets/Info.plist
         MARKETING_VERSION: 2.4.0

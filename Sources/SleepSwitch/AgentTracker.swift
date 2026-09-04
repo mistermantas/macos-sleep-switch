@@ -99,6 +99,20 @@ struct AgentTracker {
             ]
         ),
         AgentDefinition(
+            id: "hermes-agent",
+            name: "Hermes",
+            executableNames: ["hermes"],
+            commandMarkers: [
+                "/.hermes/",
+                "/hermes_cli/"
+            ],
+            excludedMarkers: [
+                " completion ",
+                ".app/contents/macos/hermes",
+                "hermes_cli.main serve"
+            ]
+        ),
+        AgentDefinition(
             id: "opencode",
             name: "OpenCode",
             executableNames: ["opencode"],
@@ -232,15 +246,18 @@ struct AgentTracker {
 
     let definitions: [AgentDefinition]
     let codexSessionTracker: CodexSessionTracker
+    let hermesSessionTracker: HermesSessionTracker
     let codexSessionsDirectory: (() -> URL?)?
 
     init(
         definitions: [AgentDefinition] = AgentTracker.supportedAgents,
         codexSessionTracker: CodexSessionTracker = CodexSessionTracker(),
+        hermesSessionTracker: HermesSessionTracker = HermesSessionTracker(),
         codexSessionsDirectory: (() -> URL?)? = nil
     ) {
         self.definitions = definitions
         self.codexSessionTracker = codexSessionTracker
+        self.hermesSessionTracker = hermesSessionTracker
         self.codexSessionsDirectory = codexSessionsDirectory
     }
 
@@ -258,13 +275,20 @@ struct AgentTracker {
             } ?? []
 
         guard let sessionsDirectory = codexSessionsDirectory?() else {
-            return normalizedDesktopCodexFallback(processAgents)
+            return applyingHermesSessionActivity(
+                to: normalizedDesktopCodexFallback(processAgents),
+                preserveProcessFallback: false
+            )
         }
 
-        return applyingCodexSessionActivity(
+        let codexResolvedAgents = applyingCodexSessionActivity(
             to: processAgents,
             tracker: CodexSessionTracker(sessionsDirectory: sessionsDirectory),
             preserveProcessFallback: true
+        )
+        return applyingHermesSessionActivity(
+            to: codexResolvedAgents,
+            preserveProcessFallback: false
         )
 #else
         let process = Process()
@@ -288,7 +312,8 @@ struct AgentTracker {
                 in: processList,
                 excludingPID: ProcessInfo.processInfo.processIdentifier
             )
-            return applyingCodexSessionActivity(to: processAgents)
+            let codexResolvedAgents = applyingCodexSessionActivity(to: processAgents)
+            return applyingHermesSessionActivity(to: codexResolvedAgents)
         } catch {
             return nil
         }
@@ -344,6 +369,36 @@ struct AgentTracker {
                         $0.definition.id == definition.id
                     }
                 }
+                guard activeSessionCount > 0 else { return nil }
+                return DetectedAgent(
+                    definition: definition,
+                    processCount: activeSessionCount
+                )
+            }
+
+            return processAgents.first {
+                $0.definition.id == definition.id
+            }
+        }
+    }
+
+    func applyingHermesSessionActivity(
+        to processAgents: [DetectedAgent],
+        tracker: HermesSessionTracker? = nil,
+        preserveProcessFallback: Bool = true
+    ) -> [DetectedAgent] {
+        // Hermes records active leases separately from its long-lived gateway.
+        // When its runtime file is present, it is the source of truth for
+        // whether a Hermes task is actually working. If it is unavailable,
+        // preserve ordinary process detection as a safe fallback.
+        guard let activeSessionCount = (tracker ?? hermesSessionTracker).scan() else {
+            return preserveProcessFallback
+                ? processAgents
+                : processAgents.filter { $0.definition.id != "hermes-agent" }
+        }
+
+        return definitions.compactMap { definition in
+            if definition.id == "hermes-agent" {
                 guard activeSessionCount > 0 else { return nil }
                 return DetectedAgent(
                     definition: definition,

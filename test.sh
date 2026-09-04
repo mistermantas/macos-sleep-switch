@@ -47,6 +47,15 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/AppLinks.swift" \
   "$script_dir/Sources/SleepSwitch/AwakeSession.swift" \
   "$script_dir/Sources/SleepSwitch/CodexSessionTracker.swift" \
+  "$script_dir/Sources/SleepSwitch/OperatorModels.swift" \
+  "$script_dir/Sources/SleepSwitch/CodexOperatorAdapter.swift" \
+  "$script_dir/Sources/SleepSwitch/CodexThreadMirrorAdapter.swift" \
+  "$script_dir/Sources/SleepSwitch/CodexThreadSectionController.swift" \
+  "$script_dir/Sources/SleepSwitch/HermesOperatorAdapter.swift" \
+  "$script_dir/Sources/SleepSwitch/OperatorStore.swift" \
+  "$script_dir/Sources/SleepSwitch/OperatorSkillIndexer.swift" \
+  "$script_dir/Sources/SleepSwitch/OperatorCoordinator.swift" \
+  "$script_dir/Sources/SleepSwitch/HermesSessionTracker.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingProfile.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingPolicy.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingTelemetry.swift" \
@@ -57,11 +66,14 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/Shared/CompanionWidgetShared.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionCloudStore.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionMacBridge.swift" \
   "$script_dir/Sources/SleepSwitch/CoolingCoordinator.swift" \
   "$script_dir/Sources/SleepSwitch/DisplayPowerController.swift" \
   "$script_dir/Sources/SleepSwitch/PowerAssertionController.swift" \
+  "$script_dir/Sources/SleepSwitch/SleepSwitchPreferences.swift" \
+  "$script_dir/Sources/SleepSwitch/StatusBarAppearance.swift" \
   "$script_dir/Sources/SleepSwitch/ProcessInfoThermalMonitor.swift" \
   "$script_dir/Sources/SleepSwitch/FanHelperClient.swift" \
   "$script_dir/Sources/SleepSwitchFanProtocol/FanHelperMessages.swift" \
@@ -77,6 +89,8 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitchFanHelper/SMCConnection.swift" \
   "$script_dir/Sources/SleepSwitchFanHelper/TemperatureMonitor.swift" \
   "$script_dir/Tests/AgentTrackerTests.swift" \
+  "$script_dir/Tests/OperatorAdapterTests.swift" \
+  "$script_dir/Tests/CodexThreadMirrorAdapterTests.swift" \
   "$script_dir/Tests/CoolingPolicyTests.swift" \
   "$script_dir/Tests/FanHardwareFixtureTests.swift" \
   "$script_dir/Tests/FanHardwareControllerTests.swift" \

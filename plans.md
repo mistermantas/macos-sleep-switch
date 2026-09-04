@@ -1,78 +1,104 @@
-# Sleep Switch release plan
+# Operator implementation plan
 
 ## Verification checklist
 
-- [x] Plan and release constraints recorded.
-- [x] Live thermal/fan delivery is correct from Mac status publication through iOS UI.
-- [x] Agent-finish sleep and shutdown are safe, one-shot, and controllable from macOS and iOS.
-- [x] Focused configurable widgets render from the shared snapshot in all supported families.
-- [x] macOS tests and iOS simulator build pass.
-- [ ] New iOS archive is exported and uploaded to App Store Connect.
-- [ ] New macOS archive is exported and uploaded to App Store Connect, or its credential blocker is evidenced.
+- [x] Operator scope, privacy boundary, and source-of-truth rules recorded.
+- [x] Normalized Operator models and durable local metadata store are implemented and migration-safe.
+- [x] Codex adapter reads task/session metadata—including available `tokens_used`—without reading or retaining prompts.
+- [x] Hermes adapter reads its documented local data defensively and exposes availability/capabilities.
+- [x] Adapter fixtures and store tests pass, including denied/malformed data states.
+- [x] Mac Operator window exposes Overview, Sessions, Skills, Machine, and Automations with truthful freshness/empty states.
+- [x] Skills browser supports filtering, local tags, favourites, use counts, copy/reveal/export/share without mutating source skills.
+- [x] Private iCloud summaries reach the iPhone without raw skills, paths, prompts, or detailed events.
+- [ ] macOS/iOS builds and final privacy review pass.
 
-## Approach
+## Architecture
 
-The Mac remains the source of truth. It publishes a compact `CompanionMacStatus` to private CloudKit; iOS refreshes that status, writes a reduced app-group widget snapshot, and sends expiring named commands back to the Mac. Widgets never talk directly to CloudKit and never control the Mac.
+`OperatorAdapter` is a read-only boundary over a harness. It emits normalized records into `OperatorStore`: `OperatorSession`, `OperatorMetric`, `OperatorEvent`, `HarnessCapability`, `OperatorSkill`, local `SkillTag`, and `SkillUseEvent`. The store derives lightweight totals and expiry-aware snapshots.
+
+The Mac window reads the store directly. The companion receives a separate `CompanionOperatorSummary` produced from the store and sent through the existing private CloudKit channel. That summary contains only session counts, harness labels, token/duration deltas, machine state, alert state, and existing finish-action state.
 
 ## Milestones
 
-### 1. Thermal freshness [x]
+### 1. Contract and local store [x]
 
-Scope: trace the status heartbeat, CloudKit subscription/refresh, and iOS thermal card. Ensure fan RPM and thermal timestamps update with status changes rather than only on an unrelated refresh.
+Scope: define stable normalized models, adapter protocol, privacy redaction boundary, and a durable local store for derived records plus user metadata.
 
-Key files: `CompanionMacBridge.swift`, `CompanionCloudStore.swift`, `CompanionApp.swift`, `CompanionDashboard.swift`.
+Key files/modules: new `Sources/SleepSwitch/Operator*` models/store, tests, project target configuration.
 
-Acceptance: an RPM or temperature change reaches the iOS thermal surface during normal status publication; stale status remains clearly labelled.
+Acceptance: tags/favourites/use events are stored locally by skill fingerprint; re-indexing a skill never changes its source; unavailable adapters are distinguishable from empty results.
 
-Verify: protocol/unit tests, iOS simulator build, targeted source review.
+Verify: focused unit tests for encoding, deduplication, expiry, redaction, and migration.
 
-### 2. Agent-finish power actions [x]
+### 2. Codex adapter [x]
 
-Scope: introduce explicit one-shot sleep-after-agents and shutdown-after-agents modes, schedule only on a genuine nonzero-to-zero transition, and expose safe iOS controls with destructive confirmation for shutdown.
+Scope: adapt local Codex task/session records to normalized sessions/events/metrics. Read only the fields needed for identity, lifecycle, duration, and token totals.
 
-Key files: `CompanionProtocol.swift`, `main.swift`, awake/session coordination, companion dashboard.
+Acceptance: active and completed tasks are deduplicated across refreshes; `tokens_used` is recorded when present; prompt and tool content is discarded before persistence.
 
-Acceptance: the selected action remains visible and cancellable while armed; shutdown cannot happen from a stale remote state or a false transition. It intentionally does not survive an app relaunch.
+Verify: fixtures for live, complete, aborted, stale, partial, and malformed session logs.
 
-Verify: protocol tests covering command validation and agent transitions; macOS/iOS builds.
+### 3. Hermes adapter [x]
 
-### 3. Widget family [x]
+Scope: discover the documented Hermes local session store and capabilities; layer it over the existing active-lease tracker without assuming its schema is always available.
 
-Scope: add configurable overview, battery, thermal, agent, and focused status widgets. Provide per-widget Mac selection, title visibility, and metric-focused configurations for Home Screen and Lock Screen families.
+Acceptance: Hermes sessions/metrics are represented when readable; schema or permission problems show a diagnostic availability state and never affect awake-session detection.
 
-Key files: `CompanionWidgetShared.swift`, `SleepSwitchCompanionWidgets.swift`, widget/app intents, companion snapshot publisher.
+Verify: database/JSON fixtures and no-file/no-permission paths.
 
-Acceptance: at least five useful widget types beyond the current overview, all sourced from the app-group snapshot and graceful when a chosen Mac is unavailable.
+### 4. Mac Operator window [x]
 
-Verify: widget target build and generated widget configuration review.
+Scope: add a native window with Overview, Sessions, Skills, Machine, and Automations. Reuse existing power, thermal, history, and finish-action models rather than creating duplicate control paths.
 
-### 4. Release [ ]
+Acceptance: each surface has useful loading, empty, stale, and unavailable states; sessions show current state/duration/tokens where supported; Machine and Automations surface existing truth.
 
-Scope: update build numbers, archive/export, upload iOS with the supplied API key, then archive/export/upload macOS if App Store distribution identities are available.
+Verify: macOS build, view-model tests, desktop visual review.
 
-Acceptance: App Store Connect reports the new iOS build valid; Mac upload is complete or blocked only by an evidenced Apple certificate requirement.
+### 5. Skills browser and metadata actions [x]
 
-Verify: `./test.sh`, `./test-direct.sh`, iOS simulator build, signed archive inspection, App Store Connect build query.
+Scope: index readable skills, expose filters/tags/favourites/use counts, and provide copy/reveal/export/share actions.
+
+Acceptance: tags never touch `SKILL.md`; copy/export/share disclose the chosen source only on user action; unavailable folders are explicit; skill use is recorded locally via normalized events.
+
+Verify: store tests, source-integrity tests, UI action tests where possible.
+
+### 6. iPhone summary [x]
+
+Scope: extend shared CloudKit records and companion UI with compact Operator summaries, current alerts, and finish-action visibility.
+
+Acceptance: iPhone refresh states remain accurate; summaries contain no raw prompt, path, skill-body, or event-detail fields; offline/stale Mac state is unambiguous.
+
+Verify: shared protocol tests, iOS build, simulator visual review.
+
+### 7. Hardening and release [ ]
+
+Scope: privacy audit, migration/recovery paths, performance limits, documentation, full validation, and release readiness.
+
+Acceptance: a corrupted external record cannot crash the menu app; indexing is bounded; no Operator database/cache/fixture data is committed accidentally.
+
+Verify: `./test.sh`, `./test-direct.sh`, macOS build, iOS simulator build, clean-repo secret/data scan.
 
 ## Risks and mitigations
 
-1. CloudKit pushes are not a reliable sub-second stream. Mitigation: retain periodic app refresh and make the Mac publish whenever the material status fingerprint changes; widgets show timestamped cached values.
-2. Agent detection can flap. Mitigation: require an actual active-to-empty transition, wait 15 seconds, and cancel the action if a new agent appears during that safety window.
-3. A shutdown is destructive. Mitigation: explicit queued state, clear macOS/iOS labels, remote confirmation, and cancellation whenever a new agent appears before execution.
-4. macOS App Store export currently lacks Mac App Distribution and Mac Installer Distribution certificates. Mitigation: do not substitute a development-signed build; record the exact Apple credential blocker.
+1. **Harness formats change.** Version adapters independently, parse defensively, keep raw payloads out of the store, and advertise explicit capabilities/failures.
+2. **Codex task logs can contain sensitive content.** Extract only whitelisted lifecycle/token fields and never persist original JSON lines.
+3. **Hermes database schema is unknown or locked.** Research against its public documentation/source before implementation; fall back to its existing active-lease information only.
+4. **iCloud records grow too large.** Publish deltas and bounded summaries, not a history mirror; retain detailed data on the Mac.
+5. **Skills can come from arbitrary folders.** Require existing scoped access where needed; fingerprint only metadata/content on demand and never write into source directories.
+6. **Operator duplicates existing controls.** Keep all energy/cooling/power execution in their established coordinators; Operator is a read model and presenter.
 
 ## Acceptance flow
 
-1. Open a paired Mac in iOS and change cooling; see a fresh thermal timestamp and RPM values.
-2. Add a Battery and a Thermal widget, select a Mac for each, hide the title on one, and confirm the selected values remain distinct.
-3. Queue sleep-after-agents, then shutdown-after-agents; confirm shutdown requires an explicit destructive confirmation and only runs after agents finish.
-4. Build, export, and verify the iOS artifact in App Store Connect.
+1. Start a Codex task, open Operator, and see an active session plus truthful token/duration fields when local records provide them.
+2. End the task; confirm the session is finished once, duration stops, and no task content is visible in Operator storage.
+3. Make a Hermes session available; confirm it appears with its declared capabilities or an explicit unavailable diagnostic.
+4. Browse a skill, favourite/tag it, copy or reveal it, then prove the original `SKILL.md` was unchanged.
+5. Pair iPhone, observe a compact live summary and a clearly stale/offline state, then exercise an existing finish action through its normal safety mechanism.
 
-## Decision log
+## Implementation notes
 
-- 2026-09-02: Treat widget controls as display configuration only. Remote Mac commands stay in the app so a stale widget cannot cause a power action.
-- 2026-09-02: Release target is iOS build 32 or higher because builds 30 and 31 are already reserved/used in App Store Connect.
-- 2026-09-02: The foreground companion now refetches private CloudKit status every 15 seconds while active, supplementing the silent-push subscription. Cooling displays the status freshness so cached values are not mistaken for live readings.
-- 2026-09-02: Finish actions are intentionally one-shot and in-memory. A queued shutdown is cleared on app relaunch or whenever a fresh agent appears in its 15-second safety window.
-- 2026-09-02: Widget data carries every paired Mac in the shared app-group store. Seven widget surfaces (overview, battery, thermal, fan, agents, power, and connection) share a Mac picker and an optional title.
-- 2026-09-02: iOS 2.4.0 (32) archives successfully but App Store export is blocked at `Failed to Use Accounts`; the local keychain contains only Apple Development signing identities. The supplied API key authenticates `altool`, but is not accepted by Xcode provisioning or direct certificate API calls.
+- 2026-09-04: Added a SQLite-backed local `OperatorStore`. It persists only normalized session counters/lifecycle events and local skill metadata/use events. It contains no raw task JSON, prompt, tool content, skill body, or source-file mutation path.
+- 2026-09-04: Added bounded Codex rollout and Hermes SQLite adapters. Hermes selects only fixed session lifecycle/token columns and never reads its `messages`/FTS tables, titles, paths, or prompt fields.
+- 2026-09-04: Operator now refreshes on the existing utility queue at most once per minute. Its private-CloudKit extension is a grouped harness summary with active counts, token/duration deltas, static alert codes, and the existing queued finish-action identifier.
+- 2026-09-04: Added the native macOS Operator window from the status menu. Overview, Sessions, Skills, Machine, and Automations all read existing truth; none create new power/cooling execution paths.
+- 2026-09-04: Added iPhone Operator summary card and simulator review fixture. The card displays grouped harness state, deltas, safe alert state, and queued finish action; the parent Mac status continues to supply machine state.

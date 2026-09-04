@@ -29,6 +29,7 @@ protocol CompanionCloudStoring: AnyObject {
     func publish(status: CompanionMacStatus) async throws
     func publish(history: CompanionHistorySnapshot) async throws
     func fetchHistory(for deviceID: String) async throws -> CompanionHistorySnapshot?
+    func deleteDeviceData(for deviceID: String) async throws
     func send(_ command: CompanionRemoteCommand) async throws
     func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult?
     func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand]
@@ -204,6 +205,26 @@ final class CompanionCloudStore: CompanionCloudStoring {
         } catch {
             noteIssue("An InsightsHistory payload could not be decoded.")
             return nil
+        }
+    }
+
+    /// Removes the status, bounded history, and any queued commands for a
+    /// decommissioned Mac from this user's private CloudKit database.
+    func deleteDeviceData(for deviceID: String) async throws {
+        let statusID = CKRecord.ID(recordName: Self.statusRecordPrefix + deviceID)
+        let historyID = CKRecord.ID(recordName: Self.historyRecordPrefix + deviceID)
+        var ids = [statusID, historyID]
+        let commands = try await fetchRecords(
+            type: Self.commandRecordType,
+            predicate: NSPredicate(format: "targetDeviceID == %@", deviceID)
+        )
+        ids.append(contentsOf: commands.map(\.recordID))
+        for id in ids {
+            do {
+                _ = try await database.deleteRecord(withID: id)
+            } catch let error as CKError where error.code == .unknownItem {
+                continue
+            }
         }
     }
 

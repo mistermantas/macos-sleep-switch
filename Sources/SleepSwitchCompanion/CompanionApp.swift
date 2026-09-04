@@ -31,9 +31,19 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotific
         return true
     }
 
-    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
-        NotificationCenter.default.post(name: .sleepSwitchStatusPush, object: nil)
-        return .newData
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        if application.applicationState == .active {
+            NotificationCenter.default.post(name: .sleepSwitchStatusPush, object: nil)
+            completionHandler(.newData)
+            return
+        }
+        Task {
+            completionHandler(await CompanionWidgetBackgroundRefresher.refresh())
+        }
     }
 
     func userNotificationCenter(
@@ -42,6 +52,47 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotific
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+}
+
+private enum CompanionWidgetPublisher {
+    static func publish(_ macs: [CompanionMacStatus]) {
+        let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
+        let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
+        let snapshots = macs.map { mac in
+            CompanionWidgetSnapshot(
+                deviceID: mac.deviceID,
+                macName: mac.displayName,
+                batteryPercent: mac.batteryPercent,
+                temperatureCelsius: mac.cooling?.temperatureCelsius,
+                fanRPM: mac.cooling?.fans.map(\.actualRPM).max(),
+                isCharging: mac.isCharging,
+                activeSessionCount: mac.activeSessionCount,
+                thermalState: mac.thermalState,
+                updatedAt: mac.lastSeen
+            )
+        }
+        CompanionWidgetStore.save(macs: snapshots, defaultDeviceID: selected?.deviceID)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+}
+
+/// Receives a silent CloudKit status notification while the iPhone app is not
+/// open. The old path only notified an in-memory dashboard model, which meant
+/// a cold or backgrounded app left every widget showing its old timeline.
+private enum CompanionWidgetBackgroundRefresher {
+    static func refresh() async -> UIBackgroundFetchResult {
+        do {
+            let cloud = CompanionCloudClient()
+            guard try await cloud.accountStatus() == .available else { return .failed }
+            let macs = try await cloud.fetchMacs()
+            CompanionWidgetPublisher.publish(macs)
+            return macs.isEmpty ? .noData : .newData
+        } catch is CancellationError {
+            return .noData
+        } catch {
+            return .failed
+        }
     }
 }
 
@@ -222,25 +273,16 @@ final class CompanionAppModel: ObservableObject {
     }
 
     private func publishCompanionSurfaces(for macs: [CompanionMacStatus]) {
+        CompanionWidgetPublisher.publish(macs)
         let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
         let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
-        let widgetMacs = macs.map { mac in
-            CompanionWidgetSnapshot(
-                deviceID: mac.deviceID,
-                macName: mac.displayName,
-                batteryPercent: mac.batteryPercent,
-                temperatureCelsius: mac.cooling?.temperatureCelsius,
-                fanRPM: mac.cooling?.fans.map(\.actualRPM).max(),
-                isCharging: mac.isCharging,
-                activeSessionCount: mac.activeSessionCount,
-                thermalState: mac.thermalState,
-                updatedAt: mac.lastSeen
-            )
-        }
-        CompanionWidgetStore.save(macs: widgetMacs, defaultDeviceID: selected?.deviceID)
-        WidgetCenter.shared.reloadAllTimelines()
         liveActivity.synchronize(with: selected)
         heatNotifications.evaluate(macs)
+    }
+
+    func selectDashboardMac(_ deviceID: String) {
+        UserDefaults.standard.set(deviceID, forKey: "selectedMacDeviceID")
+        publishCompanionSurfaces(for: macs)
     }
 
     func enableHeatNotifications() {
@@ -691,6 +733,30 @@ private enum CompanionScreenshotDemo {
                     CompanionTemperatureSensor(key: "Tm0p", group: .auxiliary, celsius: 43.2),
                     CompanionTemperatureSensor(key: "Tm1p", group: .auxiliary, celsius: 44.1)
                 ]
+            ),
+            operatorSummary: CompanionOperatorSummary(
+                updatedAt: now,
+                harnesses: [
+                    CompanionOperatorHarnessSummary(
+                        harnessID: "codex",
+                        harnessName: "Codex",
+                        liveSessionCount: 3,
+                        tokenDelta: 18_400,
+                        durationDeltaSeconds: 9_120
+                    ),
+                    CompanionOperatorHarnessSummary(
+                        harnessID: "hermes-agent",
+                        harnessName: "Hermes",
+                        liveSessionCount: 1,
+                        tokenDelta: 6_200,
+                        durationDeltaSeconds: 2_700
+                    )
+                ],
+                activeSessionCount: 4,
+                tokenDelta: 24_600,
+                durationDeltaSeconds: 11_820,
+                finishAction: CompanionRemoteAction.sleepMacWhenAgentsFinish.rawValue,
+                alertCodes: []
             )
         )
 

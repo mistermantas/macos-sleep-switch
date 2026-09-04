@@ -1,41 +1,48 @@
-# Sleep Switch operator runbook
+# Sleep Switch Operator runbook
 
-## What it is
+## What Operator is
 
-Sleep Switch is a macOS menu-bar app with a private-iCloud iPhone companion. The Mac observes local agent sessions, power and cooling telemetry, and executes all power/awake actions. The iPhone shows a compact status, sends expiring remote commands, and publishes cached app-group data for widgets.
+Operator is the read-only operations layer inside Sleep Switch. On the Mac it makes local agent sessions, skills, machine state, and existing automations observable in one place. On iPhone it sends only compact private-iCloud summaries and never executes a new control path.
 
-## Local setup and verification
+## Privacy and ownership
+
+- Harness adapters read whitelisted local metadata only. They do not retain prompts, tool payloads, credentials, or original task logs.
+- The Operator database is local. It owns skill tags, favourites, and use counts.
+- A source `SKILL.md` is never changed by Operator. Copy, reveal, export, and share happen only after a user action.
+- iCloud summaries are bounded and private: live counts, safe token/duration deltas, machine state, alert state, and existing finish actions. They exclude raw skills, file paths, prompts, and event details.
+
+## Current sources
+
+- `Sources/SleepSwitch/CodexSessionTracker.swift` observes task activity from local Codex session logs.
+- `Sources/SleepSwitch/HermesSessionTracker.swift` observes Hermes active leases.
+- `Sources/SleepSwitch/AgentTracker.swift` remains responsible for awake-session detection; Operator adapters must not change that safety behavior.
+- `Sources/SleepSwitch/CompanionProtocol.swift` and `CompanionMacBridge.swift` provide the existing private-CloudKit path.
+- `Sources/SleepSwitch/OperatorModels.swift`, `OperatorStore.swift`, and `OperatorCoordinator.swift` hold the normalized local records, SQLite metadata database, and bounded refresh path.
+- `Sources/SleepSwitch/CodexOperatorAdapter.swift` and `HermesOperatorAdapter.swift` whitelist lifecycle/token fields. Hermes never reads its message or FTS tables.
+- `Sources/SleepSwitch/OperatorSkillIndexer.swift` indexes `SKILL.md` files without changing them.
+
+## Local verification
 
 Run from the repository root:
 
 ```zsh
 ./test.sh
 ./test-direct.sh
-xcodebuild -project SleepSwitch.xcodeproj -scheme SleepSwitchCompanion -configuration Debug -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \\
+  xcodebuild -project SleepSwitch.xcodeproj -scheme SleepSwitch -configuration Debug build CODE_SIGNING_ALLOWED=NO
+DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer \\
+  xcodebuild -project SleepSwitch.xcodeproj -scheme SleepSwitchCompanion -configuration Debug -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO
 ```
 
-Generate the Xcode project after editing `project.yml`:
+After changing `project.yml`, regenerate the project with `xcodegen generate`.
 
-```zsh
-xcodegen generate
-```
+## Operator demo recipe
 
-## Demo recipes
+1. Open Operator from Sleep Switch and start a Codex task.
+2. Confirm the Overview and Sessions surfaces show a fresh session state and only supported metrics.
+3. Browse skills, apply a local tag/favourite, then inspect the original source to confirm it remains untouched.
+4. On a paired iPhone, verify the compact summary describes current/stale/offline state honestly and does not expose task content.
 
-- **Thermals:** while the companion is foregrounded, it refetches Mac status every 15 seconds. Open a paired Mac, select a cooling profile, and verify the temperature/fan timestamp advances as the Mac publishes status.
-- **Widgets:** add any of the overview, battery, thermal, fan, agents, power, or connection widgets. Choose a paired Mac, hide its name if desired, then check that the focused value comes from the cached app-group snapshot.
-- **Agent finish action:** queue sleep or shutdown on the Mac or iPhone while agents are active. The one-shot request waits for the final session to end, holds for 15 seconds, and cancels if an agent starts again in that window.
+## Current implementation status
 
-## Important architecture
-
-- `Sources/SleepSwitch/CompanionMacBridge.swift`: Mac status/history publication and command polling.
-- `Sources/SleepSwitch/CompanionProtocol.swift`: shared remote command and status model.
-- `Sources/SleepSwitchCompanion/`: iPhone dashboard, CloudKit client, notifications, Live Activity.
-- `Sources/SleepSwitchCompanionWidgets/`: WidgetKit extensions.
-- `Sources/Shared/CompanionWidgetShared.swift`: app-group snapshot shared by the iPhone app and widgets.
-
-## Release notes
-
-iOS build 30 is valid in App Store Connect. Builds 31 and 32 are reserved for follow-up releases; build 32 is the thermal-refresh, finish-actions, and widget-family archive. New uploads authenticate with the supplied App Store Connect API key; never place that `.p8` file in the repository.
-
-The local keychain currently has Apple Development identities only. An iOS 2.4.0 (32) archive can be produced, but App Store export stops at `Failed to Use Accounts` because no iOS Distribution identity is available. macOS App Store export separately requires Mac App Distribution and Mac Installer Distribution identities. Do not use an Apple Development-signed archive as a substitute.
+The local data layer, native macOS Operator window, and grouped iPhone summary are implemented. The macOS status menu opens Operator. Its Skills surface filters by text/source/tag/favourite and performs copy, reveal, export, or share only on explicit user action. The app publishes only harness-level session counts, token/duration deltas, static availability codes, and queued finish-action identifiers—not raw sessions, skills, paths, prompts, or events.

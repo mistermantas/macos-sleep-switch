@@ -75,6 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(showInsights),
         keyEquivalent: ""
     )
+    private let operatorItem = NSMenuItem(
+        title: "Operator…",
+        action: #selector(showOperator),
+        keyEquivalent: ""
+    )
     private let settingsMenu = NSMenu(title: "Settings")
     private let supportMenu = NSMenu(title: AppLinks.menuTitle)
 #if APP_STORE
@@ -131,12 +136,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return AgentTracker(codexSessionTracker: tracker)
 #endif
     }()
+    private lazy var operatorCoordinator: OperatorCoordinator = {
+#if APP_STORE
+        let access = codexDirectoryAccess
+        return OperatorCoordinator(
+            codexSessionsDirectory: { access.sessionsDirectory },
+            codexRootDirectory: { access.rootDirectory },
+            skillSources: {
+                guard let sessions = access.sessionsDirectory else { return [] }
+                return [
+                    .init(
+                        url: sessions.deletingLastPathComponent()
+                            .appendingPathComponent("skills", isDirectory: true),
+                        label: "Codex"
+                    )
+                ]
+            }
+        )
+#else
+        return OperatorCoordinator()
+#endif
+    }()
     private let powerAssertions = PowerAssertionController()
     private let lidClosedSleep = LidClosedSleepController()
     private let displayPower = DisplayPowerController()
     private let insightsRecorder = InsightsRecorder()
     private var insightsWindowController: InsightsWindowController?
+    private var operatorWindowController: OperatorWindowController?
     private var preferencesWindowController: SleepSwitchPreferencesWindowController?
+    private var companionDeviceManagerWindowController: CompanionDeviceManagerWindowController?
     private var agentDiagnosticsWindowController: AgentDiagnosticsWindowController?
     private var companionBridgeEnabled = true
     private lazy var companionBridge = CompanionMacBridge(
@@ -177,6 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let activateOnLaunchKey = "activateOnLaunch"
     private let defaultDurationSecondsKey = "defaultDurationSeconds"
     private let automaticAgentAwakeKey = "automaticAgentAwake"
+    private let showsDockIconKey = "showsDockIcon"
     private let awakeModeKey = "awakeMode"
     private let triggerRunner = AgentTriggerRunner()
     private var manualAwakeSession: AwakeSession?
@@ -191,12 +220,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var agentIdleGraceDeadline: Date?
     private var agentIdleGraceTimer: Timer?
     private var agentScanInFlight = false
+    private var operatorRefreshInFlight = false
+    private var lastOperatorRefreshAt: Date?
+    private var lastOperatorRefreshResult: OperatorRefreshResult?
     private var lastAgentScanAt: Date?
     private var lastCodexSessionCount: Int?
     private var refreshTimer: Timer?
     private var expiryTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+#if DEBUG
+        let shouldShowInsights = ProcessInfo.processInfo.arguments.contains("--show-insights")
+        let shouldShowOperator = ProcessInfo.processInfo.arguments.contains("--show-operator")
+        // Preview windows should be self-contained: their unsigned debug build
+        // cannot initialise the production iCloud container.
+        if shouldShowInsights || shouldShowOperator {
+            companionBridgeEnabled = false
+        }
+#endif
         registerDefaults()
 #if APP_STORE
         codexDirectoryAccess.restoreAccess()
@@ -207,9 +248,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
         insightsRecorder.start()
         observeDisplayWake()
+#if DEBUG
+        if !shouldShowInsights && !shouldShowOperator {
+            companionBridge.onDiagnosticsChange = { [weak self] diagnostics in
+                self?.updateCompanionDiagnostics(diagnostics)
+            }
+        }
+#else
         companionBridge.onDiagnosticsChange = { [weak self] diagnostics in
             self?.updateCompanionDiagnostics(diagnostics)
         }
+#endif
 #if !APP_STORE
         lidClosedSleep.onRestorationFailure = { [weak self] error in
             self?.presentAssertionError(error)
@@ -232,14 +281,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshState()
         startRefreshTimer()
 #if DEBUG
-        let shouldShowInsights = ProcessInfo.processInfo.arguments.contains("--show-insights")
-        companionBridgeEnabled = !shouldShowInsights
+        companionBridgeEnabled = !shouldShowInsights && !shouldShowOperator
         if !shouldShowInsights {
-            companionBridge.start()
+            if !shouldShowOperator {
+                companionBridge.start()
+            }
         }
         if shouldShowInsights {
             DispatchQueue.main.async { [weak self] in
                 self?.showInsights()
+            }
+        }
+        if shouldShowOperator {
+            DispatchQueue.main.async { [weak self] in
+                self?.showOperator()
             }
         }
 #else
@@ -283,6 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             activateOnLaunchKey: false,
             defaultDurationSecondsKey: 0,
             automaticAgentAwakeKey: true,
+            showsDockIconKey: false,
             awakeModeKey: KeepAwakeMode.preventSleep.rawValue,
             SleepSwitchPreferenceKey.lidClosedMinimumBatteryPercent: LidClosedSafetyPolicy.defaultMinimumBatteryPercent,
             SleepSwitchPreferenceKey.lidClosedRequiresExternalPower: true,
@@ -290,7 +346,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             SleepSwitchPreferenceKey.agentStartedTriggerCommand: "",
             SleepSwitchPreferenceKey.agentFinishedTriggerCommand: "",
             SleepSwitchPreferenceKey.agentDiagnosticsEnabled: false,
-            SleepSwitchPreferenceKey.codexActiveWindowSeconds: 3 * 60
+            SleepSwitchPreferenceKey.codexActiveWindowSeconds: 3 * 60,
+            SleepSwitchPreferenceKey.statusBarIconStyle: StatusBarIconStyle.adaptive.rawValue,
+            SleepSwitchPreferenceKey.statusBarIconScale: StatusBarIconScale.standard.rawValue,
+            SleepSwitchPreferenceKey.showsColoredStatusDots: true,
+            SleepSwitchPreferenceKey.statusBarDotEmphasis: StatusBarDotEmphasis.standard.rawValue
         ]
 #if !APP_STORE
         registeredDefaults[coolingAgentsOnlyKey] = false
@@ -339,6 +399,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         insightsItem.image = NSImage(
             systemSymbolName: "chart.xyaxis.line",
             accessibilityDescription: "Energy and agent insights"
+        )
+        operatorItem.target = self
+        operatorItem.image = NSImage(
+            systemSymbolName: "circle.grid.2x2.fill",
+            accessibilityDescription: "Operator"
         )
 
         automaticAgentAwakeItem.image = NSImage(
@@ -444,6 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(automaticAgentAwakeItem)
         menu.addItem(agentsHeaderItem)
         menu.addItem(agentsSeparator)
+        menu.addItem(operatorItem)
         menu.addItem(insightsItem)
 #if APP_STORE
         menu.addItem(sleepUntilAgentsFinishItem)
@@ -709,6 +775,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         reconcileAndUpdatePresentation()
         requestAgentScan()
+        requestOperatorRefresh()
+    }
+
+    private func requestOperatorRefresh(force: Bool = false) {
+        guard !operatorRefreshInFlight else { return }
+        if !force,
+           let lastOperatorRefreshAt,
+           Date().timeIntervalSince(lastOperatorRefreshAt) < 60 {
+            return
+        }
+        operatorRefreshInFlight = true
+        let coordinator = operatorCoordinator
+        agentScanQueue.async { [weak self] in
+            let result = coordinator.refresh()
+            DispatchQueue.main.async { [weak self] in
+                self?.operatorRefreshInFlight = false
+                self?.lastOperatorRefreshAt = result.refreshedAt
+                self?.lastOperatorRefreshResult = result
+                self?.operatorWindowController?.refreshFromBackground()
+                if self?.companionBridgeEnabled == true {
+                    self?.companionBridge.publishStatusChange()
+                }
+            }
+        }
     }
 
     private func requestAgentScan() {
@@ -797,6 +887,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         return CompanionMacStatus(
             deviceID: companionBridge.deviceID,
+            machineFingerprint: CompanionMachineFingerprint.current(),
             displayName: Host.current().localizedName ?? "This Mac",
             build: AppLinks.currentVersionTitle,
             lastSeen: Date(),
@@ -831,8 +922,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 lidClosedRequiresExternalPower: lidClosedSafetyConfiguration.requiresExternalPower,
                 lidClosedAllowedNow: lidClosedSafetyDecision == .allowed,
                 lidClosedBlockReason: lidClosedSafetyDecision.message
+            ),
+            operatorSummary: operatorCoordinator.companionSummary(
+                finishAction: queuedAgentFinishAction,
+                alerts: operatorAlertCodes
             )
         )
+    }
+
+    private var operatorAlertCodes: [String] {
+        guard let result = lastOperatorRefreshResult else { return ["operator.refreshing"] }
+        var codes = result.adapters.compactMap { snapshot -> String? in
+            switch snapshot.availability {
+            case .available:
+                nil
+            case .permissionRequired:
+                "operator.\(snapshot.harnessID).permission_required"
+            case .malformedSource:
+                "operator.\(snapshot.harnessID).unreadable"
+            case .unavailable:
+                "operator.\(snapshot.harnessID).unavailable"
+            }
+        }
+        if result.persistenceError != nil { codes.append("operator.store.unavailable") }
+        return Array(Set(codes)).sorted()
     }
 
     private func companionCoolingStatus() -> CompanionCoolingStatus? {
@@ -1281,10 +1394,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let agentSummary = agentNames.isEmpty ? nil : agentNames.joined(separator: ", ")
         let presentation = awakePresentation
 
-        statusItem.button?.image = NSImage(
-            systemSymbolName: presentation.symbolName,
-            accessibilityDescription: presentation.accessibilityDescription
+        let appearance = StatusBarAppearance()
+        let statusIndicator = statusBarIndicator(for: presentation.indicator)
+        let statusSymbolName = appearance.iconStyle.symbolName(
+            for: presentation.symbolName
         )
+        let statusImage = NSImage(
+            systemSymbolName: statusSymbolName,
+            accessibilityDescription: presentation.accessibilityDescription
+        )?.withSymbolConfiguration(appearance.iconScale.symbolConfiguration)
+        statusImage?.isTemplate = true
+        statusItem.length = appearance.showsColoredStatusDots && statusIndicator.dotColor != nil
+            ? NSStatusItem.variableLength
+            : NSStatusItem.squareLength
+        statusItem.button?.image = statusImage
+        statusItem.button?.imagePosition = .imageLeft
+        statusItem.button?.attributedTitle = appearance.dotTitle(for: statusIndicator)
         statusItem.button?.toolTip = if let agentSummary {
             "\(presentation.toolTip) · \(agentSummary)"
         } else {
@@ -1319,18 +1444,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateAgentFinishActionPresentation()
     }
 
+    private func statusBarIndicator(
+        for presentationIndicator: StatusBarIndicator
+    ) -> StatusBarIndicator {
+        // A live automatic agent session is more useful than the manual-session
+        // state when both are true: it answers why the Mac is being kept awake.
+        if agentAwakeRequested && powerAssertions.isActive {
+            return .agentsRunning
+        }
+        return presentationIndicator
+    }
+
     private var awakePresentation: (
         symbolName: String,
         accessibilityDescription: String,
         toolTip: String,
-        stateTitle: String
+        stateTitle: String,
+        indicator: StatusBarIndicator
     ) {
         if lidClosedSleep.isRestoring {
             return (
                 "arrow.clockwise",
                 "Sleep Switch is restoring normal lid sleep",
                 "Restoring normal lid sleep…",
-                "Restoring normal lid sleep…"
+                "Restoring normal lid sleep…",
+                .restoringLidSleep
             )
         }
 
@@ -1340,7 +1478,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     "exclamationmark.triangle",
                     "Sleep Switch is still trying to wake the display",
                     "Display wake pending · Click for controls",
-                    "Display wake pending · \(selectedAwakeMode.stateTitle)"
+                    "Display wake pending · \(selectedAwakeMode.stateTitle)",
+                    .unavailable
                 )
             }
 
@@ -1351,7 +1490,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "moon.zzz.fill",
                 "Sleep Switch will wake the display when \(agentName) finishes",
                 "Wake queued for \(agentName) · Click for controls",
-                "Wake queued · \(agentName) · \(selectedAwakeMode.stateTitle)"
+                "Wake queued · \(agentName) · \(selectedAwakeMode.stateTitle)",
+                .finishActionQueued
             )
         }
 
@@ -1361,7 +1501,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     "cup.and.saucer.fill",
                 "Sleep Switch keeping this Mac awake manually in \(effectiveAwakeMode.menuTitle) mode",
                 "Awake manually · \(effectiveAwakeMode.stateTitle) · Click for controls",
-                "Awake · Manual · \(effectiveAwakeMode.stateTitle)"
+                "Awake · Manual · \(effectiveAwakeMode.stateTitle)",
+                .manualSession
                 )
             }
 
@@ -1370,7 +1511,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "timer",
                 "Sleep Switch keeping this Mac awake for \(remainingText) in \(effectiveAwakeMode.menuTitle) mode",
                 "\(remainingText) · \(effectiveAwakeMode.stateTitle) · Click for controls",
-                "Awake · \(remainingText) · \(effectiveAwakeMode.stateTitle)"
+                "Awake · \(remainingText) · \(effectiveAwakeMode.stateTitle)",
+                .timedManualSession
             )
         }
 
@@ -1380,7 +1522,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "timer",
                 "Sleep Switch will return sleep control to macOS after the agent cooldown",
                 "No agents · Sleep resumes in \(remaining)m · Click for controls",
-                "No agents · Sleep resumes in \(remaining)m"
+                "No agents · Sleep resumes in \(remaining)m",
+                .agentCooldown
             )
         }
 
@@ -1392,7 +1535,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "terminal.fill",
                 "Sleep Switch keeping this Mac awake for \(agentName) in \(effectiveAwakeMode.menuTitle) mode",
                 "Awake for \(agentName) · \(effectiveAwakeMode.stateTitle) · Click for controls",
-                "Awake · \(agentName) · \(effectiveAwakeMode.stateTitle)"
+                "Awake · \(agentName) · \(effectiveAwakeMode.stateTitle)",
+                .agentsRunning
             )
         }
 
@@ -1401,7 +1545,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "exclamationmark.triangle",
                 "Sleep Switch could not keep this Mac awake",
                 "An agent is running, but the awake assertion is unavailable",
-                "Agent detected · Awake unavailable"
+                "Agent detected · Awake unavailable",
+                .unavailable
             )
         }
 
@@ -1409,7 +1554,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "cup.and.saucer",
             "Sleep Switch inactive",
             "Sleep follows macOS settings · Click for controls",
-            "Sleep follows macOS settings"
+            "Sleep follows macOS settings",
+            .idle
         )
     }
 
@@ -1755,6 +1901,150 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         insightsWindowController?.show()
     }
 
+    @objc private func showOperator() {
+        if operatorWindowController == nil {
+            let coordinator = operatorCoordinator
+            let viewModel = OperatorViewModel(
+                snapshotProvider: { [weak self] in
+                    self?.operatorWindowSnapshot ?? .empty
+                },
+                refreshAction: { [weak self] in
+                    self?.requestOperatorRefresh(force: true)
+                },
+                setFavourite: { favourite, skillID in
+                    try coordinator.setFavourite(favourite, skillID: skillID)
+                },
+                replaceTags: { tags, skillID in
+                    try coordinator.replaceTags(tags, skillID: skillID)
+                },
+                recordUse: { event in
+                    try coordinator.recordSkillUse(event)
+                },
+                setThreadWorkflowLane: { lane, threadID in
+                    try coordinator.setThreadWorkflowLane(lane, threadID: threadID)
+                },
+                moveCodexThread: { threadID, sectionID in
+                    try coordinator.moveCodexThread(threadID, toSectionID: sectionID)
+                },
+                actions: OperatorActionHandlers(
+                    toggleManualAwake: { [weak self] in self?.toggleKeepAwake() },
+                    sleepDisplay: { [weak self] in self?.sleepDisplayNow() },
+                    toggleAgentAwake: { [weak self] in self?.toggleAutomaticAgentAwake() },
+                    toggleWakeWhenFinished: { [weak self] in
+#if APP_STORE
+                        self?.toggleWakeWhenAgentsFinish()
+#else
+                        self?.sleepUntilAgentsFinish()
+#endif
+                    },
+                    toggleSleepWhenFinished: { [weak self] in self?.toggleSleepMacWhenAgentsFinish() },
+                    toggleShutdownWhenFinished: { [weak self] in
+#if APP_STORE
+                        NSSound.beep()
+#else
+                        self?.toggleShutdownMacWhenAgentsFinish()
+#endif
+                    },
+                    toggleKeepDisplayAwake: { [weak self] in
+                        guard let self else { return }
+                        UserDefaults.standard.set(!self.shouldKeepDisplayAwake, forKey: keepDisplayAwakeKey)
+                        self.reconcileAndUpdatePresentation()
+                    },
+                    setAwakeMode: { [weak self] rawValue in
+                        guard let self, KeepAwakeMode(rawValue: rawValue) != nil else { return }
+                        UserDefaults.standard.set(rawValue, forKey: awakeModeKey)
+                        self.reconcileAndUpdatePresentation()
+                    },
+                    setCoolingProfile: { [weak self] rawValue in
+#if APP_STORE
+                        _ = rawValue
+                        NSSound.beep()
+#else
+                        let item = NSMenuItem()
+                        item.representedObject = rawValue
+                        self?.selectCoolingProfile(item)
+#endif
+                    },
+                    toggleAgentTriggers: { [weak self] in
+                        guard let self else { return }
+                        var configuration = self.agentTriggerConfiguration
+                        configuration.isEnabled.toggle()
+                        self.applyPreferencesMutation(.agentTriggers(configuration))
+                    },
+                    toggleDiagnostics: { [weak self] in
+                        guard let self else { return }
+                        self.applyPreferencesMutation(.diagnosticsEnabled(
+                            !UserDefaults.standard.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled)
+                        ))
+                    },
+                    toggleHistory: { [weak self] in self?.toggleHistorySaving() },
+                    showSettings: { [weak self] in self?.showPreferences() },
+                    showInsights: { [weak self] in self?.showInsights() },
+                    showDiagnostics: { [weak self] in self?.showAgentDiagnostics() }
+                )
+            )
+            operatorWindowController = OperatorWindowController(viewModel: viewModel)
+        }
+        operatorWindowController?.show()
+        requestOperatorRefresh(force: true)
+    }
+
+    private var operatorWindowSnapshot: OperatorWindowSnapshot {
+        let reading = IOKitPowerTelemetryProvider().read()
+        let cooling = companionCoolingStatus()
+        let thermalState: String = switch ProcessInfo.processInfo.thermalState {
+        case .nominal: "nominal"
+        case .fair: "fair"
+        case .serious: "serious"
+        case .critical: "critical"
+        @unknown default: "unknown"
+        }
+        return OperatorWindowSnapshot(
+            refreshedAt: lastOperatorRefreshResult?.refreshedAt,
+            adapterSnapshots: lastOperatorRefreshResult?.adapters ?? [],
+            sessions: operatorCoordinator.sessions(),
+            codexThreads: lastOperatorRefreshResult?.codexMirror.threads ?? [],
+            threadWorkflowLanes: operatorCoordinator.threadWorkflowLanes(),
+            skills: operatorCoordinator.skills(),
+            machine: OperatorMachineSnapshot(
+                name: Host.current().localizedName ?? "This Mac",
+                batteryPercent: reading.batteryPercent,
+                powerSource: reading.source.title,
+                estimatedWatts: reading.watts,
+                isCharging: reading.isCharging,
+                chargingWatts: reading.chargingWatts,
+                thermalState: thermalState,
+                temperatureCelsius: cooling?.temperatureCelsius,
+                isKeepingAwake: powerAssertions.isActive || lidClosedSleep.isActive,
+                keepsDisplayAwake: shouldKeepDisplayAwakeNow,
+                keepDisplayAwakePreference: shouldKeepDisplayAwake,
+                awakeMode: effectiveAwakeMode.menuTitle,
+                awakeModeRaw: effectiveAwakeMode.rawValue,
+                displayAsleep: displaySleepOverride,
+                coolingProfile: cooling?.profile,
+                availableCoolingProfiles: cooling?.availableProfiles ?? [],
+                coolingState: cooling?.state,
+                coolingMessage: cooling?.message,
+                fanCount: cooling?.fans.count ?? 0,
+                activeFanRPM: cooling?.fans.map(\.actualRPM).max().map { Int($0.rounded()) },
+                lidSafetyMessage: lidClosedSafetyDecision.message ?? "Lid-closed mode is ready",
+                manualSessionEndsAt: manualAwakeSession?.endDate
+            ),
+            automations: OperatorAutomationSnapshot(
+                keepsAwakeForAgents: automaticAgentAwakeEnabled,
+                wakeDisplayWhenFinished: wakeDisplayWhenAgentsFinish,
+                finishAction: queuedAgentFinishAction?.rawValue,
+                activeAgentCount: detectedAgents.count,
+                activeSessionCount: detectedAgents.reduce(0) { $0 + $1.processCount },
+                agentNames: detectedAgents.map(\.definition.name).sorted(),
+                triggersEnabled: agentTriggerConfiguration.isEnabled,
+                diagnosticsEnabled: UserDefaults.standard.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
+                historyEnabled: insightsRecorder.historyEnabled
+            ),
+            persistenceError: lastOperatorRefreshResult?.persistenceError
+        )
+    }
+
     @objc private func showPreferences() {
         if preferencesWindowController == nil {
             preferencesWindowController = SleepSwitchPreferencesWindowController(
@@ -1769,10 +2059,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 },
                 showCoolingDetails: { [weak self] in
                     self?.showCoolingDetailsFromPreferences()
+                },
+                showDeviceManager: { [weak self] in
+                    self?.showCompanionDeviceManager()
                 }
             )
         }
         preferencesWindowController?.show()
+    }
+
+    private func showCompanionDeviceManager() {
+        if companionDeviceManagerWindowController == nil {
+            companionDeviceManagerWindowController = CompanionDeviceManagerWindowController()
+        }
+        companionDeviceManagerWindowController?.show()
     }
 
     private var preferencesSnapshot: SleepSwitchPreferencesSnapshot {
@@ -1806,7 +2106,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             codexActiveWindowSeconds: codexActiveWindowSeconds,
             coolingDescription: coolingDescription,
             aggressiveComfortTargetCelsius: aggressiveComfortTargetCelsius,
-            aggressiveLaunchBoostDemand: aggressiveLaunchBoostDemand
+            aggressiveLaunchBoostDemand: aggressiveLaunchBoostDemand,
+            statusBarAppearance: StatusBarAppearance(defaults: defaults),
+            showsDockIcon: defaults.bool(forKey: showsDockIconKey)
         )
     }
 
@@ -1858,6 +2160,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return AgentTracker(codexSessionTracker: tracker)
 #endif
             }()
+        case .statusBarIconStyle(let style):
+            defaults.set(style.rawValue, forKey: SleepSwitchPreferenceKey.statusBarIconStyle)
+            updatePresentation()
+            return
+        case .statusBarIconScale(let scale):
+            defaults.set(scale.rawValue, forKey: SleepSwitchPreferenceKey.statusBarIconScale)
+            updatePresentation()
+            return
+        case .showsColoredStatusDots(let enabled):
+            defaults.set(enabled, forKey: SleepSwitchPreferenceKey.showsColoredStatusDots)
+            updatePresentation()
+            return
+        case .statusBarDotEmphasis(let emphasis):
+            defaults.set(emphasis.rawValue, forKey: SleepSwitchPreferenceKey.statusBarDotEmphasis)
+            updatePresentation()
+            return
+        case .showsDockIcon(let enabled):
+            defaults.set(enabled, forKey: showsDockIconKey)
+            NSApp.setActivationPolicy(enabled ? .regular : .accessory)
+            return
         case .aggressiveComfortTarget(let celsius):
 #if !APP_STORE
             defaults.set(
@@ -2698,7 +3020,9 @@ struct SleepSwitchApplication {
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
-        app.setActivationPolicy(.accessory)
+        app.setActivationPolicy(
+            UserDefaults.standard.bool(forKey: "showsDockIcon") ? .regular : .accessory
+        )
         app.run()
     }
 }

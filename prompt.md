@@ -1,26 +1,26 @@
-# Sleep Switch — overnight completion brief
+# Sleep Switch — Operator implementation brief
 
-Act as the product engineer responsible for finishing the companion release, not as a feature sketcher. Ship a coherent iPhone experience that remains truthful when a Mac is offline or data is stale, and preserve the Mac as the sole executor of power and cooling actions.
+Act as the product engineer shipping Operator: a calm, private operations layer for people running coding agents on their own Macs. It must turn local harness data into useful, trustworthy sessions, activity, skills, and machine context without becoming a new agent runner or collecting prompts.
 
 ## Goals
 
-- Make iPhone thermal data—including fan RPM—refresh live enough to be useful while controlling cooling.
-- Expand the iOS widget family into focused, configurable widgets: a user can choose a Mac, hide its name, and choose a focused battery, thermal, agent, or overview presentation across supported Home Screen and Lock Screen families.
-- Add `Sleep When Agents Finish` and `Shut Down When Agents Finish` on macOS and expose them safely in iOS.
-- Push source to GitHub and upload valid iOS and macOS App Store Connect builds.
+- Establish a read-only Operator data layer with normalized sessions, metric samples, events, harness capabilities, skills, user-owned tags, favourites, and skill-use events.
+- Ship Codex and Hermes adapters first. Codex may read local task `tokens_used`; Hermes may read its documented local session database. Never write to either harness.
+- Add a native Mac Operator window with Overview, Sessions, Skills, Machine, and Automations surfaces.
+- Extend the private iCloud companion with compact summaries only: live session state, token and duration deltas, machine state, alert state, and finish actions.
+- Add a Skills browser that can filter, tag, favourite, count use, copy, reveal, export, and share skills. Tags and use history belong to Operator’s local store only; source `SKILL.md` files remain untouched.
 
 ## Hard requirements
 
-- Never fabricate live telemetry: show freshness and keep stale data visibly stale.
-- A shutdown must be clearly dangerous, require confirmation, and be cancellable before it is sent to the Mac.
-- Widgets read only the private app-group snapshot; they must not perform remote power actions.
-- Preserve the existing private CloudKit model: no new server or pairing code.
-- The public repository must not contain credentials or product-strategy notes.
+- Read-only adapters. No prompt content, tool payloads, credentials, source-file mutation, or developer-operated server.
+- Be explicit about freshness and adapter availability. Missing permission or an unknown database schema must present as unavailable, never as zero activity.
+- Use stable local identifiers and privacy-preserving CloudKit summaries. iPhone receives no raw skill text, prompts, filesystem paths, or detailed event payloads.
+- Preserve the existing Mac-as-executor power/cooling model. Operator can show or schedule existing finish actions but never bypasses their confirmation/safety rules.
 
 ## Deliverable
 
-A tested source release on `main`, an iOS App Store Connect build containing the work, and a macOS App Store Connect build when Apple signing credentials available on this Mac permit it.
+A tested Operator implementation for macOS and its private iPhone summary surfaces, documented well enough for another engineer to add an adapter without reverse-engineering the app.
 
 ## Process
 
-Plan before coding. Work milestone by milestone from `plans.md`; validate each milestone and update the operator runbook as the implementation becomes real. Start now.
+Plan before coding. Work milestone by milestone from `plans.md`; validate every layer before exposing it. Start now. Do NOT begin broad UI work until the Operator data contract and adapter boundaries are coherent.

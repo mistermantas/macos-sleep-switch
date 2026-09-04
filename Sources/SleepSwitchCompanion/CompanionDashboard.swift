@@ -35,6 +35,16 @@ struct CompanionDashboardRoot: View {
             NavigationStack {
                 CompanionRemoteControlsScreen(mac: mac, model: model)
             }
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-operator"),
+                  let mac = selectedMac,
+                  let summary = mac.operatorSummary {
+            NavigationStack {
+                ScrollView {
+                    OperatorSummaryCard(summary: summary, isStale: mac.isStale)
+                        .padding(16)
+                }
+                .navigationTitle("Operator")
+            }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-settings") {
             CompanionPreferencesView(model: model) {}
         } else {
@@ -120,6 +130,7 @@ struct CompanionDashboardRoot: View {
                     macs: model.macs,
                     selectedMac: mac,
                     selectedDeviceID: $selectedMacDeviceID,
+                    selectMac: model.selectDashboardMac,
                     lastSyncAt: model.lastSyncAt
                 )
                 NavigationLink {
@@ -151,6 +162,9 @@ struct CompanionDashboardRoot: View {
                     model: model,
                     confirm: { pendingAction = $0 }
                 )
+                if let summary = mac.operatorSummary {
+                    OperatorSummaryCard(summary: summary, isStale: mac.isStale)
+                }
                 if mac.cooling != nil || mac.capabilities.canSetCoolingProfile == true {
                     CoolingControlCard(mac: mac, model: model)
                 }
@@ -273,6 +287,7 @@ private struct DeviceAndRefreshHeader: View {
     let macs: [CompanionMacStatus]
     let selectedMac: CompanionMacStatus
     @Binding var selectedDeviceID: String
+    let selectMac: (String) -> Void
     let lastSyncAt: Date?
 
     var body: some View {
@@ -282,6 +297,7 @@ private struct DeviceAndRefreshHeader: View {
                     ForEach(macs) { mac in
                         Button {
                             selectedDeviceID = mac.deviceID
+                            selectMac(mac.deviceID)
                         } label: {
                             Label(mac.displayName, systemImage: mac.id == selectedMac.id ? "checkmark" : "laptopcomputer")
                         }
@@ -300,7 +316,7 @@ private struct DeviceAndRefreshHeader: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("Phone refreshed")
+                Text("App checked iCloud")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 Text(
@@ -478,6 +494,89 @@ private struct SnapshotMetric: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
+    }
+}
+
+private struct OperatorSummaryCard: View {
+    let summary: CompanionOperatorSummary
+    let isStale: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Operator", systemImage: "circle.grid.2x2.fill")
+                    .font(.headline)
+                Spacer()
+                Text(isStale ? "Last known" : "Live")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isStale ? Color.secondary : Color.green)
+            }
+
+            HStack(spacing: 0) {
+                SnapshotMetric(
+                    value: "\(summary.activeSessionCount)",
+                    label: summary.activeSessionCount == 1 ? "Live session" : "Live sessions",
+                    symbol: "terminal"
+                )
+                Divider().frame(height: 42)
+                SnapshotMetric(
+                    value: operatorTokenText(summary.tokenDelta),
+                    label: "Token delta",
+                    symbol: "text.word.spacing"
+                )
+                Divider().frame(height: 42)
+                SnapshotMetric(
+                    value: operatorDurationText(summary.durationDeltaSeconds),
+                    label: "Duration delta",
+                    symbol: "clock"
+                )
+            }
+
+            if !summary.harnesses.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(summary.harnesses) { harness in
+                        Label("\(harness.harnessName) · \(harness.liveSessionCount)", systemImage: "terminal")
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .background(Color.accentColor.opacity(0.12), in: Capsule())
+                    }
+                }
+            }
+
+            if let action = summary.finishAction {
+                Label(operatorFinishTitle(action), systemImage: "clock.badge.checkmark")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            if !summary.alertCodes.isEmpty {
+                Label("Operator needs attention", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .cardStyle()
+    }
+
+    private func operatorTokenText(_ value: Int) -> String {
+        value >= 1_000 ? String(format: "%.1fk", Double(value) / 1_000) : "\(value)"
+    }
+
+    private func operatorDurationText(_ seconds: TimeInterval) -> String {
+        let rounded = max(0, Int(seconds))
+        if rounded >= 3_600 { return "\(rounded / 3_600)h \((rounded % 3_600) / 60)m" }
+        return "\(rounded / 60)m"
+    }
+
+    private func operatorFinishTitle(_ rawValue: String) -> String {
+        switch rawValue {
+        case CompanionRemoteAction.sleepMacWhenAgentsFinish.rawValue:
+            "Sleep Mac when agents finish"
+        case CompanionRemoteAction.shutdownMacWhenAgentsFinish.rawValue:
+            "Shut down Mac when agents finish"
+        default:
+            "Finish action queued"
+        }
     }
 }
 

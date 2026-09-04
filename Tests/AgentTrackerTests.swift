@@ -8,6 +8,7 @@ struct AgentTrackerTests {
         let fixture = """
           101 /opt/homebrew/bin/codex
           102 /Users/test/.local/share/claude/versions/2.1.0/claude
+          123 /Users/test/.hermes/bin/hermes
           103 /Users/test/.opencode/bin/opencode
           104 /opt/homebrew/bin/node /opt/homebrew/lib/node_modules/@google/gemini-cli/dist/index.js
           105 /Users/test/.local/bin/agy
@@ -38,6 +39,7 @@ struct AgentTrackerTests {
             detectedIDs == [
                 "codex",
                 "claude-code",
+                "hermes-agent",
                 "opencode",
                 "gemini-cli",
                 "antigravity-cli",
@@ -84,6 +86,8 @@ struct AgentTrackerTests {
               402 /bin/zsh -lc node /@google/gemini-cli/
               403 /Applications/Claude.app/Contents/MacOS/Claude
               404 /Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Helpers/Codex (Renderer)
+              405 /Users/test/.hermes/Hermes.app/Contents/MacOS/Hermes
+              406 /Users/test/.hermes/venv/bin/python -m hermes_cli.main serve --host 127.0.0.1
             """
         )
         expect(
@@ -98,6 +102,9 @@ struct AgentTrackerTests {
             codexAgent: detected[0],
             anotherAgent: detected[1]
         )
+        testHermesSessionTracker(hermesAgent: detected[2])
+        OperatorAdapterTests.run()
+        CodexThreadMirrorAdapterTests.run()
         testPowerAssertions()
         testKeepAwakeModes()
         testAgentIdleGrace()
@@ -110,6 +117,7 @@ struct AgentTrackerTests {
         testAppLinks()
         testDistribution()
         testStatusSymbols()
+        testStatusBarAppearance()
         CoolingPolicyTests.run()
         FanHardwareFixtureTests.run()
         FanLeaseManagerTests.run()
@@ -389,6 +397,77 @@ struct AgentTrackerTests {
         expect(
             idleAgents == [anotherAgent],
             "does not treat completed or aborted Codex turns as running sessions"
+        )
+    }
+
+    private static func testHermesSessionTracker(hermesAgent: DetectedAgent) {
+        let fileManager = FileManager.default
+        let root = fileManager.temporaryDirectory.appendingPathComponent(
+            "sleep-switch-hermes-tracker-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let activeSessions = root.appendingPathComponent("active_sessions.json")
+
+        do {
+            try fileManager.createDirectory(
+                at: root,
+                withIntermediateDirectories: true
+            )
+            try write(
+                """
+                {
+                  "entries": [
+                    {"pid": 7001, "track_liveness": true},
+                    {"pid": 7002, "track_liveness": false},
+                    {"pid": 7003, "track_liveness": true}
+                  ]
+                }
+                """,
+                to: activeSessions
+            )
+        } catch {
+            fatalError("Test failed: could not create Hermes fixtures: \(error)")
+        }
+        defer {
+            try? fileManager.removeItem(at: root)
+        }
+
+        let tracker = HermesSessionTracker(
+            activeSessionsURL: activeSessions,
+            processIsRunning: { $0 == 7001 }
+        )
+        expect(
+            tracker.scan() == 1,
+            "counts live Hermes runtime leases and ignores stale leases"
+        )
+
+        let resolvedAgents = AgentTracker(
+            hermesSessionTracker: tracker
+        ).applyingHermesSessionActivity(
+            to: [
+                DetectedAgent(
+                    definition: hermesAgent.definition,
+                    processCount: 9
+                )
+            ]
+        )
+        expect(
+            resolvedAgents == [
+                DetectedAgent(
+                    definition: hermesAgent.definition,
+                    processCount: 1
+                )
+            ],
+            "replaces Hermes process counts with live runtime lease counts"
+        )
+
+        let missingTracker = HermesSessionTracker(
+            activeSessionsURL: root.appendingPathComponent("missing.json"),
+            processIsRunning: { _ in false }
+        )
+        expect(
+            missingTracker.scan() == nil,
+            "falls back to process detection when Hermes runtime state is unavailable"
         )
     }
 
@@ -953,6 +1032,10 @@ struct AgentTrackerTests {
             "cup.and.saucer.fill",
             "timer",
             "terminal.fill",
+            "switch.2",
+            "moon.fill",
+            "bolt.fill",
+            "power",
             "moon.zzz",
             "moon.zzz.fill",
             "display",
@@ -977,6 +1060,77 @@ struct AgentTrackerTests {
                 "provides the \(symbolName) menu-bar symbol"
             )
         }
+    }
+
+    private static func testStatusBarAppearance() {
+        expect(
+            StatusBarIconStyle.persisted(from: nil) == .adaptive,
+            "defaults the menu-bar icon to the adaptive symbol"
+        )
+        expect(
+            StatusBarIconStyle.persisted(from: "moon") == .moon,
+            "restores a selected menu-bar symbol"
+        )
+        expect(
+            StatusBarIconStyle.adaptive.symbolName(for: "timer") == "timer",
+            "keeps state-specific symbols in adaptive mode"
+        )
+        expect(
+            StatusBarIconStyle.cup.symbolName(for: "timer") == "cup.and.saucer.fill",
+            "uses a chosen static menu-bar symbol"
+        )
+        expect(
+            Set(StatusBarIconStyle.galleryGroups.flatMap(\.styles))
+                == Set(StatusBarIconStyle.allCases)
+                && StatusBarIconStyle.galleryGroups.flatMap(\.styles).count
+                    == StatusBarIconStyle.allCases.count,
+            "shows every menu-bar symbol in the appearance gallery"
+        )
+        expect(
+            StatusBarIconStyle.allCases.allSatisfy {
+                NSImage(systemSymbolName: $0.previewSymbolName, accessibilityDescription: nil) != nil
+            },
+            "uses available SF Symbols for every appearance choice"
+        )
+        expect(
+            StatusBarIconScale.persisted(from: "prominent") == .prominent,
+            "restores the chosen icon scale"
+        )
+        expect(
+            StatusBarDotEmphasis.persisted(from: "subtle") == .subtle,
+            "restores the chosen dot emphasis"
+        )
+        expect(
+            StatusBarIndicator.timedManualSession.dotColor == .red,
+            "marks timed sessions with a red status dot"
+        )
+        expect(
+            StatusBarIndicator.agentsRunning.dotColor == .blue,
+            "marks active agent sessions with a blue status dot"
+        )
+        expect(
+            StatusBarIndicator.idle.dotColor == nil,
+            "keeps the idle icon uncoloured"
+        )
+        expect(
+            StatusBarAppearance(iconStyle: .adaptive, showsColoredStatusDots: true)
+                .dotTitle(for: .agentsRunning).string == "●",
+            "renders a dot when coloured status is enabled"
+        )
+        expect(
+            StatusBarAppearance(iconStyle: .adaptive, showsColoredStatusDots: false)
+                .dotTitle(for: .agentsRunning).string.isEmpty,
+            "removes the dot when coloured status is disabled"
+        )
+        expect(
+            StatusBarAppearance(
+                iconStyle: .terminal,
+                iconScale: .prominent,
+                showsColoredStatusDots: true,
+                dotEmphasis: .bold
+            ).dotTitle(for: .agentsRunning).string == "●",
+            "keeps the state indicator visible for prominent icon choices"
+        )
     }
 
     private static func expect(

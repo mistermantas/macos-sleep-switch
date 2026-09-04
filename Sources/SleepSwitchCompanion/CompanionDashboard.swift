@@ -157,6 +157,13 @@ struct CompanionDashboardRoot: View {
                     selectMac: model.selectDashboardMac,
                     lastSyncAt: model.lastSyncAt
                 )
+                if mac.capabilities.canReceiveContextTransfers == true {
+                    RemoteInboxCard(
+                        mac: mac,
+                        model: model,
+                        sendFile: { showingContextImporter = true }
+                    )
+                }
                 NavigationLink {
                     CompanionMacDetailScreen(mac: mac)
                 } label: {
@@ -202,13 +209,6 @@ struct CompanionDashboardRoot: View {
                         )
                     }
                     .buttonStyle(.plain)
-                }
-                if mac.capabilities.canReceiveContextTransfers == true {
-                    RemoteInboxCard(
-                        mac: mac,
-                        model: model,
-                        sendFile: { showingContextImporter = true }
-                    )
                 }
                 if mac.cooling != nil || mac.capabilities.canSetCoolingProfile == true {
                     CoolingControlCard(mac: mac, model: model)
@@ -724,39 +724,30 @@ private struct RemoteInboxCard: View {
     let sendFile: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Remote Inbox", systemImage: "tray.and.arrow.down.fill")
                     .font(.headline)
                 Spacer()
-                Text(mac.isStale ? "Queues for later" : "Private")
+                Label(mac.isStale ? "Queueing" : "Ready", systemImage: mac.isStale ? "clock" : "lock.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(mac.isStale ? .orange : .secondary)
             }
 
-            Text(statusLine)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            HStack(spacing: 10) {
-                Button("Send file", systemImage: "square.and.arrow.up") {
+            HStack(spacing: 12) {
+                Button("Send context", systemImage: "paperclip") {
                     sendFile()
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.commandInFlight)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("25 MB max")
-                        .font(.caption.weight(.medium))
-                    Text("PDFs, screenshots, docs, exports")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
                 Spacer()
+                Text("25 MB max")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
 
-            Text(model.lastContextTransferStatus)
+            Text(transferStatus)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -764,11 +755,10 @@ private struct RemoteInboxCard: View {
         .cardStyle()
     }
 
-    private var statusLine: String {
-        if mac.isStale {
-            return "Send one file now. It stays queued until this Mac wakes."
-        }
-        return "Send one file from iPhone to \(mac.displayName)’s private inbox."
+    private var transferStatus: String {
+        model.lastContextTransferStatus == "Never"
+            ? "No recent transfers"
+            : model.lastContextTransferStatus
     }
 }
 

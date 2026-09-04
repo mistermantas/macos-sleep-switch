@@ -32,6 +32,8 @@
 		464678BC2FE3991DABF9F4A6 /* EnergyTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */; };
 		476EA4624D25306D3BFB0276 /* CompanionCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */; };
 		481D0399CA0321685DFD616F /* CompanionHeatNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */; };
+		48EAA619F3F934675CAE06EC /* LocalPreviewSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E8B8AB2D71C23085B0DE11 /* LocalPreviewSecurity.swift */; };
+		493806B15834A16FA9883032 /* LocalPreviewSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E8B8AB2D71C23085B0DE11 /* LocalPreviewSecurity.swift */; };
 		4A5D74797E0A2CEC395B3DC7 /* CodexOperatorAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F991247D69190A8D9DB9295 /* CodexOperatorAdapter.swift */; };
 		4D0365F8EB185E41BB15034E /* CoolingProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */; };
 		4F1A9D320F819CCFE737AEB8 /* RemoteArtifactDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4484764A6CE593B0E65A6F62 /* RemoteArtifactDownloadStore.swift */; };
@@ -134,6 +136,7 @@
 		2282BCEAA5D823FC6501E481 /* CompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionApp.swift; sourceTree = "<group>"; };
 		240B255155829F9D001C6E38 /* SleepSwitchCompanion.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SleepSwitchCompanion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
+		39E8B8AB2D71C23085B0DE11 /* LocalPreviewSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPreviewSecurity.swift; sourceTree = "<group>"; };
 		3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDashboard.swift; sourceTree = "<group>"; };
 		3F7F4EC54B706D0603118738 /* CoolingDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingDiagnostics.swift; sourceTree = "<group>"; };
 		3F991247D69190A8D9DB9295 /* CodexOperatorAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexOperatorAdapter.swift; sourceTree = "<group>"; };
@@ -260,6 +263,7 @@
 				CE73E3A9B401E2143B487793 /* InsightsModels.swift */,
 				89A622C3214E67FE53DD4124 /* InsightsRecorder.swift */,
 				69027F0007898B8B4E9DA966 /* InsightsWindowController.swift */,
+				39E8B8AB2D71C23085B0DE11 /* LocalPreviewSecurity.swift */,
 				9E6B98ED0F17BA35EEE482C2 /* main.swift */,
 				9CDF3A21FF5FF4AC8C292B40 /* NetworkAvailabilityMonitor.swift */,
 				68931360AAEA28ACE0AE2B09 /* OperatorCoordinator.swift */,
@@ -529,6 +533,7 @@
 				19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */,
 				AEA031F385CA11941E009F1A /* CompanionWorkNotifications.swift in Sources */,
 				16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */,
+				48EAA619F3F934675CAE06EC /* LocalPreviewSecurity.swift in Sources */,
 				2FA386B6714BBC7073002D81 /* ManualSessionActivityAttributes.swift in Sources */,
 				4F1A9D320F819CCFE737AEB8 /* RemoteArtifactDownloadStore.swift in Sources */,
 				1D0498D99877330210ACDB44 /* RemoteWorkAttention.swift in Sources */,
@@ -573,6 +578,7 @@
 				C4F2D1925A01AAB159F6B7F6 /* InsightsModels.swift in Sources */,
 				FD7519E58AA5A2850D032CAE /* InsightsRecorder.swift in Sources */,
 				BD3C96E2DFFF7DE7D1E56535 /* InsightsWindowController.swift in Sources */,
+				493806B15834A16FA9883032 /* LocalPreviewSecurity.swift in Sources */,
 				04D6AAEEFD0C7CE4912C39BD /* NetworkAvailabilityMonitor.swift in Sources */,
 				B775EFF8838B5DDA59C7183A /* OperatorCoordinator.swift in Sources */,
 				A2CF147E764F593B43FCB77E /* OperatorModels.swift in Sources */,

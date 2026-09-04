@@ -129,6 +129,7 @@ struct AgentTrackerTests {
         CoolingDiagnosticsTests.run()
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
+        LocalPreviewSecurityTests.run()
         RemoteContextInboxTests.run()
         SharedContextIntakeTests.run()
         do {

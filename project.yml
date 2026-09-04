@@ -52,6 +52,7 @@ targets:
     sources:
       - path: Sources/SleepSwitchCompanion
       - path: Sources/SleepSwitch/CompanionProtocol.swift
+      - path: Sources/SleepSwitch/LocalPreviewSecurity.swift
       - path: Sources/SleepSwitch/InsightsModels.swift
       - path: Sources/SleepSwitch/AppLinks.swift
       - path: Sources/SleepSwitch/CompanionCloudStore.swift

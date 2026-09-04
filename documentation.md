@@ -83,6 +83,8 @@ The companion can send opt-in local notifications after a fresh iCloud update. I
 ### Preview design gate
 
 Local previews are not shipped yet. The future flow is an explicit Mac registration of one local preview, then companion discovery over an opaque Bonjour service on the same network. It will not expose arbitrary ports or act as a tunnel. Apple requires Local Network purpose text and the specific Bonjour service in the **container app** Info.plist; a real iPhone/iPad is required for testing because the simulator does not support Local Network privacy. A preview release also requires authenticated encrypted transport—an iCloud-delivered URL token alone is not an adequate transport boundary.
+
+The transport contract is implemented and tested, but not enabled: every short-lived registration has an opaque service ID, a private capability secret, a Mac static key, and a fresh companion key-agreement key. Both endpoints authenticate the handshake and derive a per-connection AES-GCM key before any payload can be opened. The missing release work is deliberately operational rather than cosmetic: length-bounded Network-framework frames, explicit loopback endpoint registration, authenticated Bonjour discovery, and physical-device testing.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;

@@ -428,9 +428,7 @@ private struct MacSnapshotCard: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(
-                        mac.isStale
-                            ? "Last seen \(CompanionTimeText.elapsed(since: mac.lastSeen))"
-                            : "Online"
+                        connectionTitle
                     )
                         .font(.headline)
                     Text(mac.build)
@@ -439,7 +437,7 @@ private struct MacSnapshotCard: View {
                 }
                 Spacer()
                 Circle()
-                    .fill(mac.isStale ? Color.secondary : Color.green)
+                    .fill(connectionColor)
                     .frame(width: 10, height: 10)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
@@ -461,6 +459,24 @@ private struct MacSnapshotCard: View {
 
     private var energyValue: String {
         mac.estimatedWatts.map { "\(Int($0.rounded())) W" } ?? "—"
+    }
+
+    private var connectionTitle: String {
+        if mac.isStale { return "Last seen \(CompanionTimeText.elapsed(since: mac.lastSeen))" }
+        return switch mac.network {
+        case .offline: "Network offline"
+        case .constrained: "Limited network"
+        case .online, .unknown, nil: "Online"
+        }
+    }
+
+    private var connectionColor: Color {
+        if mac.isStale { return .secondary }
+        return switch mac.network {
+        case .offline: .red
+        case .constrained: .orange
+        case .online, .unknown, nil: .green
+        }
     }
 
     private var chargingText: String {
@@ -1255,6 +1271,7 @@ private struct CompanionMacDetailScreen: View {
                 LabeledContent("Awake mode", value: awakeModeTitle)
                 LabeledContent("Uptime", value: uptimeText)
                 LabeledContent("Power", value: powerText)
+                LabeledContent("Network", value: networkText)
             }
         }
         .navigationTitle(mac.displayName)
@@ -1277,6 +1294,10 @@ private struct CompanionMacDetailScreen: View {
     private var powerText: String {
         guard let watts = mac.estimatedWatts else { return mac.energySource.title }
         return "\(Int(watts.rounded())) W · \(mac.energySource.title)"
+    }
+
+    private var networkText: String {
+        mac.network?.title ?? "Not reported"
     }
 
     private func temperatureText(_ value: Double) -> String {

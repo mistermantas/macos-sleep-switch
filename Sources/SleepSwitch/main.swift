@@ -127,6 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: nil,
         keyEquivalent: ""
     )
+    private lazy var networkAvailability = NetworkAvailabilityMonitor { [weak self] in
+        self?.companionBridge.publishStatusChange()
+    }
     private let codexFolderItem = NSMenuItem(
         title: "Connect Codex…",
         action: #selector(connectCodex),
@@ -268,6 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         observeStorefrontForSupportLinks()
 #endif
         insightsRecorder.start()
+        networkAvailability.start()
         observeDisplayWake()
 #if DEBUG
         if !shouldShowInsights && !shouldShowOperator {
@@ -344,6 +348,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         powerAssertions.stop()
         insightsRecorder.stop()
+        networkAvailability.stop()
         if companionBridgeEnabled {
             companionBridge.stop()
         }
@@ -946,6 +951,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             energyConfidence: reading.confidence,
             isCharging: reading.isCharging,
             chargingWatts: reading.chargingWatts,
+            network: networkAvailability.status,
             capabilities: capabilities,
             agents: agentStatuses,
             manualSession: manualAwakeSession.map {

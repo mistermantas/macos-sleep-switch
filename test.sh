@@ -40,6 +40,7 @@ xcrun swiftc \
   -framework SwiftUI \
   -framework Charts \
   -framework CloudKit \
+  -framework Network \
   -framework Security \
   -lsqlite3 \
   "$script_dir/Sources/SleepSwitch/AgentTracker.swift" \
@@ -68,6 +69,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/SleepSwitch/NetworkAvailabilityMonitor.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionContextTransferHistory.swift" \
   "$script_dir/Sources/SleepSwitch/RemoteArtifactDownloadStore.swift" \
   "$script_dir/Sources/SleepSwitch/RemoteContextInbox.swift" \

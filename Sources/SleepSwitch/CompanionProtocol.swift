@@ -548,6 +548,25 @@ struct CompanionCoolingStatus: Codable, Equatable {
     var sensors: [CompanionTemperatureSensor]? = nil
 }
 
+/// A deliberately coarse host-network state. It has no interface, address, or
+/// network-name information, so it is safe to carry in the private status
+/// snapshot alongside existing machine availability state.
+enum CompanionNetworkStatus: String, Codable, Equatable {
+    case online
+    case constrained
+    case offline
+    case unknown
+
+    var title: String {
+        switch self {
+        case .online: "Online"
+        case .constrained: "Limited"
+        case .offline: "Offline"
+        case .unknown: "Unknown"
+        }
+    }
+}
+
 struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let deviceID: String
     /// Stable hardware-derived value for safe same-Mac deduplication. It is
@@ -573,6 +592,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let energyConfidence: EnergyConfidence
     let isCharging: Bool
     let chargingWatts: Double?
+    var network: CompanionNetworkStatus? = nil
     let capabilities: CompanionMacCapabilities
     let agents: [CompanionAgentStatus]?
     let manualSession: CompanionManualSessionStatus?
@@ -605,6 +625,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         energyConfidence: EnergyConfidence,
         isCharging: Bool,
         chargingWatts: Double? = nil,
+        network: CompanionNetworkStatus? = nil,
         capabilities: CompanionMacCapabilities,
         agents: [CompanionAgentStatus]? = nil,
         manualSession: CompanionManualSessionStatus? = nil,
@@ -635,6 +656,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.energyConfidence = energyConfidence
         self.isCharging = isCharging
         self.chargingWatts = chargingWatts
+        self.network = network
         self.capabilities = capabilities
         self.agents = agents
         self.manualSession = manualSession

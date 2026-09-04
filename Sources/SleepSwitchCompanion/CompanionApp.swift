@@ -1155,6 +1155,7 @@ private enum CompanionScreenshotDemo {
             energyConfidence: .estimated,
             isCharging: true,
             chargingWatts: 31,
+            network: .online,
             capabilities: capabilities,
             agents: [
                 CompanionAgentStatus(id: "codex", name: "Codex", sessionCount: 3),

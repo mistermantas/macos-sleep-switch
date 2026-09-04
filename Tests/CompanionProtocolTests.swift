@@ -152,6 +152,7 @@ enum CompanionProtocolTests {
             energySource: .ac,
             energyConfidence: .estimated,
             isCharging: true,
+            network: .constrained,
             capabilities: appStoreCapabilities,
             agents: [CompanionAgentStatus(id: "opencode", name: "OpenCode", sessionCount: 2)],
             manualSession: CompanionManualSessionStatus(startedAt: now, endsAt: nil),
@@ -241,6 +242,7 @@ enum CompanionProtocolTests {
         legacyObject.removeValue(forKey: "cooling")
         legacyObject.removeValue(forKey: "operatorSummary")
         legacyObject.removeValue(forKey: "remoteWork")
+        legacyObject.removeValue(forKey: "network")
         if var legacyCapabilities = legacyObject["capabilities"] as? [String: Any] {
             legacyCapabilities.removeValue(forKey: "canControlManualSession")
             legacyCapabilities.removeValue(forKey: "canSetCoolingProfile")
@@ -259,6 +261,10 @@ enum CompanionProtocolTests {
         expect(
             legacyStatus.remoteWork == nil,
             "decodes status written before Remote Work sharing existed"
+        )
+        expect(
+            legacyStatus.network == nil,
+            "decodes status written before network state was reported"
         )
 
         let projectedStatus = status.applyingKeepAwake(parameters: ["enabled": "false"])

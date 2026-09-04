@@ -32,6 +32,10 @@ struct CompanionCloudClient {
         try await store.send(transfer, assetURL: assetURL)
     }
 
+    func fetchArtifactOffers(for sourceDeviceID: String) async throws -> [CompanionPendingArtifactOffer] {
+        try await store.fetchArtifactOffers(for: sourceDeviceID)
+    }
+
     func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
         try await store.fetchCommandResult(for: commandID)
     }

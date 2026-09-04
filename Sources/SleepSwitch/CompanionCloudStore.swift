@@ -53,8 +53,8 @@ protocol CompanionCloudStoring: AnyObject {
     func fetchHistory(for deviceID: String) async throws -> CompanionHistorySnapshot?
     func deleteDeviceData(for deviceID: String) async throws
     func send(_ command: CompanionRemoteCommand) async throws
-    func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult?
-    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult?
+    func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult?
+    func fetchContextTransferResult(for transferID: UUID) async throws -> CompanionContextTransferResult?
     func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand]
     func finish(
         command: CompanionPendingCommand,
@@ -368,7 +368,7 @@ final class CompanionCloudStore: CompanionCloudStoring {
         try await database.save(record)
     }
 
-    func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
+    func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
         let recordID = CKRecord.ID(recordName: commandID.uuidString)
         let records = try await database.records(for: [recordID])
         guard let result = records[recordID] else { return nil }
@@ -404,7 +404,7 @@ final class CompanionCloudStore: CompanionCloudStoring {
         )
     }
 
-    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
+    func fetchContextTransferResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
         let recordID = CKRecord.ID(recordName: transferID.uuidString)
         let records = try await database.records(for: [recordID])
         guard let result = records[recordID] else { return nil }

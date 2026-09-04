@@ -32,12 +32,12 @@ struct CompanionCloudClient {
         try await store.send(transfer, assetURL: assetURL)
     }
 
-    func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
-        try await store.fetchResult(for: commandID)
+    func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult? {
+        try await store.fetchCommandResult(for: commandID)
     }
 
-    func fetchResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
-        try await store.fetchResult(for: transferID)
+    func fetchContextTransferResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
+        try await store.fetchContextTransferResult(for: transferID)
     }
 
     func consumeLastIssue() -> String? {

@@ -110,6 +110,7 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var lastConnectionError: CompanionConnectionError?
     @Published private(set) var syncStage = "Not checked"
     @Published private(set) var lastCommandStatus = "Never"
+    @Published private(set) var lastContextTransferStatus = "Never"
     @Published private(set) var commandProgress: CompanionCommandProgress?
 
     private lazy var cloud = CompanionCloudClient()
@@ -497,6 +498,99 @@ final class CompanionAppModel: ObservableObject {
 #endif
     }
 
+    func sendContextItem(from sourceURL: URL, to mac: CompanionMacStatus) {
+        guard !commandInFlight else { return }
+
+#if targetEnvironment(simulator)
+        lastContextTransferStatus = "Simulated — \(sourceURL.lastPathComponent)"
+        message = "Simulated sending \(sourceURL.lastPathComponent) to \(mac.displayName)."
+#else
+        do {
+            let draft = try prepareContextTransfer(from: sourceURL, to: mac)
+            commandInFlight = true
+            message = nil
+            lastContextTransferStatus = "Waiting — \(draft.transfer.filename)"
+            progressDismissTask?.cancel()
+            commandProgress = CompanionCommandProgress(
+                commandID: draft.transfer.id,
+                actionTitle: "Send \(draft.transfer.filename)",
+                stage: .sending
+            )
+
+            commandTask?.cancel()
+            commandTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer {
+                    self.commandInFlight = false
+                    self.commandTask = nil
+                    try? FileManager.default.removeItem(at: draft.stagingDirectoryURL)
+                }
+
+                do {
+                    try await self.cloud.send(draft.transfer, assetURL: draft.stagingFileURL)
+                    self.commandProgress = self.commandProgress?.withStage(.waitingForMac)
+                    self.message = "\(draft.transfer.filename) is queued for \(mac.displayName)."
+                    let result = try await self.waitForTransferResult(draft.transfer.id)
+                    let completionMessage: String
+                    if let result {
+                        self.commandProgress = self.commandProgress?.withStage(.confirming)
+                        completionMessage = result.message ?? (result.accepted
+                            ? "\(draft.transfer.filename) reached the Remote Inbox."
+                            : "\(draft.transfer.filename) was rejected by the Mac.")
+                        self.lastContextTransferStatus = result.accepted
+                            ? "Delivered — \(draft.transfer.filename)"
+                            : "Rejected — \(draft.transfer.filename)"
+                        self.commandProgress = self.commandProgress?.withStage(
+                            result.accepted ? .completed : .failed
+                        )
+                    } else {
+                        completionMessage = "\(draft.transfer.filename) is still queued. The Mac may be offline."
+                        self.lastContextTransferStatus = "Pending — \(draft.transfer.filename)"
+                        self.commandProgress = self.commandProgress?.withStage(.failed)
+                    }
+                    await self.refreshAndWait()
+                    self.message = completionMessage
+                    self.dismissCommandProgress(commandID: draft.transfer.id)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    let issue = CompanionConnectionError(error: error)
+                    self.lastContextTransferStatus = "Failed — \(draft.transfer.filename)"
+                    self.lastSyncIssue = issue.userMessage
+                    self.message = "Could not send \(draft.transfer.filename). \(issue.recovery)"
+                    self.commandProgress = self.commandProgress?.withStage(.failed)
+                    self.dismissCommandProgress(commandID: draft.transfer.id)
+                }
+            }
+        } catch {
+            let issue = error as? CompanionContextTransferPreparationError
+            message = issue?.errorDescription ?? "Sleep Switch could not prepare that file."
+            lastContextTransferStatus = "Failed — \(sourceURL.lastPathComponent)"
+        }
+#endif
+    }
+
+    func handleContextImportResult(
+        _ result: Result<[URL], Error>,
+        for mac: CompanionMacStatus
+    ) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else {
+                message = "No file was selected."
+                lastContextTransferStatus = "Failed — import"
+                return
+            }
+            sendContextItem(from: url, to: mac)
+        case .failure(let error):
+            if let cocoa = error as? CocoaError, cocoa.code == .userCancelled {
+                return
+            }
+            message = "Sleep Switch could not open that file."
+            lastContextTransferStatus = "Failed — import"
+        }
+    }
+
     private func dismissCommandProgress(commandID: UUID) {
         progressDismissTask?.cancel()
         progressDismissTask = Task { @MainActor [weak self] in
@@ -546,7 +640,7 @@ final class CompanionAppModel: ObservableObject {
         // timeout for CloudKit propagation and temporarily slow connections.
         for _ in 0..<60 {
             try Task.checkCancellation()
-            if let result = try await cloud.fetchResult(for: commandID) {
+            if let result = try await cloud.fetchCommandResult(for: commandID) {
                 return result
             }
             try await Task.sleep(nanoseconds: 250_000_000)
@@ -554,10 +648,112 @@ final class CompanionAppModel: ObservableObject {
         return nil
     }
 
+    private func waitForTransferResult(_ transferID: UUID) async throws -> CompanionContextTransferResult? {
+        for _ in 0..<120 {
+            try Task.checkCancellation()
+            if let result = try await cloud.fetchContextTransferResult(for: transferID) {
+                return result
+            }
+            try await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return nil
+    }
+
+    private func prepareContextTransfer(
+        from sourceURL: URL,
+        to mac: CompanionMacStatus
+    ) throws -> PreparedContextTransfer {
+        let accessed = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let values = try sourceURL.resourceValues(forKeys: [
+            .isRegularFileKey,
+            .fileSizeKey,
+            .nameKey,
+            .typeIdentifierKey
+        ])
+        if values.isRegularFile == false {
+            throw CompanionContextTransferPreparationError.folderNotSupported
+        }
+
+        let filename = values.name ?? sourceURL.lastPathComponent
+        guard !filename.isEmpty else {
+            throw CompanionContextTransferPreparationError.missingFilename
+        }
+        let byteCount = Int64(values.fileSize ?? 0)
+        guard CompanionContextTransferPolicy.isAllowed(byteCount: byteCount) else {
+            throw CompanionContextTransferPreparationError.invalidSize(maximum: CompanionContextTransferPolicy.maximumByteCount)
+        }
+
+        let now = Date()
+        let transfer = CompanionContextTransfer(
+            id: UUID(),
+            targetDeviceID: mac.deviceID,
+            requesterDeviceID: requesterDeviceID,
+            filename: filename,
+            typeIdentifier: values.typeIdentifier,
+            byteCount: byteCount,
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(CompanionContextTransferPolicy.lifetime)
+        )
+
+        let stagingRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SleepSwitch-RemoteInbox-Staging", isDirectory: true)
+        let stagingDirectoryURL = stagingRoot.appendingPathComponent(transfer.id.uuidString, isDirectory: true)
+        let stagingFileURL = stagingDirectoryURL.appendingPathComponent(filename, isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: stagingDirectoryURL,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        do {
+            try FileManager.default.copyItem(at: sourceURL, to: stagingFileURL)
+        } catch {
+            throw CompanionContextTransferPreparationError.copyFailed
+        }
+
+        return PreparedContextTransfer(
+            transfer: transfer,
+            stagingDirectoryURL: stagingDirectoryURL,
+            stagingFileURL: stagingFileURL
+        )
+    }
+
     private struct HistoryFetchResult {
         let deviceID: String
         let history: CompanionHistorySnapshot?
         let issue: String?
+    }
+
+    private struct PreparedContextTransfer {
+        let transfer: CompanionContextTransfer
+        let stagingDirectoryURL: URL
+        let stagingFileURL: URL
+    }
+
+    private enum CompanionContextTransferPreparationError: LocalizedError {
+        case folderNotSupported
+        case missingFilename
+        case invalidSize(maximum: Int64)
+        case copyFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .folderNotSupported:
+                return "Pick one file for the Remote Inbox, not a folder."
+            case .missingFilename:
+                return "Sleep Switch could not read that file name."
+            case .invalidSize(let maximum):
+                let megabytes = Int(maximum / 1_024 / 1_024)
+                return "Remote Inbox currently accepts files up to \(megabytes) MB."
+            case .copyFailed:
+                return "Sleep Switch could not copy that file into its private upload queue."
+            }
+        }
     }
 }
 
@@ -682,7 +878,8 @@ private enum CompanionScreenshotDemo {
             supportsCloudKit: true,
             canControlManualSession: true,
             canSetCoolingProfile: true,
-            canPreventSleepWithLidClosed: true
+            canPreventSleepWithLidClosed: true,
+            canReceiveContextTransfers: true
         )
         let mac = CompanionMacStatus(
             deviceID: deviceID,

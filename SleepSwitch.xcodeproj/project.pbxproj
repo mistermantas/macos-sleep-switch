@@ -11,6 +11,7 @@
 		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
 		09AB6F07012F46FB1E504D02 /* OperatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FC2025D19972895107F134 /* OperatorWindowController.swift */; };
 		0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */; };
+		0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */; };
 		16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
 		19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
 		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
@@ -129,6 +130,7 @@
 		74FE798BF3CE08268A12E2C7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentDiagnosticsWindowController.swift; sourceTree = "<group>"; };
 		7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexSessionTracker.swift; sourceTree = "<group>"; };
+		7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteContextInbox.swift; sourceTree = "<group>"; };
 		888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCloudStore.swift; sourceTree = "<group>"; };
 		89A622C3214E67FE53DD4124 /* InsightsRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsRecorder.swift; sourceTree = "<group>"; };
 		90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWidgetShared.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 				674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */,
 				4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */,
 				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
+				7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */,
 				BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */,
 				C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */,
 				9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */,
@@ -492,6 +495,7 @@
 				606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */,
 				F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */,
 				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
+				0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */,
 				9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */,
 				68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */,
 				B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */,

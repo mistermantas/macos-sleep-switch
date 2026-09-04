@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct CompanionDashboardRoot: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -7,6 +8,7 @@ struct CompanionDashboardRoot: View {
     @AppStorage("selectedMacDeviceID") private var selectedMacDeviceID = ""
     @State private var showingSettings = false
     @State private var showingPairingHelp = false
+    @State private var showingContextImporter = false
     @State private var pendingAction: CompanionRemoteAction?
 
     private var selectedMac: CompanionMacStatus? {
@@ -109,6 +111,14 @@ struct CompanionDashboardRoot: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            .fileImporter(
+                isPresented: $showingContextImporter,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: false
+            ) { result in
+                guard let mac = selectedMac else { return }
+                model.handleContextImportResult(result, for: mac)
+            }
             .animation(.snappy, value: model.commandProgress)
             .confirmationDialog(
                 pendingAction?.title ?? "Confirm action",
@@ -125,6 +135,14 @@ struct CompanionDashboardRoot: View {
                     }
                 }
                 Button("Cancel", role: .cancel) { pendingAction = nil }
+            }
+            .fileImporter(
+                isPresented: $showingContextImporter,
+                allowedContentTypes: [.item],
+                allowsMultipleSelection: false
+            ) { result in
+                guard let mac = selectedMac else { return }
+                model.handleContextImportResult(result, for: mac)
             }
         }
     }
@@ -184,6 +202,13 @@ struct CompanionDashboardRoot: View {
                         )
                     }
                     .buttonStyle(.plain)
+                }
+                if mac.capabilities.canReceiveContextTransfers == true {
+                    RemoteInboxCard(
+                        mac: mac,
+                        model: model,
+                        sendFile: { showingContextImporter = true }
+                    )
                 }
                 if mac.cooling != nil || mac.capabilities.canSetCoolingProfile == true {
                     CoolingControlCard(mac: mac, model: model)
@@ -690,6 +715,60 @@ private struct CompanionRemoteWorkScreen: View {
             }
         }
         .navigationTitle("Agent work")
+    }
+}
+
+private struct RemoteInboxCard: View {
+    let mac: CompanionMacStatus
+    @ObservedObject var model: CompanionAppModel
+    let sendFile: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Remote Inbox", systemImage: "tray.and.arrow.down.fill")
+                    .font(.headline)
+                Spacer()
+                Text(mac.isStale ? "Queues for later" : "Private")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(mac.isStale ? .orange : .secondary)
+            }
+
+            Text(statusLine)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            HStack(spacing: 10) {
+                Button("Send file", systemImage: "square.and.arrow.up") {
+                    sendFile()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.commandInFlight)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("25 MB max")
+                        .font(.caption.weight(.medium))
+                    Text("PDFs, screenshots, docs, exports")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            Text(model.lastContextTransferStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .cardStyle()
+    }
+
+    private var statusLine: String {
+        if mac.isStale {
+            return "Send one file now. It stays queued until this Mac wakes."
+        }
+        return "Send one file from iPhone to \(mac.displayName)’s private inbox."
     }
 }
 

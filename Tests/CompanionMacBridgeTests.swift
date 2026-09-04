@@ -13,6 +13,7 @@ enum CompanionMacBridgeTests {
         await testCommandPollDoesNotWaitForFullSync()
         await testProcessesContextTransfers()
         await testChangedStatusPublishesWithoutHistory()
+        await testPrunesExpiredRemoteHandoffs()
     }
 
     private static func testPublishesAndCoalesces() async {
@@ -247,6 +248,18 @@ enum CompanionMacBridgeTests {
         )
     }
 
+    private static func testPrunesExpiredRemoteHandoffs() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let bridge = makeBridge(cloud: cloud, defaults: defaults)
+
+        await bridge.synchronizeAndWait(force: true)
+
+        expect(cloud.prunedCommandDeviceIDs == ["test-mac"], "prunes completed command receipts for this Mac")
+        expect(cloud.prunedTransferDeviceIDs == ["test-mac"], "prunes expired remote inbox records for this Mac")
+        expect(cloud.prunedOfferDeviceIDs == ["test-mac"], "prunes expired result offers for this Mac")
+    }
+
     private static func makeBridge(
         cloud: FakeCompanionCloudStore,
         defaults: UserDefaults,
@@ -349,6 +362,9 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     var finishedResults: [CompanionRemoteResult] = []
     var finishedTransferResults: [CompanionContextTransferResult] = []
     var transferResults: [UUID: CompanionContextTransferResult] = [:]
+    var prunedCommandDeviceIDs: [String] = []
+    var prunedTransferDeviceIDs: [String] = []
+    var prunedOfferDeviceIDs: [String] = []
     var accountDelayNanoseconds: UInt64 = 0
     var accountStatusCallCount = 0
 
@@ -408,7 +424,20 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
         rejectedReasons.append(reason)
     }
 
-    func pruneCommands(for deviceID: String, before date: Date) async throws -> Int { 0 }
+    func pruneCommands(for deviceID: String, before _: Date) async throws -> Int {
+        prunedCommandDeviceIDs.append(deviceID)
+        return 0
+    }
+
+    func pruneContextTransfers(for deviceID: String, before _: Date) async throws -> Int {
+        prunedTransferDeviceIDs.append(deviceID)
+        return 0
+    }
+
+    func pruneArtifactOffers(for sourceDeviceID: String, before _: Date) async throws -> Int {
+        prunedOfferDeviceIDs.append(sourceDeviceID)
+        return 0
+    }
 
     func consumeLastIssue() -> String? {
         defer { lastIssue = nil }

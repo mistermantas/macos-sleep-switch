@@ -70,7 +70,7 @@ final class CompanionMacBridge {
     private var lastHistoryPublishedAt: Date?
     private var cachedHistory: CompanionHistorySnapshot?
     private var lastHistoryBuiltAt: Date?
-    private var lastCommandCleanupAt: Date?
+    private var lastRemoteCleanupAt: Date?
     private var lastSyncStartedAt: Date?
     private var lastCommandPollStartedAt: Date?
     private var lastFullSyncStartedAt: Date?
@@ -352,16 +352,24 @@ final class CompanionMacBridge {
             }
         }
 
-        if shouldPruneCommands(now: now) {
+        if shouldPruneRemoteRecords(now: now) {
             do {
                 _ = try await cloud.pruneCommands(
                     for: deviceIDValue,
                     before: now.addingTimeInterval(-Self.commandLedgerRetention)
                 )
+                _ = try await cloud.pruneContextTransfers(
+                    for: deviceIDValue,
+                    before: now
+                )
+                _ = try await cloud.pruneArtifactOffers(
+                    for: deviceIDValue,
+                    before: now
+                )
                 guard !Task.isCancelled else { return }
-                lastCommandCleanupAt = now
+                lastRemoteCleanupAt = now
             } catch {
-                errors.append(operationMessage("command cleanup", error: error))
+                errors.append(operationMessage("private iCloud cleanup", error: error))
             }
         }
 
@@ -485,9 +493,9 @@ final class CompanionMacBridge {
             || now.timeIntervalSince(lastHistoryPublishedAt) >= historyHeartbeatInterval
     }
 
-    private func shouldPruneCommands(now: Date) -> Bool {
-        guard let lastCommandCleanupAt else { return true }
-        return now.timeIntervalSince(lastCommandCleanupAt) >= Self.commandCleanupInterval
+    private func shouldPruneRemoteRecords(now: Date) -> Bool {
+        guard let lastRemoteCleanupAt else { return true }
+        return now.timeIntervalSince(lastRemoteCleanupAt) >= Self.commandCleanupInterval
     }
 
     private func statusFingerprint(_ status: CompanionMacStatus) -> Data {

@@ -87,6 +87,13 @@ protocol CompanionCloudStoring: AnyObject {
         reason: String
     ) async throws
     func pruneCommands(for deviceID: String, before date: Date) async throws -> Int
+    /// Deletes expired inbound handoffs and their delivery receipts. A context
+    /// asset is cleared as soon as the Mac receives it; this removes the small
+    /// metadata record once its advertised lifetime is over.
+    func pruneContextTransfers(for deviceID: String, before date: Date) async throws -> Int
+    /// Deletes expired Mac-authored result offers. The asset is never retained
+    /// beyond the same bounded offer lifetime.
+    func pruneArtifactOffers(for sourceDeviceID: String, before date: Date) async throws -> Int
     func send(_ transfer: CompanionContextTransfer, assetURL: URL) async throws
     func fetchPendingContextTransfers(
         for deviceID: String
@@ -105,14 +112,14 @@ protocol CompanionCloudStoring: AnyObject {
 
 enum CompanionCloudStoreError: Error, LocalizedError {
     case commandRecordUnavailable(String)
-    case commandCleanupFailed(String)
+    case recordCleanupFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .commandRecordUnavailable:
             return "The remote command record is no longer available."
-        case .commandCleanupFailed(let detail):
-            return "Sleep Switch could not clean up old remote commands. " + detail
+        case .recordCleanupFailed(let detail):
+            return "Sleep Switch could not clean up expired private iCloud records. " + detail
         }
     }
 }
@@ -454,8 +461,8 @@ final class CompanionCloudStore: CompanionCloudStoring {
         record["accepted"] = result.accepted as CKRecordValue
         record["resultMessage"] = (result.message ?? "") as CKRecordValue
         // The remote Mac has copied the staged asset into its own private
-        // inbox. Orphan it now so CloudKit can reclaim it; the record remains
-        // as a small delivery receipt until normal cleanup is added.
+        // inbox. Orphan it now so CloudKit can reclaim it; periodic cleanup
+        // removes the small delivery receipt after its advertised lifetime.
         record["asset"] = nil
         try await database.save(record)
     }
@@ -619,7 +626,35 @@ final class CompanionCloudStore: CompanionCloudStoring {
                 date as NSDate
             )
         )
-        let ids = records.map { $0.recordID }
+        return try await delete(records: records)
+    }
+
+    func pruneContextTransfers(for deviceID: String, before date: Date) async throws -> Int {
+        let records = try await fetchRecords(
+            type: Self.contextTransferRecordType,
+            predicate: NSPredicate(
+                format: "targetDeviceID == %@ AND expiresAt < %@",
+                deviceID,
+                date as NSDate
+            )
+        )
+        return try await delete(records: records)
+    }
+
+    func pruneArtifactOffers(for sourceDeviceID: String, before date: Date) async throws -> Int {
+        let records = try await fetchRecords(
+            type: Self.artifactOfferRecordType,
+            predicate: NSPredicate(
+                format: "sourceDeviceID == %@ AND expiresAt < %@",
+                sourceDeviceID,
+                date as NSDate
+            )
+        )
+        return try await delete(records: records)
+    }
+
+    private func delete(records: [CKRecord]) async throws -> Int {
+        let ids = records.map(\.recordID)
         guard !ids.isEmpty else { return 0 }
         var failures: [Error] = []
         for start in stride(from: 0, to: ids.count, by: 200) {
@@ -635,7 +670,7 @@ final class CompanionCloudStore: CompanionCloudStoring {
             })
         }
         guard failures.isEmpty else {
-            throw CompanionCloudStoreError.commandCleanupFailed(
+            throw CompanionCloudStoreError.recordCleanupFailed(
                 "\(failures.count) records could not be deleted."
             )
         }

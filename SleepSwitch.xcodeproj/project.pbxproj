@@ -15,6 +15,7 @@
 		16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
 		19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
 		1A60C517E8B2A10E41FD6AC2 /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
+		1D0498D99877330210ACDB44 /* RemoteWorkAttention.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1730F59467AA0E0E37B2FF82 /* RemoteWorkAttention.swift */; };
 		213204C2ADD3B76D7DE8742F /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6B98ED0F17BA35EEE482C2 /* main.swift */; };
 		2444F1FB6EECD52522B5B007 /* CoolingTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A68D2DAB9CCE171A6A4A932 /* CoolingTelemetry.swift */; };
 		25E56F321CD2F28AA460E2E5 /* CodexThreadSectionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44DFE26BF3D329DF6349F46 /* CodexThreadSectionController.swift */; };
@@ -55,6 +56,7 @@
 		A2CF147E764F593B43FCB77E /* OperatorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79493D5F520A2E0D75666E3 /* OperatorModels.swift */; };
 		A3492B708CAD0FB57A0702EB /* FanHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93A571FED9A9C619EEF25422 /* FanHelperClient.swift */; };
 		A41FED9EA4F4788B8A8AC110 /* SleepSwitchCompanionWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F0B3C9E16AB85496BE3734 /* SleepSwitchCompanionWidgets.swift */; };
+		AEA031F385CA11941E009F1A /* CompanionWorkNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 973FB41B8C860E4E1F146958 /* CompanionWorkNotifications.swift */; };
 		B0396C9DF810BC911E4E0E9A /* AgentTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB8F8F9A3591A79D53720A0 /* AgentTracker.swift */; };
 		B0C5069F91B1923252C16426 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 74FE798BF3CE08268A12E2C7 /* Assets.xcassets */; };
 		B27DCFCFD166836698364F75 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1C738315AD299CAE5C654F6 /* PrivacyInfo.xcprivacy */; };
@@ -73,6 +75,7 @@
 		F06B3A7E0EB84CFEADEBFB38 /* CompanionWidgetShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */; };
 		F2D713E5FD927C8AE0A5B679 /* CompanionContextTransferHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC67023AEFEFA987749933D0 /* CompanionContextTransferHistory.swift */; };
 		F45593AEC8ACB1B8EAD1893E /* DisplayPowerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */; };
+		F4A9F489396B259635791FAD /* RemoteWorkAttention.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1730F59467AA0E0E37B2FF82 /* RemoteWorkAttention.swift */; };
 		F6DBC86B5CB84C3829C6E532 /* RemoteArtifactDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4484764A6CE593B0E65A6F62 /* RemoteArtifactDownloadStore.swift */; };
 		F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */; };
 		F97904FDEE29B8DBFB4C361F /* StatusBarAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */; };
@@ -111,6 +114,7 @@
 		0C721CDD072558D8C2C9C612 /* RemoteInboxWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInboxWindowController.swift; sourceTree = "<group>"; };
 		0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCloudClient.swift; sourceTree = "<group>"; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
+		1730F59467AA0E0E37B2FF82 /* RemoteWorkAttention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWorkAttention.swift; sourceTree = "<group>"; };
 		21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHeatNotifications.swift; sourceTree = "<group>"; };
 		227EC5C9C7AEA6D82C5B3022 /* CodexThreadMirrorAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexThreadMirrorAdapter.swift; sourceTree = "<group>"; };
 		2282BCEAA5D823FC6501E481 /* CompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionApp.swift; sourceTree = "<group>"; };
@@ -143,6 +147,7 @@
 		90C2B1B32A6FA17E7B104F8F /* CompanionWidgetShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWidgetShared.swift; sourceTree = "<group>"; };
 		93A571FED9A9C619EEF25422 /* FanHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanHelperClient.swift; sourceTree = "<group>"; };
 		94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessInfoThermalMonitor.swift; sourceTree = "<group>"; };
+		973FB41B8C860E4E1F146958 /* CompanionWorkNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionWorkNotifications.swift; sourceTree = "<group>"; };
 		990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionProtocol.swift; sourceTree = "<group>"; };
 		99968A3C61569AE944BE2DC9 /* FanHelperMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanHelperMessages.swift; sourceTree = "<group>"; };
 		9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSwitchPreferences.swift; sourceTree = "<group>"; };
@@ -179,6 +184,7 @@
 				3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */,
 				21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */,
 				D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */,
+				973FB41B8C860E4E1F146958 /* CompanionWorkNotifications.swift */,
 			);
 			name = SleepSwitchCompanion;
 			path = Sources/SleepSwitchCompanion;
@@ -250,6 +256,7 @@
 				7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */,
 				BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */,
 				0C721CDD072558D8C2C9C612 /* RemoteInboxWindowController.swift */,
+				1730F59467AA0E0E37B2FF82 /* RemoteWorkAttention.swift */,
 				C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */,
 				9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */,
 				CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */,
@@ -458,9 +465,11 @@
 				0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */,
 				839C3B3CA1F5B7BB2C00760B /* CompanionProtocol.swift in Sources */,
 				19D1D1770E7D26EF01C17F48 /* CompanionWidgetShared.swift in Sources */,
+				AEA031F385CA11941E009F1A /* CompanionWorkNotifications.swift in Sources */,
 				16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */,
 				2FA386B6714BBC7073002D81 /* ManualSessionActivityAttributes.swift in Sources */,
 				4F1A9D320F819CCFE737AEB8 /* RemoteArtifactDownloadStore.swift in Sources */,
+				1D0498D99877330210ACDB44 /* RemoteWorkAttention.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -513,6 +522,7 @@
 				0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */,
 				9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */,
 				9CD0B257432E20783833A893 /* RemoteInboxWindowController.swift in Sources */,
+				F4A9F489396B259635791FAD /* RemoteWorkAttention.swift in Sources */,
 				68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */,
 				B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */,
 				F97904FDEE29B8DBFB4C361F /* StatusBarAppearance.swift in Sources */,

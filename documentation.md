@@ -71,6 +71,10 @@ On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, va
 ### Current result handoff
 
 On the Mac, **Share Result…** offers one user-selected file through a short-lived private CloudKit asset. The companion’s **Results** card appears only when offers exist. It displays the offered filename, size, and age, and uses an explicit **Get** step before a private local copy becomes available to Quick Look or the system share sheet. There is no directory listing, project path, automatic download, or raw agent output summary.
+
+### Current attention routing
+
+The companion can send opt-in local notifications after a fresh iCloud update. It establishes a baseline first, then alerts only when a work item transitions into an evidence-backed `blocked`, `rate limited`, `stalled`, or `failed` state. `finished` and `ready to review` notifications are a separate off-by-default choice. A stale Mac status never causes a catch-up notification. Notifications use the harness and state, not a private task title.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;

@@ -49,6 +49,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/CodexSessionTracker.swift" \
   "$script_dir/Sources/SleepSwitch/OperatorModels.swift" \
   "$script_dir/Sources/SleepSwitch/RemoteWorkProjection.swift" \
+  "$script_dir/Sources/SleepSwitch/RemoteWorkAttention.swift" \
   "$script_dir/Sources/SleepSwitch/CodexOperatorAdapter.swift" \
   "$script_dir/Sources/SleepSwitch/CodexThreadMirrorAdapter.swift" \
   "$script_dir/Sources/SleepSwitch/CodexThreadSectionController.swift" \
@@ -95,6 +96,7 @@ xcrun swiftc \
   "$script_dir/Tests/AgentTrackerTests.swift" \
   "$script_dir/Tests/OperatorAdapterTests.swift" \
   "$script_dir/Tests/RemoteWorkProjectionTests.swift" \
+  "$script_dir/Tests/RemoteWorkAttentionTests.swift" \
   "$script_dir/Tests/CodexThreadMirrorAdapterTests.swift" \
   "$script_dir/Tests/CoolingPolicyTests.swift" \
   "$script_dir/Tests/FanHardwareFixtureTests.swift" \

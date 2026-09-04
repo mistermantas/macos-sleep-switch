@@ -2286,6 +2286,8 @@ private struct CompanionPreferencesView: View {
     @AppStorage(CompanionHeatNotificationManager.thresholdKey) private var heatNotificationThreshold = 85
     @AppStorage(CompanionHeatNotificationManager.thirtyMinuteKey) private var thirtyMinuteAlert = true
     @AppStorage(CompanionHeatNotificationManager.sixtyMinuteKey) private var sixtyMinuteAlert = true
+    @AppStorage(CompanionWorkNotificationManager.enabledKey) private var workNotificationsEnabled = false
+    @AppStorage(CompanionWorkNotificationManager.finishedEnabledKey) private var finishedWorkNotificationsEnabled = false
 
     var body: some View {
         NavigationStack {
@@ -2312,6 +2314,22 @@ private struct CompanionPreferencesView: View {
                     Text("Smart defaults alert at 85°C only while a non-system cooling profile is active. The iPhone needs a recent status from the Mac to evaluate the timer.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Toggle("Attention alerts", isOn: Binding(
+                        get: { workNotificationsEnabled },
+                        set: { enabled in
+                            if enabled { model.enableWorkNotifications() }
+                            else { workNotificationsEnabled = false }
+                        }
+                    ))
+                    Toggle("Finished work", isOn: $finishedWorkNotificationsEnabled)
+                        .disabled(!workNotificationsEnabled)
+                } header: {
+                    Text("Agent work")
+                } footer: {
+                    Text("Attention alerts cover evidence-backed blocked, rate-limited, stalled, and failed work. Finished work stays separate and off by default.")
                 }
 
                 Section("Uncascade") {

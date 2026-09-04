@@ -87,6 +87,7 @@ private enum CompanionWidgetBackgroundRefresher {
             guard try await cloud.accountStatus() == .available else { return .failed }
             let macs = try await cloud.fetchMacs()
             CompanionWidgetPublisher.publish(macs)
+            CompanionWorkNotificationManager().evaluate(macs)
             return macs.isEmpty ? .noData : .newData
         } catch is CancellationError {
             return .noData
@@ -120,6 +121,7 @@ final class CompanionAppModel: ObservableObject {
 
     private lazy var cloud = CompanionCloudClient()
     let heatNotifications = CompanionHeatNotificationManager()
+    let workNotifications = CompanionWorkNotificationManager()
     private let liveActivity = CompanionLiveActivityController()
     private let contextTransferHistory = CompanionContextTransferHistoryStore()
     private let artifactDownloadStore = RemoteArtifactDownloadStore()
@@ -293,6 +295,7 @@ final class CompanionAppModel: ObservableObject {
         let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
         liveActivity.synchronize(with: selected)
         heatNotifications.evaluate(macs)
+        workNotifications.evaluate(macs)
     }
 
     func selectDashboardMac(_ deviceID: String) {
@@ -304,6 +307,14 @@ final class CompanionAppModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             let granted = await heatNotifications.requestAuthorization()
+            if !granted { message = "Notifications are disabled in iPhone Settings." }
+        }
+    }
+
+    func enableWorkNotifications() {
+        Task { [weak self] in
+            guard let self else { return }
+            let granted = await workNotifications.requestAuthorization()
             if !granted { message = "Notifications are disabled in iPhone Settings." }
         }
     }

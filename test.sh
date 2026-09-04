@@ -70,6 +70,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
   "$script_dir/Sources/SleepSwitch/LocalPreviewSecurity.swift" \
+  "$script_dir/Sources/SleepSwitch/LocalPreviewEndpoint.swift" \
   "$script_dir/Sources/SleepSwitch/NetworkAvailabilityMonitor.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionContextTransferHistory.swift" \
   "$script_dir/Sources/SleepSwitch/RemoteArtifactDownloadStore.swift" \
@@ -112,6 +113,7 @@ xcrun swiftc \
   "$script_dir/Tests/InsightsHistoryTests.swift" \
   "$script_dir/Tests/CompanionProtocolTests.swift" \
   "$script_dir/Tests/LocalPreviewSecurityTests.swift" \
+  "$script_dir/Tests/LocalPreviewEndpointTests.swift" \
   "$script_dir/Tests/RemoteContextInboxTests.swift" \
   "$script_dir/Tests/RemoteArtifactDownloadStoreTests.swift" \
   "$script_dir/Tests/SharedContextIntakeTests.swift" \

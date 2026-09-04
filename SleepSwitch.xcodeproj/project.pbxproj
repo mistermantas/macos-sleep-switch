@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00E7BA1F1C2D0B8AA3DA5F2B /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09C8FEC6CC81B7403F577C86 /* AppLinks.swift */; };
 		0207008783D4280003F4C0A3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11BBFBFF57DEC976C8F1A67 /* Assets.xcassets */; };
+		04D6AAEEFD0C7CE4912C39BD /* NetworkAvailabilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDF3A21FF5FF4AC8C292B40 /* NetworkAvailabilityMonitor.swift */; };
 		09AB6F07012F46FB1E504D02 /* OperatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FC2025D19972895107F134 /* OperatorWindowController.swift */; };
 		0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */; };
 		0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */; };
@@ -166,6 +167,7 @@
 		990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionProtocol.swift; sourceTree = "<group>"; };
 		99968A3C61569AE944BE2DC9 /* FanHelperMessages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FanHelperMessages.swift; sourceTree = "<group>"; };
 		9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepSwitchPreferences.swift; sourceTree = "<group>"; };
+		9CDF3A21FF5FF4AC8C292B40 /* NetworkAvailabilityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkAvailabilityMonitor.swift; sourceTree = "<group>"; };
 		9E6B98ED0F17BA35EEE482C2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A0FD083E2FBDE60AFDDCECA3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1C738315AD299CAE5C654F6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 				89A622C3214E67FE53DD4124 /* InsightsRecorder.swift */,
 				69027F0007898B8B4E9DA966 /* InsightsWindowController.swift */,
 				9E6B98ED0F17BA35EEE482C2 /* main.swift */,
+				9CDF3A21FF5FF4AC8C292B40 /* NetworkAvailabilityMonitor.swift */,
 				68931360AAEA28ACE0AE2B09 /* OperatorCoordinator.swift */,
 				D79493D5F520A2E0D75666E3 /* OperatorModels.swift */,
 				54AA9CB9BD55BB5D8D273375 /* OperatorSkillIndexer.swift */,
@@ -570,6 +573,7 @@
 				C4F2D1925A01AAB159F6B7F6 /* InsightsModels.swift in Sources */,
 				FD7519E58AA5A2850D032CAE /* InsightsRecorder.swift in Sources */,
 				BD3C96E2DFFF7DE7D1E56535 /* InsightsWindowController.swift in Sources */,
+				04D6AAEEFD0C7CE4912C39BD /* NetworkAvailabilityMonitor.swift in Sources */,
 				B775EFF8838B5DDA59C7183A /* OperatorCoordinator.swift in Sources */,
 				A2CF147E764F593B43FCB77E /* OperatorModels.swift in Sources */,
 				5441FEF187A1AA28E6FFA15B /* OperatorSkillIndexer.swift in Sources */,

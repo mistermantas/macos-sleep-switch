@@ -1,4 +1,5 @@
 import Charts
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -162,6 +163,12 @@ struct CompanionDashboardRoot: View {
                         mac: mac,
                         model: model,
                         sendFile: { showingContextImporter = true }
+                    )
+                }
+                if !model.artifactOffers(for: mac).isEmpty {
+                    ArtifactOffersCard(
+                        mac: mac,
+                        model: model
                     )
                 }
                 NavigationLink {
@@ -813,6 +820,128 @@ private func contextTransferColor(_ state: CompanionContextTransferActivityState
         .orange
     case .rejected, .failed:
         .red
+    }
+}
+
+private struct ArtifactOffersCard: View {
+    let mac: CompanionMacStatus
+    @ObservedObject var model: CompanionAppModel
+    @State private var previewURL: URL?
+
+    private var offers: [CompanionPendingArtifactOffer] {
+        model.artifactOffers(for: mac)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Results", systemImage: "doc.badge.arrow.up")
+                    .font(.headline)
+                Spacer()
+                Text(offers.count == 1 ? "1 file" : "\(offers.count) files")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 10) {
+                ForEach(offers, id: \.recordName) { offer in
+                    artifactRow(offer)
+                }
+            }
+        }
+        .cardStyle()
+        .sheet(item: Binding(
+            get: { previewURL.map(LocalPreviewFile.init(url:)) },
+            set: { previewURL = $0?.url }
+        )) { preview in
+            ArtifactQuickLookPreview(url: preview.url)
+        }
+    }
+
+    @ViewBuilder
+    private func artifactRow(_ pending: CompanionPendingArtifactOffer) -> some View {
+        if let offer = pending.offer {
+            HStack(spacing: 10) {
+                Image(systemName: pending.assetURL == nil ? "doc.badge.exclamationmark" : "doc.fill")
+                    .foregroundStyle(pending.assetURL == nil ? .orange : .blue)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(offer.filename)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                    Text("\(ByteCountFormatter.string(fromByteCount: offer.byteCount, countStyle: .file)) · \(CompanionTimeText.elapsed(since: offer.createdAt))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if let assetURL = pending.assetURL {
+                    Button("Preview") { previewURL = assetURL }
+                        .buttonStyle(.bordered)
+                    ShareLink(item: assetURL, preview: SharePreview(offer.filename)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Text("Unavailable")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
+            }
+        } else {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Result metadata unavailable")
+                        .font(.subheadline.weight(.medium))
+                    Text(pending.decodeError ?? "Refresh to try again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct LocalPreviewFile: Identifiable {
+    let url: URL
+    var id: String { url.path }
+}
+
+private struct ArtifactQuickLookPreview: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {
+        context.coordinator.url = url
+        controller.reloadData()
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(url: url)
+    }
+
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        var url: URL
+
+        init(url: URL) {
+            self.url = url
+        }
+
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+
+        func previewController(
+            _ controller: QLPreviewController,
+            previewItemAt index: Int
+        ) -> QLPreviewItem {
+            url as NSURL
+        }
     }
 }
 

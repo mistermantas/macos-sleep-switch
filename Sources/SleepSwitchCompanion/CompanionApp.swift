@@ -101,6 +101,7 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var accountStatus: CKAccountStatus = .couldNotDetermine
     @Published private(set) var macs: [CompanionMacStatus] = []
     @Published private(set) var histories: [String: CompanionHistorySnapshot] = [:]
+    @Published private(set) var artifactOffersByDeviceID: [String: [CompanionPendingArtifactOffer]] = [:]
     @Published private(set) var message: String?
     @Published private(set) var isLoading = false
     @Published private(set) var commandInFlight = false
@@ -234,6 +235,7 @@ final class CompanionAppModel: ObservableObject {
                 message = issue
                 macs = []
                 histories = [:]
+                artifactOffersByDeviceID = [:]
                 lastSyncAt = Date()
                 syncStage = "iCloud unavailable"
                 return
@@ -245,12 +247,16 @@ final class CompanionAppModel: ObservableObject {
             let fetchedMacs = try await cloud.fetchMacs()
             macs = fetchedMacs
             publishCompanionSurfaces(for: fetchedMacs)
+            syncStage = "Loading results"
+            let artifactResults = await fetchArtifactOffers(for: fetchedMacs)
+            artifactOffersByDeviceID = artifactResults.offers
             syncStage = "Loading history"
             let historyResults = await fetchHistories(for: fetchedMacs)
             histories = historyResults.histories
-            lastSyncIssue = historyResults.issues.isEmpty
+            let syncIssues = artifactResults.issues + historyResults.issues
+            lastSyncIssue = syncIssues.isEmpty
                 ? cloud.consumeLastIssue()
-                : historyResults.issues.joined(separator: " ")
+                : syncIssues.joined(separator: " ")
             lastSyncAt = Date()
             lastSuccessfulSyncAt = lastSyncAt
             lastConnectionError = nil
@@ -258,8 +264,8 @@ final class CompanionAppModel: ObservableObject {
 
             if fetchedMacs.isEmpty {
                 message = "No Mac is paired yet. Open Sleep Switch on the Mac and keep it running."
-            } else if !historyResults.issues.isEmpty {
-                message = "Some history is unavailable. Refresh to try again."
+            } else if !syncIssues.isEmpty {
+                message = "Some private data is unavailable. Refresh to try again."
             } else if let lastSyncIssue {
                 message = lastSyncIssue
             }
@@ -344,6 +350,41 @@ final class CompanionAppModel: ObservableObject {
         }
     }
 
+    private func fetchArtifactOffers(
+        for macs: [CompanionMacStatus]
+    ) async -> (
+        offers: [String: [CompanionPendingArtifactOffer]],
+        issues: [String]
+    ) {
+        let cloud = self.cloud
+        return await withTaskGroup(of: (String, [CompanionPendingArtifactOffer]?, String?).self) { group in
+            for mac in macs {
+                group.addTask {
+                    do {
+                        let offers = try await cloud.fetchArtifactOffers(for: mac.deviceID)
+                        return (mac.deviceID, offers, nil)
+                    } catch is CancellationError {
+                        return (mac.deviceID, nil, "Result loading was cancelled.")
+                    } catch {
+                        return (mac.deviceID, nil, "Results for \(mac.displayName) are unavailable.")
+                    }
+                }
+            }
+
+            var offersByDeviceID: [String: [CompanionPendingArtifactOffer]] = [:]
+            var issues: [String] = []
+            for await result in group {
+                if let offers = result.1 {
+                    offersByDeviceID[result.0] = offers
+                }
+                if let issue = result.2 {
+                    issues.append(issue)
+                }
+            }
+            return (offersByDeviceID, issues)
+        }
+    }
+
     private func accountStatusMessage(for status: CKAccountStatus) -> String {
         switch status {
         case .available:
@@ -368,6 +409,12 @@ final class CompanionAppModel: ObservableObject {
     func contextTransfers(for mac: CompanionMacStatus, limit: Int = 3) -> [CompanionContextTransferActivity] {
         contextTransferActivities
             .filter { $0.targetDeviceID == mac.deviceID }
+            .prefix(max(0, limit))
+            .map { $0 }
+    }
+
+    func artifactOffers(for mac: CompanionMacStatus, limit: Int = 3) -> [CompanionPendingArtifactOffer] {
+        (artifactOffersByDeviceID[mac.deviceID] ?? [])
             .prefix(max(0, limit))
             .map { $0 }
     }

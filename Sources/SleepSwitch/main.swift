@@ -117,6 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         action: #selector(showRemoteInbox),
         keyEquivalent: ""
     )
+    private let shareResultItem = NSMenuItem(
+        title: "Share Result…",
+        action: #selector(shareResult),
+        keyEquivalent: ""
+    )
     private let companionStatusItem = NSMenuItem(
         title: "iCloud Companion · Checking…",
         action: nil,
@@ -487,6 +492,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             systemSymbolName: "tray.and.arrow.down",
             accessibilityDescription: "Show context received from your companion devices"
         )
+        shareResultItem.target = self
+        shareResultItem.image = NSImage(
+            systemSymbolName: "square.and.arrow.up",
+            accessibilityDescription: "Offer one selected result to your companion devices"
+        )
         configureSettingsMenu()
 
 #if APP_STORE
@@ -547,6 +557,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(toggleItem)
         menu.addItem(durationItem)
         menu.addItem(.separator())
+        menu.addItem(shareResultItem)
         menu.addItem(remoteInboxItem)
         menu.addItem(settingsItem)
         menu.addItem(refreshItem)
@@ -2989,6 +3000,67 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             remoteInboxWindowController = RemoteInboxWindowController(inbox: remoteContextInbox)
         }
         remoteInboxWindowController?.show()
+    }
+
+    @objc private func shareResult() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Offer Result"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .nameKey, .typeIdentifierKey]),
+              values.isRegularFile == true,
+              CompanionArtifactOfferPolicy.isAllowed(byteCount: Int64(values.fileSize ?? 0))
+        else {
+            presentRemoteResultAlert(title: "Result not offered", message: "Choose one file up to 25 MB.")
+            return
+        }
+
+        let now = Date()
+        let offer = CompanionArtifactOffer(
+            id: UUID(), sourceDeviceID: companionBridge.deviceID,
+            filename: values.name ?? url.lastPathComponent,
+            typeIdentifier: values.typeIdentifier,
+            byteCount: Int64(values.fileSize ?? 0),
+            createdAt: now,
+            expiresAt: now.addingTimeInterval(CompanionArtifactOfferPolicy.lifetime)
+        )
+        let stagingDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SleepSwitch-ArtifactOffers", isDirectory: true)
+            .appendingPathComponent(offer.id.uuidString, isDirectory: true)
+        let stagingFile = stagingDirectory.appendingPathComponent(offer.filename)
+        do {
+            try FileManager.default.createDirectory(
+                at: stagingDirectory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            try FileManager.default.copyItem(at: url, to: stagingFile)
+        } catch {
+            presentRemoteResultAlert(title: "Result not offered", message: "Sleep Switch could not prepare that file.")
+            return
+        }
+        Task { @MainActor in
+            defer { try? FileManager.default.removeItem(at: stagingDirectory) }
+            do {
+                try await CompanionCloudStore().send(offer, assetURL: stagingFile)
+                presentRemoteResultAlert(title: "Result offered", message: "Available to your companion devices for 24 hours.")
+            } catch {
+                presentRemoteResultAlert(title: "Result not offered", message: "Sleep Switch could not publish that result to private iCloud.")
+            }
+        }
+    }
+
+    private func presentRemoteResultAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func connectCodex() {

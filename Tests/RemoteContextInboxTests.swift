@@ -5,6 +5,7 @@ enum RemoteContextInboxTests {
         testReceivesOneSafeCopy()
         testRejectsExpiredTransfer()
         testRejectsEmptyAsset()
+        testListsNewestItemsFirstAndIgnoresNoise()
     }
 
     private static func testReceivesOneSafeCopy() {
@@ -25,6 +26,10 @@ enum RemoteContextInboxTests {
         expect(
             (try? Data(contentsOf: destination)) == Data("private context".utf8),
             "copies the item without altering its contents"
+        )
+        expect(
+            inbox.items().map(\.filename) == ["reference_notes_.pdf"],
+            "surfaces one completed receipt without traversing arbitrary files"
         )
 
         let repeated = inbox.receive(transfer, assetURL: source)
@@ -62,6 +67,43 @@ enum RemoteContextInboxTests {
             .receive(makeTransfer(filename: "empty.txt"), assetURL: source)
 
         expect(!result.accepted, "rejects an empty asset before persisting it")
+    }
+
+    private static func testListsNewestItemsFirstAndIgnoresNoise() {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let inbox = RemoteContextInbox(rootURL: root.appendingPathComponent("inbox"))
+        let firstSource = root.appendingPathComponent("first.txt")
+        let secondSource = root.appendingPathComponent("second.txt")
+        try? Data("first".utf8).write(to: firstSource)
+        try? Data("second".utf8).write(to: secondSource)
+
+        let olderTransfer = makeTransfer(filename: "older.txt")
+        let newerTransfer = makeTransfer(filename: "newer.txt")
+        _ = inbox.receive(olderTransfer, assetURL: firstSource)
+        _ = inbox.receive(newerTransfer, assetURL: secondSource)
+
+        let olderFile = inbox.rootURL
+            .appendingPathComponent(olderTransfer.id.uuidString, isDirectory: true)
+            .appendingPathComponent("older.txt")
+        let newerFile = inbox.rootURL
+            .appendingPathComponent(newerTransfer.id.uuidString, isDirectory: true)
+            .appendingPathComponent("newer.txt")
+        let olderDate = Date(timeIntervalSince1970: 100)
+        let newerDate = Date(timeIntervalSince1970: 200)
+        try? FileManager.default.setAttributes([.modificationDate: olderDate], ofItemAtPath: olderFile.path)
+        try? FileManager.default.setAttributes([.modificationDate: newerDate], ofItemAtPath: newerFile.path)
+
+        let strayDirectory = inbox.rootURL.appendingPathComponent("not-a-transfer", isDirectory: true)
+        try? FileManager.default.createDirectory(at: strayDirectory, withIntermediateDirectories: true)
+        let strayFile = inbox.rootURL.appendingPathComponent("README.txt")
+        try? Data("ignore me".utf8).write(to: strayFile)
+
+        let items = inbox.items(limit: 1)
+
+        expect(items.count == 1, "applies the requested inbox item limit")
+        expect(items.first?.transferID == newerTransfer.id, "sorts inbox items from newest to oldest")
+        expect(items.first?.filename == "newer.txt", "returns the delivered payload filename")
     }
 
     private static func makeTransfer(

@@ -47,6 +47,7 @@
 		88F8BF9E74992CFE3275EF6D /* CoolingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D79FECAE7829B1FF180F384 /* CoolingPolicy.swift */; };
 		928E8E4BF4459EEA3A104297 /* CompanionDeviceManagerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8986F5AE5B6C474EC0CA791 /* CompanionDeviceManagerWindowController.swift */; };
 		9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */; };
+		9CD0B257432E20783833A893 /* RemoteInboxWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C721CDD072558D8C2C9C612 /* RemoteInboxWindowController.swift */; };
 		9F40B9B4615545B273EC2DE1 /* HermesOperatorAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B88265D039A215406A21772 /* HermesOperatorAdapter.swift */; };
 		A01385884E15ACF498553BAA /* AwakeSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434EFCEF4FBDD8DC652EEF14 /* AwakeSession.swift */; };
 		A2CF147E764F593B43FCB77E /* OperatorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79493D5F520A2E0D75666E3 /* OperatorModels.swift */; };
@@ -103,6 +104,7 @@
 		04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDirectoryAccess.swift; sourceTree = "<group>"; };
 		05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingHelperMaintenance.swift; sourceTree = "<group>"; };
 		09C8FEC6CC81B7403F577C86 /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
+		0C721CDD072558D8C2C9C612 /* RemoteInboxWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteInboxWindowController.swift; sourceTree = "<group>"; };
 		0EE2A26511370F28C2398C36 /* CompanionCloudClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCloudClient.swift; sourceTree = "<group>"; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
 		21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHeatNotifications.swift; sourceTree = "<group>"; };
@@ -239,6 +241,7 @@
 				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
 				7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */,
 				BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */,
+				0C721CDD072558D8C2C9C612 /* RemoteInboxWindowController.swift */,
 				C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */,
 				9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */,
 				CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */,
@@ -497,6 +500,7 @@
 				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
 				0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */,
 				9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */,
+				9CD0B257432E20783833A893 /* RemoteInboxWindowController.swift in Sources */,
 				68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */,
 				B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */,
 				F97904FDEE29B8DBFB4C361F /* StatusBarAppearance.swift in Sources */,

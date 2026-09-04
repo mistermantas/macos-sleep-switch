@@ -39,6 +39,11 @@ struct OperatorAutomationSnapshot: Equatable {
     let historyEnabled: Bool
 }
 
+struct OperatorRemoteInboxSnapshot: Equatable {
+    let rootURL: URL
+    let items: [RemoteContextInboxItem]
+}
+
 struct OperatorActionHandlers {
     let toggleManualAwake: () -> Void
     let sleepDisplay: () -> Void
@@ -66,6 +71,7 @@ struct OperatorWindowSnapshot: Equatable {
     let skills: [OperatorSkillRecord]
     let machine: OperatorMachineSnapshot
     let automations: OperatorAutomationSnapshot
+    let remoteInbox: OperatorRemoteInboxSnapshot?
     let persistenceError: String?
 
     static let empty = OperatorWindowSnapshot(
@@ -110,6 +116,7 @@ struct OperatorWindowSnapshot: Equatable {
             diagnosticsEnabled: false,
             historyEnabled: false
         ),
+        remoteInbox: nil,
         persistenceError: nil
     )
 }
@@ -652,6 +659,52 @@ private struct OperatorOverview: View {
                                 Text(lastActivityText(session)).foregroundStyle(.secondary)
                             }
                             .font(.subheadline)
+                        }
+                    }
+                }
+                if let remoteInbox = viewModel.snapshot.remoteInbox {
+                    OperatorPanel(title: "Remote Inbox", symbol: "tray.and.arrow.down.fill") {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(remoteInbox.items.isEmpty ? "No received items" : "\(remoteInbox.items.count) recent deliveries")
+                                    .fontWeight(.medium)
+                                if let latest = remoteInbox.items.first {
+                                    Text("Latest \(relativeTime(latest.receivedAt)) ago")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Button("Review") { viewModel.section = .machine }
+                                .buttonStyle(.bordered)
+                            Button("Reveal folder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([remoteInbox.rootURL])
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        if !remoteInbox.items.isEmpty {
+                            VStack(spacing: 8) {
+                                ForEach(Array(remoteInbox.items.prefix(3))) { item in
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "doc.fill")
+                                            .foregroundStyle(.blue)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.filename)
+                                                .lineLimit(1)
+                                                .fontWeight(.medium)
+                                            Text("\(formatByteCount(item.byteCount)) · \(relativeTime(item.receivedAt)) ago")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Button("Reveal") {
+                                            NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
+                                        }
+                                            .buttonStyle(.bordered)
+                                    }
+                                }
+                            }
+                            .padding(.top, 4)
                         }
                     }
                 }
@@ -1201,6 +1254,7 @@ private struct OperatorMachine: View {
     @ObservedObject var viewModel: OperatorViewModel
 
     private var snapshot: OperatorMachineSnapshot { viewModel.snapshot.machine }
+    private var remoteInbox: OperatorRemoteInboxSnapshot? { viewModel.snapshot.remoteInbox }
 
     var body: some View {
         ScrollView {
@@ -1277,6 +1331,50 @@ private struct OperatorMachine: View {
                 }
                 OperatorPanel(title: "Lid-closed safety", symbol: "shield.lefthalf.filled") {
                     Text(snapshot.lidSafetyMessage).foregroundStyle(.secondary)
+                }
+                if let remoteInbox {
+                    OperatorPanel(title: "Remote Inbox", symbol: "tray.and.arrow.down.fill") {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(remoteInbox.items.isEmpty ? "No received items" : "\(remoteInbox.items.count) files ready for review")
+                                    .fontWeight(.medium)
+                            }
+                            Spacer()
+                            Button("Reveal folder") {
+                                NSWorkspace.shared.activateFileViewerSelecting([remoteInbox.rootURL])
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        if remoteInbox.items.isEmpty {
+                            Text("No items ready for review.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(remoteInbox.items) { item in
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "doc.fill")
+                                            .foregroundStyle(.blue)
+                                            .frame(width: 18)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(item.filename)
+                                                .fontWeight(.medium)
+                                                .lineLimit(1)
+                                            Text("\(formatByteCount(item.byteCount)) · received \(relativeTime(item.receivedAt)) ago")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Button("Reveal") {
+                                            NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding(24)
@@ -1469,6 +1567,10 @@ private func operatorWorkStateTint(_ state: CompanionWorkState) -> Color {
 
 private func formatTokens(_ value: Int) -> String {
     value >= 1_000 ? "\(String(format: "%.1f", Double(value) / 1_000))k" : "\(value)"
+}
+
+private func formatByteCount(_ value: Int64) -> String {
+    ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
 }
 
 private func formatDuration(_ seconds: TimeInterval) -> String {

@@ -113,8 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keyEquivalent: ""
     )
     private let remoteInboxItem = NSMenuItem(
-        title: "Open Remote Inbox",
-        action: #selector(openRemoteInbox),
+        title: "Remote Inbox…",
+        action: #selector(showRemoteInbox),
         keyEquivalent: ""
     )
     private let companionStatusItem = NSMenuItem(
@@ -170,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var operatorWindowController: OperatorWindowController?
     private var preferencesWindowController: SleepSwitchPreferencesWindowController?
     private var companionDeviceManagerWindowController: CompanionDeviceManagerWindowController?
+    private var remoteInboxWindowController: RemoteInboxWindowController?
     private var agentDiagnosticsWindowController: AgentDiagnosticsWindowController?
     private var companionBridgeEnabled = true
     private let remoteContextInbox = RemoteContextInbox()
@@ -484,7 +485,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         remoteInboxItem.target = self
         remoteInboxItem.image = NSImage(
             systemSymbolName: "tray.and.arrow.down",
-            accessibilityDescription: "Open the Remote Inbox folder"
+            accessibilityDescription: "Show context received from your companion devices"
         )
         configureSettingsMenu()
 
@@ -2075,6 +2076,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 diagnosticsEnabled: UserDefaults.standard.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
                 historyEnabled: insightsRecorder.historyEnabled
             ),
+            remoteInbox: OperatorRemoteInboxSnapshot(
+                rootURL: remoteContextInbox.rootURL,
+                items: remoteContextInbox.items()
+            ),
             persistenceError: lastOperatorRefreshResult?.persistenceError
         )
     }
@@ -2979,17 +2984,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         NSWorkspace.shared.open(link.url)
     }
 
-    @objc private func openRemoteInbox() {
-        do {
-            try FileManager.default.createDirectory(
-                at: remoteContextInbox.rootURL,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700]
-            )
-            NSWorkspace.shared.activateFileViewerSelecting([remoteContextInbox.rootURL])
-        } catch {
-            NSSound.beep()
+    @objc private func showRemoteInbox() {
+        if remoteInboxWindowController == nil {
+            remoteInboxWindowController = RemoteInboxWindowController(inbox: remoteContextInbox)
         }
+        remoteInboxWindowController?.show()
     }
 
     @objc private func connectCodex() {

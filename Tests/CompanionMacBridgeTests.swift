@@ -11,6 +11,7 @@ enum CompanionMacBridgeTests {
         await testRecoversFromStalledSync()
         await testFastCommandPollingSkipsHeartbeatWrites()
         await testCommandPollDoesNotWaitForFullSync()
+        await testProcessesContextTransfers()
         await testChangedStatusPublishesWithoutHistory()
     }
 
@@ -198,6 +199,54 @@ enum CompanionMacBridgeTests {
         )
     }
 
+    private static func testProcessesContextTransfers() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let transfer = CompanionContextTransfer(
+            id: UUID(),
+            targetDeviceID: "test-mac",
+            requesterDeviceID: "test-phone",
+            filename: "brief.pdf",
+            typeIdentifier: "com.adobe.pdf",
+            byteCount: 1_024,
+            createdAt: Date(),
+            expiresAt: Date().addingTimeInterval(60)
+        )
+        cloud.pendingTransfers = [
+            CompanionPendingContextTransfer(
+                recordName: transfer.id.uuidString,
+                transfer: transfer,
+                assetURL: URL(fileURLWithPath: "/private/tmp/remote-context-test")
+            )
+        ]
+        var handlerCalls = 0
+        let bridge = makeBridge(
+            cloud: cloud,
+            defaults: defaults,
+            contextTransferHandler: { received, _ in
+                handlerCalls += 1
+                return CompanionContextTransferResult(
+                    transferID: received.id,
+                    accepted: true,
+                    deliveredAt: Date(),
+                    message: "Delivered to Remote Inbox."
+                )
+            }
+        )
+
+        await bridge.pollCommandsAndWait()
+
+        expect(handlerCalls == 1, "hands a pending context item to the private inbox once")
+        expect(
+            cloud.finishedTransferResults.first?.accepted == true,
+            "writes a delivery receipt for the companion"
+        )
+        expect(
+            bridge.diagnostics.processedContextTransferCount == 1,
+            "counts processed context transfers independently from commands"
+        )
+    }
+
     private static func makeBridge(
         cloud: FakeCompanionCloudStore,
         defaults: UserDefaults,
@@ -210,6 +259,14 @@ enum CompanionMacBridgeTests {
                 completedAt: Date(),
                 message: "Executed."
             )
+        },
+        contextTransferHandler: @escaping CompanionMacBridge.ContextTransferHandler = { transfer, _ in
+            CompanionContextTransferResult(
+                transferID: transfer.id,
+                accepted: false,
+                deliveredAt: Date(),
+                message: "Remote Inbox is unavailable."
+            )
         }
     ) -> CompanionMacBridge {
         CompanionMacBridge(
@@ -218,6 +275,7 @@ enum CompanionMacBridgeTests {
             statusProvider: { makeStatus() },
             historyProvider: { makeHistory() },
             commandHandler: commandHandler,
+            contextTransferHandler: contextTransferHandler,
             defaults: defaults,
             statusHeartbeatInterval: 60 * 60,
             stalledSyncInterval: stalledSyncInterval
@@ -337,6 +395,7 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
         result: CompanionContextTransferResult
     ) async throws {
         finishedTransferResults.append(result)
+        transferResults[result.transferID] = result
     }
 
     func reject(

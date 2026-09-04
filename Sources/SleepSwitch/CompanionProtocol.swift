@@ -434,6 +434,17 @@ enum CompanionContextTransferPolicy {
     }
 }
 
+/// A mobile follow-up is intentionally a short text attachment, not a remote
+/// chat channel. It uses the same explicit, expiring Remote Inbox handoff as a
+/// file and cannot be injected into a local agent session automatically.
+enum CompanionFollowUpNotePolicy {
+    static let maximumByteCount = 16 * 1_024
+
+    static func isAllowed(byteCount: Int) -> Bool {
+        (1...maximumByteCount).contains(byteCount)
+    }
+}
+
 /// A Mac owner’s deliberate offer of one generated result to their own
 /// companion devices. It contains no project path, command, or agent output
 /// text: the chosen filename and asset are the entire offer.

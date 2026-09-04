@@ -55,6 +55,8 @@ Scope: evidence-backed attention events, notification routing, completed-work su
 
 Acceptance: active work does not spam; action-required events name a session/project only when titles are opted in; approval execution remains narrow, explicit, and auditable.
 
+First delivered follow-up slice: the companion can send one user-written, 16 KB maximum note through the existing expiring Remote Inbox transfer. It is a text attachment addressed to a selected Mac, never a remote agent-chat message or automatic injection into a project/session. Codex’s current local history schema exposes no structured approval request item, so command approvals remain unshipped until a harness can supply an evidence-backed request contract.
+
 ### 5. Preview access [planned]
 
 Scope: opt-in same-network preview registration/discovery and direct secure opening.

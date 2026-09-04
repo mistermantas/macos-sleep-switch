@@ -783,6 +783,41 @@ final class CompanionAppModel: ObservableObject {
         }
     }
 
+    /// Sends a short, explicit mobile follow-up through the existing private
+    /// inbox contract. It never opens or controls a harness directly.
+    func sendFollowUpNote(_ text: String, to mac: CompanionMacStatus) {
+        let note = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let data = Data(note.utf8)
+        guard CompanionFollowUpNotePolicy.isAllowed(byteCount: data.count) else {
+            message = note.isEmpty
+                ? "Write a follow-up before sending it."
+                : "Follow-up notes are limited to 16 KB."
+            return
+        }
+
+        let directory = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        )[0]
+        .appendingPathComponent("Sleep Switch/Follow-up Drafts/\(UUID().uuidString)", isDirectory: true)
+        let sourceURL = directory.appendingPathComponent("follow-up-note.txt", isDirectory: false)
+        do {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            try data.write(to: sourceURL, options: [.atomic])
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: sourceURL.path)
+            sendContextItem(from: sourceURL, to: mac) { _ in
+                try? FileManager.default.removeItem(at: directory)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            message = "Sleep Switch could not prepare that follow-up."
+        }
+    }
+
     func reloadSharedContextDrafts() {
 #if DEBUG
         if isSharedContextDemo { return }

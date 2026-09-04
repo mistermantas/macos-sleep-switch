@@ -10,6 +10,8 @@ struct CompanionDashboardRoot: View {
     @State private var showingSettings = false
     @State private var showingPairingHelp = false
     @State private var showingContextImporter = false
+    @State private var showingFollowUpComposer = false
+    @State private var followUpText = ""
     @State private var pendingAction: CompanionRemoteAction?
     @State private var pendingSharedContextDraft: SharedContextDraft?
 
@@ -57,6 +59,9 @@ struct CompanionDashboardRoot: View {
             }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-settings") {
             CompanionPreferencesView(model: model) {}
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-follow-up"),
+                  let mac = selectedMac {
+            RemoteFollowUpComposer(mac: mac, model: model, text: .constant("")) {}
         } else {
             rootContent
         }
@@ -107,6 +112,14 @@ struct CompanionDashboardRoot: View {
             }
             .sheet(isPresented: $showingPairingHelp) {
                 PairingHelpView()
+            }
+            .sheet(isPresented: $showingFollowUpComposer) {
+                if let mac = selectedMac {
+                    RemoteFollowUpComposer(mac: mac, model: model, text: $followUpText) {
+                        followUpText = ""
+                        showingFollowUpComposer = false
+                    }
+                }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if let progress = model.commandProgress {
@@ -190,7 +203,8 @@ struct CompanionDashboardRoot: View {
                     RemoteInboxCard(
                         mac: mac,
                         model: model,
-                        sendFile: { showingContextImporter = true }
+                        sendFile: { showingContextImporter = true },
+                        addFollowUp: { showingFollowUpComposer = true }
                     )
                 }
                 if !model.artifactOffers(for: mac).isEmpty {
@@ -814,6 +828,7 @@ private struct RemoteInboxCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
     let sendFile: () -> Void
+    let addFollowUp: () -> Void
 
     private var recentTransfers: [CompanionContextTransferActivity] {
         model.contextTransfers(for: mac)
@@ -835,6 +850,12 @@ private struct RemoteInboxCard: View {
                     sendFile()
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(model.commandInFlight)
+
+                Button("Add note", systemImage: "square.and.pencil") {
+                    addFollowUp()
+                }
+                .buttonStyle(.bordered)
                 .disabled(model.commandInFlight)
 
                 Spacer()
@@ -881,6 +902,63 @@ private struct RemoteInboxCard: View {
         model.lastContextTransferStatus == "Never"
             ? "No recent transfers"
             : model.lastContextTransferStatus
+    }
+}
+
+private struct RemoteFollowUpComposer: View {
+    let mac: CompanionMacStatus
+    @ObservedObject var model: CompanionAppModel
+    @Binding var text: String
+    let dismiss: () -> Void
+
+    private var byteCount: Int { Data(text.utf8).count }
+    private var canSend: Bool {
+        CompanionFollowUpNotePolicy.isAllowed(byteCount: byteCount) && !model.commandInFlight
+    }
+
+    private var sizeText: String {
+        byteCount == 0
+            ? "0 B"
+            : ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .file)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextEditor(text: $text)
+                        .frame(minHeight: 180)
+                        .accessibilityLabel("Follow-up note")
+                } header: {
+                    Text("Note for \(mac.displayName)")
+                } footer: {
+                    Text("This arrives in the Mac’s private Remote Inbox. It is not sent to an agent automatically.")
+                }
+
+                Section {
+                    HStack {
+                        Text("Size")
+                        Spacer()
+                        Text("\(sizeText) of 16 KB")
+                            .foregroundStyle(byteCount > CompanionFollowUpNotePolicy.maximumByteCount ? .orange : .secondary)
+                    }
+                }
+            }
+            .navigationTitle("Follow-up note")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: dismiss)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Send") {
+                        model.sendFollowUpNote(text, to: mac)
+                        dismiss()
+                    }
+                    .disabled(!canSend)
+                }
+            }
+        }
     }
 }
 

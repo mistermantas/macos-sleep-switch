@@ -9,6 +9,20 @@ enum CompanionProtocolTests {
         testSelectsFreshReplacementForStalePersistedMac()
         testDoesNotSwitchAStaleSelectionToAnotherMac()
         testWidgetRefreshPlan()
+        expect(
+            CompanionFollowUpNotePolicy.isAllowed(byteCount: 1),
+            "allows a non-empty bounded follow-up note"
+        )
+        expect(
+            !CompanionFollowUpNotePolicy.isAllowed(byteCount: 0),
+            "rejects an empty follow-up note"
+        )
+        expect(
+            !CompanionFollowUpNotePolicy.isAllowed(
+                byteCount: CompanionFollowUpNotePolicy.maximumByteCount + 1
+            ),
+            "enforces the follow-up note limit"
+        )
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,

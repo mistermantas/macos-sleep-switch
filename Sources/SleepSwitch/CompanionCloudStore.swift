@@ -43,6 +43,28 @@ struct CompanionPendingContextTransfer {
     }
 }
 
+struct CompanionPendingArtifactOffer {
+    let recordName: String
+    let offer: CompanionArtifactOffer?
+    let assetURL: URL?
+    let decodeError: String?
+    fileprivate let record: CKRecord?
+
+    init(
+        recordName: String,
+        offer: CompanionArtifactOffer?,
+        assetURL: URL? = nil,
+        decodeError: String? = nil,
+        record: CKRecord? = nil
+    ) {
+        self.recordName = recordName
+        self.offer = offer
+        self.assetURL = assetURL
+        self.decodeError = decodeError
+        self.record = record
+    }
+}
+
 protocol CompanionCloudStoring: AnyObject {
     var lastIssue: String? { get }
 
@@ -73,6 +95,8 @@ protocol CompanionCloudStoring: AnyObject {
         transfer: CompanionPendingContextTransfer,
         result: CompanionContextTransferResult
     ) async throws
+    func send(_ offer: CompanionArtifactOffer, assetURL: URL) async throws
+    func fetchArtifactOffers(for sourceDeviceID: String) async throws -> [CompanionPendingArtifactOffer]
     func consumeLastIssue() -> String?
 }
 
@@ -96,6 +120,7 @@ final class CompanionCloudStore: CompanionCloudStoring {
     static let historyRecordType = "InsightsHistory"
     static let commandRecordType = "RemoteCommand"
     static let contextTransferRecordType = "RemoteContextTransfer"
+    static let artifactOfferRecordType = "RemoteArtifactOffer"
     static let statusRecordPrefix = "mac-status-"
     static let historyRecordPrefix = "mac-history-"
     static let commandStatePending = "pending"
@@ -104,6 +129,7 @@ final class CompanionCloudStore: CompanionCloudStoring {
     static let contextStatePending = "pending"
     static let contextStateDelivered = "delivered"
     static let contextStateRejected = "rejected"
+    static let artifactStateOffered = "offered"
 
     private static let pageLimit = 100
     private static let maxQueryPages = 20
@@ -257,8 +283,13 @@ final class CompanionCloudStore: CompanionCloudStoring {
             type: Self.contextTransferRecordType,
             predicate: NSPredicate(format: "targetDeviceID == %@", deviceID)
         )
+        let offers = try await fetchRecords(
+            type: Self.artifactOfferRecordType,
+            predicate: NSPredicate(format: "sourceDeviceID == %@", deviceID)
+        )
         ids.append(contentsOf: commands.map(\.recordID))
         ids.append(contentsOf: transfers.map(\.recordID))
+        ids.append(contentsOf: offers.map(\.recordID))
         for id in ids {
             do {
                 _ = try await database.deleteRecord(withID: id)
@@ -294,6 +325,52 @@ final class CompanionCloudStore: CompanionCloudStoring {
         record["payload"] = try CompanionJSON.encoder.encode(transfer) as CKRecordValue
         record["asset"] = CKAsset(fileURL: assetURL)
         try await database.save(record)
+    }
+
+    func send(_ offer: CompanionArtifactOffer, assetURL: URL) async throws {
+        let record = CKRecord(
+            recordType: Self.artifactOfferRecordType,
+            recordID: CKRecord.ID(recordName: offer.id.uuidString)
+        )
+        record["sourceDeviceID"] = offer.sourceDeviceID as CKRecordValue
+        record["state"] = Self.artifactStateOffered as CKRecordValue
+        record["createdAt"] = offer.createdAt as CKRecordValue
+        record["expiresAt"] = offer.expiresAt as CKRecordValue
+        record["payload"] = try CompanionJSON.encoder.encode(offer) as CKRecordValue
+        record["asset"] = CKAsset(fileURL: assetURL)
+        try await database.save(record)
+    }
+
+    func fetchArtifactOffers(for sourceDeviceID: String) async throws -> [CompanionPendingArtifactOffer] {
+        try await fetchRecords(
+            type: Self.artifactOfferRecordType,
+            predicate: NSPredicate(
+                format: "sourceDeviceID == %@ AND state == %@ AND expiresAt > %@",
+                sourceDeviceID,
+                Self.artifactStateOffered,
+                Date() as NSDate
+            )
+        )
+        .compactMap { record in
+            guard let data = record["payload"] as? Data else {
+                noteIssue("A remote artifact offer is missing its metadata.")
+                return CompanionPendingArtifactOffer(recordName: record.recordID.recordName, offer: nil, decodeError: "Remote artifact metadata is unavailable.", record: record)
+            }
+            do {
+                let offer = try CompanionJSON.decoder.decode(CompanionArtifactOffer.self, from: data)
+                guard !offer.isExpired else { return nil }
+                return CompanionPendingArtifactOffer(
+                    recordName: record.recordID.recordName,
+                    offer: offer,
+                    assetURL: (record["asset"] as? CKAsset)?.fileURL,
+                    record: record
+                )
+            } catch {
+                noteIssue("Remote artifact metadata could not be decoded.")
+                return CompanionPendingArtifactOffer(recordName: record.recordID.recordName, offer: nil, decodeError: "Remote artifact metadata is unavailable.", record: record)
+            }
+        }
+        .sorted { ($0.offer?.createdAt ?? .distantPast) > ($1.offer?.createdAt ?? .distantPast) }
     }
 
     func fetchPendingContextTransfers(

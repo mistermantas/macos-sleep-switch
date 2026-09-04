@@ -368,6 +368,8 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     func deleteDeviceData(for deviceID: String) async throws {}
     func send(_ command: CompanionRemoteCommand) async throws {}
     func send(_ transfer: CompanionContextTransfer, assetURL _: URL) async throws {}
+    func send(_ offer: CompanionArtifactOffer, assetURL _: URL) async throws {}
+    func fetchArtifactOffers(for sourceDeviceID: String) async throws -> [CompanionPendingArtifactOffer] { [] }
     func fetchCommandResult(for commandID: UUID) async throws -> CompanionRemoteResult? { nil }
     func fetchContextTransferResult(for transferID: UUID) async throws -> CompanionContextTransferResult? {
         transferResults[transferID]

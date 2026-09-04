@@ -405,6 +405,30 @@ enum CompanionContextTransferPolicy {
     }
 }
 
+/// A Mac owner’s deliberate offer of one generated result to their own
+/// companion devices. It contains no project path, command, or agent output
+/// text: the chosen filename and asset are the entire offer.
+struct CompanionArtifactOffer: Codable, Equatable, Identifiable {
+    let id: UUID
+    let sourceDeviceID: String
+    let filename: String
+    let typeIdentifier: String?
+    let byteCount: Int64
+    let createdAt: Date
+    let expiresAt: Date
+
+    var isExpired: Bool { Date() >= expiresAt }
+}
+
+enum CompanionArtifactOfferPolicy {
+    static let maximumByteCount: Int64 = 25 * 1_024 * 1_024
+    static let lifetime: TimeInterval = 24 * 60 * 60
+
+    static func isAllowed(byteCount: Int64) -> Bool {
+        (1...maximumByteCount).contains(byteCount)
+    }
+}
+
 struct CompanionManualSessionStatus: Codable, Equatable {
     let startedAt: Date
     let endsAt: Date?

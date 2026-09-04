@@ -45,6 +45,7 @@ struct OperatorRemoteInboxSnapshot: Equatable {
 }
 
 struct OperatorActionHandlers {
+    let connectCodex: () -> Void
     let toggleManualAwake: () -> Void
     let sleepDisplay: () -> Void
     let toggleAgentAwake: () -> Void
@@ -225,6 +226,11 @@ final class OperatorViewModel: ObservableObject {
 
     var displayedSessions: [OperatorSession] {
         sessionScope == .live ? activeSessions : recentSessions
+    }
+
+    func codexThread(for session: OperatorSession) -> CodexThreadMirror? {
+        guard session.harnessID == "codex" else { return nil }
+        return snapshot.codexThreads.first { $0.id == session.id }
     }
 
     var attentionItems: [String] {
@@ -612,6 +618,15 @@ private struct OperatorOverview: View {
                         ForEach(viewModel.attentionItems, id: \.self) { item in
                             Label(item, systemImage: "exclamationmark.circle.fill")
                                 .foregroundStyle(.orange)
+                        }
+                    }
+                }
+                if viewModel.snapshot.adapterSnapshots.contains(where: { $0.harnessID == "codex" && $0.availability == .permissionRequired }) {
+                    OperatorPanel(title: "Codex access", symbol: "folder.badge.plus") {
+                        HStack {
+                            Text("Choose your .codex folder to restore local sessions, chats, and skills.").foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Connect Codex…") { viewModel.actions.connectCodex() }.buttonStyle(.borderedProminent)
                         }
                     }
                 }
@@ -1135,11 +1150,19 @@ private struct OperatorSessions: View {
             } else {
                 List(viewModel.displayedSessions) { session in
                     let state = viewModel.workState(for: session)
+                    let thread = viewModel.codexThread(for: session)
                     HStack(spacing: 12) {
                         Circle().fill(operatorWorkStateTint(state)).frame(width: 8, height: 8)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(session.harnessName).fontWeight(.semibold)
-                            Text(state.title).font(.caption).foregroundStyle(.secondary)
+                            Text(thread?.title ?? session.harnessName).fontWeight(.semibold).lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(thread?.projectName ?? session.harnessName)
+                                Text("·")
+                                Text(thread?.recentActivity?.title ?? state.title)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                         }
                         Spacer()
                         Text(formatDuration(session.durationSeconds)).foregroundStyle(.secondary).monospacedDigit()

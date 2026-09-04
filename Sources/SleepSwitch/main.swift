@@ -1983,6 +1983,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try coordinator.moveCodexThread(threadID, toSectionID: sectionID)
                 },
                 actions: OperatorActionHandlers(
+                    connectCodex: { [weak self] in self?.connectCodex() },
                     toggleManualAwake: { [weak self] in self?.toggleKeepAwake() },
                     sleepDisplay: { [weak self] in self?.sleepDisplayNow() },
                     toggleAgentAwake: { [weak self] in self?.toggleAutomaticAgentAwake() },

@@ -45,6 +45,12 @@ struct CompanionDashboardRoot: View {
                 }
                 .navigationTitle("Operator")
             }
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-remote-work"),
+                  let mac = selectedMac,
+                  let summary = mac.remoteWork {
+            NavigationStack {
+                CompanionRemoteWorkScreen(summary: summary, isStale: mac.isStale)
+            }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-settings") {
             CompanionPreferencesView(model: model) {}
         } else {
@@ -164,6 +170,20 @@ struct CompanionDashboardRoot: View {
                 )
                 if let summary = mac.operatorSummary {
                     OperatorSummaryCard(summary: summary, isStale: mac.isStale)
+                }
+                if let remoteWork = mac.remoteWork {
+                    NavigationLink {
+                        CompanionRemoteWorkScreen(
+                            summary: remoteWork,
+                            isStale: mac.isStale
+                        )
+                    } label: {
+                        CompanionRemoteWorkCard(
+                            summary: remoteWork,
+                            isStale: mac.isStale
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 if mac.cooling != nil || mac.capabilities.canSetCoolingProfile == true {
                     CoolingControlCard(mac: mac, model: model)
@@ -577,6 +597,149 @@ private struct OperatorSummaryCard: View {
         default:
             "Finish action queued"
         }
+    }
+}
+
+private struct CompanionRemoteWorkCard: View {
+    let summary: CompanionRemoteWorkSummary
+    let isStale: Bool
+
+    private var headline: String {
+        if summary.attentionCount > 0 {
+            return "\(summary.attentionCount) needs attention"
+        }
+        if summary.activeCount > 0 {
+            return "\(summary.activeCount) active"
+        }
+        return "No active work"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Agent work", systemImage: "rectangle.3.group.bubble")
+                    .font(.headline)
+                Spacer()
+                Text(isStale ? "Last known" : headline)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(summary.attentionCount > 0 ? .orange : .secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            if !summary.stateCounts.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(summary.stateCounts) { count in
+                            Label("\(count.count) \(count.state.title)", systemImage: stateSymbol(count.state))
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(stateColor(count.state))
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 6)
+                                .background(stateColor(count.state).opacity(0.11), in: Capsule())
+                        }
+                    }
+                }
+            }
+        }
+        .cardStyle()
+    }
+}
+
+private struct CompanionRemoteWorkScreen: View {
+    let summary: CompanionRemoteWorkSummary
+    let isStale: Bool
+
+    private var attention: [CompanionWorkItemSummary] {
+        summary.items.filter { $0.state.requiresAttention }
+    }
+
+    private var inFlight: [CompanionWorkItemSummary] {
+        summary.items.filter { !$0.state.requiresAttention && ($0.state == .active || $0.state == .waiting) }
+    }
+
+    private var complete: [CompanionWorkItemSummary] {
+        summary.items.filter { !attention.contains($0) && !inFlight.contains($0) }
+    }
+
+    var body: some View {
+        List {
+            if isStale {
+                Label("Showing the last update from this Mac", systemImage: "clock.arrow.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !attention.isEmpty {
+                Section("Attention") {
+                    ForEach(attention) { item in CompanionRemoteWorkRow(item: item) }
+                }
+            }
+            if !inFlight.isEmpty {
+                Section("In progress") {
+                    ForEach(inFlight) { item in CompanionRemoteWorkRow(item: item) }
+                }
+            }
+            if !complete.isEmpty {
+                Section("Recent") {
+                    ForEach(complete) { item in CompanionRemoteWorkRow(item: item) }
+                }
+            }
+            if summary.items.isEmpty {
+                ContentUnavailableView("No agent work yet", systemImage: "terminal")
+            }
+        }
+        .navigationTitle("Agent work")
+    }
+}
+
+private struct CompanionRemoteWorkRow: View {
+    let item: CompanionWorkItemSummary
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: stateSymbol(item.state))
+                .foregroundStyle(stateColor(item.state))
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title ?? "\(item.harnessName) session")
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                Text("\(item.harnessName) · \(CompanionTimeText.elapsed(since: item.updatedAt))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(item.state.title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(stateColor(item.state))
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+private func stateSymbol(_ state: CompanionWorkState) -> String {
+    switch state {
+    case .active: "circle.fill"
+    case .stalled: "clock.badge.exclamationmark"
+    case .waiting: "pause.circle"
+    case .blocked: "exclamationmark.triangle"
+    case .rateLimited: "gauge.with.dots.needle.50percent"
+    case .failed: "xmark.circle"
+    case .stopped: "stop.circle"
+    case .finished: "checkmark.circle"
+    case .reviewReady: "eye"
+    case .unknown: "questionmark.circle"
+    }
+}
+
+private func stateColor(_ state: CompanionWorkState) -> Color {
+    switch state {
+    case .active: .blue
+    case .stalled, .blocked, .rateLimited: .orange
+    case .failed, .stopped: .red
+    case .finished, .reviewReady: .green
+    case .waiting, .unknown: .secondary
     }
 }
 

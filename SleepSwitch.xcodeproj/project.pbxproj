@@ -35,6 +35,7 @@
 		606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */; };
 		657C4AB0D22BAB6F2DD23DF0 /* CoolingHelperMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CE92BD643538E8202EF76F /* CoolingHelperMaintenance.swift */; };
 		687ACFDFB3455DD2FF40F6DA /* CodexThreadMirrorAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227EC5C9C7AEA6D82C5B3022 /* CodexThreadMirrorAdapter.swift */; };
+		68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */; };
 		7273169E67C2C07F2BA4DF42 /* CodexDirectoryAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04174891F619D59069A544F1 /* CodexDirectoryAccess.swift */; };
 		7410E02D038E6FBB19237A79 /* AgentDiagnosticsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75325C8684ABA8052CFD0816 /* AgentDiagnosticsWindowController.swift */; };
 		75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */; };
@@ -142,6 +143,7 @@
 		B9AFC8206A9CA5225BE76899 /* CoolingProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingProfile.swift; sourceTree = "<group>"; };
 		BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteEnergyController.swift; sourceTree = "<group>"; };
 		BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyTelemetry.swift; sourceTree = "<group>"; };
+		C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWorkProjection.swift; sourceTree = "<group>"; };
 		CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarAppearance.swift; sourceTree = "<group>"; };
 		CB4D38BD344974FE57CBF81F /* DisplayPowerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayPowerController.swift; sourceTree = "<group>"; };
 		CE73E3A9B401E2143B487793 /* InsightsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsModels.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 				4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */,
 				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
 				BCFAD8925CAAF357821A3592 /* RemoteEnergyController.swift */,
+				C13E1C04566888275E16EB4F /* RemoteWorkProjection.swift */,
 				9B7F8BC6EC61FC5E27FCFDBE /* SleepSwitchPreferences.swift */,
 				CA78B259EE5D09E50A5A6723 /* StatusBarAppearance.swift */,
 			);
@@ -490,6 +493,7 @@
 				F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */,
 				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
 				9483B8EA68E15086072B868B /* RemoteEnergyController.swift in Sources */,
+				68AD3331ACB8F85E581A602B /* RemoteWorkProjection.swift in Sources */,
 				B308E2B3B790DD5D28A4D8C5 /* SleepSwitchPreferences.swift in Sources */,
 				F97904FDEE29B8DBFB4C361F /* StatusBarAppearance.swift in Sources */,
 				213204C2ADD3B76D7DE8742F /* main.swift in Sources */,

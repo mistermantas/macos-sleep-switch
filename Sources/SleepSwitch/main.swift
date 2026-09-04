@@ -350,7 +350,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             SleepSwitchPreferenceKey.statusBarIconStyle: StatusBarIconStyle.adaptive.rawValue,
             SleepSwitchPreferenceKey.statusBarIconScale: StatusBarIconScale.standard.rawValue,
             SleepSwitchPreferenceKey.showsColoredStatusDots: true,
-            SleepSwitchPreferenceKey.statusBarDotEmphasis: StatusBarDotEmphasis.standard.rawValue
+            SleepSwitchPreferenceKey.statusBarDotEmphasis: StatusBarDotEmphasis.standard.rawValue,
+            SleepSwitchPreferenceKey.remoteWorkSharingEnabled: false,
+            SleepSwitchPreferenceKey.remoteWorkTitlesEnabled: false
         ]
 #if !APP_STORE
         registeredDefaults[coolingAgentsOnlyKey] = false
@@ -857,6 +859,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func companionStatus() -> CompanionMacStatus {
         let reading = IOKitPowerTelemetryProvider().read()
+        let defaults = UserDefaults.standard
         let sessionCount = detectedAgents.reduce(0) { $0 + $1.processCount }
         let agentStatuses = detectedAgents.map {
             CompanionAgentStatus(
@@ -926,7 +929,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             operatorSummary: operatorCoordinator.companionSummary(
                 finishAction: queuedAgentFinishAction,
                 alerts: operatorAlertCodes
-            )
+            ),
+            remoteWork: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkSharingEnabled)
+                ? RemoteWorkProjection.make(
+                    sessions: operatorCoordinator.sessions(),
+                    codexThreads: lastOperatorRefreshResult?.codexMirror.threads ?? [],
+                    includeTitles: defaults.bool(
+                        forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled
+                    )
+                )
+                : nil
         )
     }
 
@@ -2108,7 +2120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             aggressiveComfortTargetCelsius: aggressiveComfortTargetCelsius,
             aggressiveLaunchBoostDemand: aggressiveLaunchBoostDemand,
             statusBarAppearance: StatusBarAppearance(defaults: defaults),
-            showsDockIcon: defaults.bool(forKey: showsDockIconKey)
+            showsDockIcon: defaults.bool(forKey: showsDockIconKey),
+            remoteWorkSharingEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkSharingEnabled),
+            remoteWorkTitlesEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled)
         )
     }
 
@@ -2180,6 +2194,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             defaults.set(enabled, forKey: showsDockIconKey)
             NSApp.setActivationPolicy(enabled ? .regular : .accessory)
             return
+        case .remoteWorkSharingEnabled(let enabled):
+            defaults.set(enabled, forKey: SleepSwitchPreferenceKey.remoteWorkSharingEnabled)
+            companionBridge.publishStatusChange()
+        case .remoteWorkTitlesEnabled(let enabled):
+            defaults.set(enabled, forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled)
+            companionBridge.publishStatusChange()
         case .aggressiveComfortTarget(let celsius):
 #if !APP_STORE
             defaults.set(

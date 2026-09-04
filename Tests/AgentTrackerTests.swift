@@ -104,6 +104,7 @@ struct AgentTrackerTests {
         )
         testHermesSessionTracker(hermesAgent: detected[2])
         OperatorAdapterTests.run()
+        RemoteWorkProjectionTests.run()
         CodexThreadMirrorAdapterTests.run()
         testPowerAssertions()
         testKeepAwakeModes()

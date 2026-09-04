@@ -757,6 +757,47 @@ private enum CompanionScreenshotDemo {
                 durationDeltaSeconds: 11_820,
                 finishAction: CompanionRemoteAction.sleepMacWhenAgentsFinish.rawValue,
                 alertCodes: []
+            ),
+            remoteWork: CompanionRemoteWorkSummary(
+                updatedAt: now,
+                items: [
+                    CompanionWorkItemSummary(
+                        id: "demo-codex-active",
+                        harnessID: "codex",
+                        harnessName: "Codex",
+                        state: .active,
+                        startedAt: now.addingTimeInterval(-2_760),
+                        updatedAt: now.addingTimeInterval(-10),
+                        durationSeconds: 2_760,
+                        title: "Refine checkout review"
+                    ),
+                    CompanionWorkItemSummary(
+                        id: "demo-codex-waiting",
+                        harnessID: "codex",
+                        harnessName: "Codex",
+                        state: .waiting,
+                        startedAt: now.addingTimeInterval(-1_040),
+                        updatedAt: now.addingTimeInterval(-95),
+                        durationSeconds: 1_040,
+                        title: "Audit release notes"
+                    ),
+                    CompanionWorkItemSummary(
+                        id: "demo-hermes-finished",
+                        harnessID: "hermes-agent",
+                        harnessName: "Hermes",
+                        state: .finished,
+                        startedAt: now.addingTimeInterval(-3_800),
+                        updatedAt: now.addingTimeInterval(-340),
+                        durationSeconds: 3_460,
+                        title: nil
+                    )
+                ],
+                stateCounts: [
+                    CompanionWorkStateCount(state: .active, count: 1),
+                    CompanionWorkStateCount(state: .waiting, count: 1),
+                    CompanionWorkStateCount(state: .finished, count: 1)
+                ],
+                attentionCount: 0
             )
         )
 

@@ -22,6 +22,8 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var aggressiveLaunchBoostDemand: Double?
     var statusBarAppearance: StatusBarAppearance
     var showsDockIcon: Bool
+    var remoteWorkSharingEnabled: Bool
+    var remoteWorkTitlesEnabled: Bool
 
     static let empty = SleepSwitchPreferencesSnapshot(
         keepDisplayAwake: true, activateOnLaunch: false, defaultDurationSeconds: 0,
@@ -34,7 +36,9 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         diagnosticsEnabled: false, codexActiveWindowSeconds: 180, coolingDescription: nil,
         aggressiveComfortTargetCelsius: nil, aggressiveLaunchBoostDemand: nil,
         statusBarAppearance: StatusBarAppearance(iconStyle: .adaptive, showsColoredStatusDots: true),
-        showsDockIcon: false
+        showsDockIcon: false,
+        remoteWorkSharingEnabled: false,
+        remoteWorkTitlesEnabled: false
     )
 }
 
@@ -57,6 +61,8 @@ enum SleepSwitchPreferencesMutation {
     case showsColoredStatusDots(Bool)
     case statusBarDotEmphasis(StatusBarDotEmphasis)
     case showsDockIcon(Bool)
+    case remoteWorkSharingEnabled(Bool)
+    case remoteWorkTitlesEnabled(Bool)
 }
 
 @MainActor
@@ -462,6 +468,20 @@ private struct PreferencesWindowView: View {
                 LabeledContent("Connection", value: viewModel.snapshot.companionStatus)
                 Button("Manage Macs…") { viewModel.showDeviceManager() }
                 Text("The iPhone must use the same Apple Account with iCloud enabled. A Mac must be awake, online, and running Sleep Switch to receive remote actions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Remote Work") {
+                Toggle("Share operational agent state", isOn: binding(
+                    get: { viewModel.snapshot.remoteWorkSharingEnabled },
+                    set: { .remoteWorkSharingEnabled($0) }
+                ))
+                Toggle("Include Codex chat titles", isOn: binding(
+                    get: { viewModel.snapshot.remoteWorkTitlesEnabled },
+                    set: { .remoteWorkTitlesEnabled($0) }
+                ))
+                .disabled(!viewModel.snapshot.remoteWorkSharingEnabled)
+                Text("State, timing, and harness names go through your private iCloud database. Prompts, message text, paths, commands, files, and logs stay on this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

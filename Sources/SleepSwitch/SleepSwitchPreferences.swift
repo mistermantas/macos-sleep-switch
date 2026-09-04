@@ -17,6 +17,11 @@ enum SleepSwitchPreferenceKey {
     static let statusBarIconScale = "statusBarIconScale"
     static let showsColoredStatusDots = "showsColoredStatusDots"
     static let statusBarDotEmphasis = "statusBarDotEmphasis"
+    /// Remote Work itself is an explicit opt-in. The separate title switch is
+    /// deliberately more private: operational state can be useful without
+    /// exposing a task’s wording on another device.
+    static let remoteWorkSharingEnabled = "remoteWorkSharingEnabled"
+    static let remoteWorkTitlesEnabled = "remoteWorkTitlesEnabled"
 }
 
 struct LidClosedSafetyConfiguration: Equatable {

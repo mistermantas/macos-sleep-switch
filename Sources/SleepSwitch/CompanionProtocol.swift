@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum CompanionTimeText {
@@ -278,6 +279,92 @@ struct CompanionOperatorSummary: Codable, Equatable {
     let alertCodes: [String]
 }
 
+/// The operational lifecycle shown by Remote Work. These are deliberately
+/// finer than a generic “active / done” badge: mobile decisions depend on
+/// whether a task is making progress, needs the user, or is simply ready for
+/// review. A harness is never guessed into an attention state it cannot prove.
+enum CompanionWorkState: String, Codable, CaseIterable, Identifiable {
+    case active
+    case stalled
+    case waiting
+    case blocked
+    case rateLimited
+    case failed
+    case stopped
+    case finished
+    case reviewReady
+    case unknown
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .active: "Active"
+        case .stalled: "Stalled"
+        case .waiting: "Waiting"
+        case .blocked: "Blocked"
+        case .rateLimited: "Rate limited"
+        case .failed: "Failed"
+        case .stopped: "Stopped"
+        case .finished: "Finished"
+        case .reviewReady: "Ready to review"
+        case .unknown: "Unknown"
+        }
+    }
+
+    var requiresAttention: Bool {
+        switch self {
+        case .stalled, .blocked, .rateLimited, .failed:
+            true
+        case .active, .waiting, .stopped, .finished, .reviewReady, .unknown:
+            false
+        }
+    }
+}
+
+struct CompanionWorkStateCount: Codable, Equatable, Identifiable {
+    let state: CompanionWorkState
+    let count: Int
+
+    var id: String { state.rawValue }
+}
+
+/// An intentionally narrow, private-iCloud projection of one unit of work.
+/// `id` is a one-way pseudonym of the local session/thread identifier. No
+/// prompts, message excerpts, paths, command text, tool payloads, artifacts,
+/// or logs are carried here. A title appears only after the Mac owner enables
+/// the separate title-sharing preference.
+struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
+    let id: String
+    let harnessID: String
+    let harnessName: String
+    let state: CompanionWorkState
+    let startedAt: Date
+    let updatedAt: Date
+    let durationSeconds: TimeInterval
+    let title: String?
+}
+
+/// A bounded remote-work projection. It is optional in Mac status for
+/// backwards compatibility and is published only when Remote Work is enabled
+/// explicitly on the Mac.
+struct CompanionRemoteWorkSummary: Codable, Equatable {
+    let updatedAt: Date
+    let items: [CompanionWorkItemSummary]
+    let stateCounts: [CompanionWorkStateCount]
+    let attentionCount: Int
+
+    var activeCount: Int {
+        stateCounts.first(where: { $0.state == .active })?.count ?? 0
+    }
+
+    static func pseudonymousID(harnessID: String, localID: String) -> String {
+        let input = Data("\(harnessID)\u{0}\(localID)".utf8)
+        let digest = SHA256.hash(data: input)
+        return digest.prefix(12).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
 struct CompanionManualSessionStatus: Codable, Equatable {
     let startedAt: Date
     let endsAt: Date?
@@ -404,6 +491,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     let cooling: CompanionCoolingStatus?
     var safety: CompanionSafetySettings? = nil
     var operatorSummary: CompanionOperatorSummary? = nil
+    /// Only present when Remote Work sharing is enabled on the Mac.
+    var remoteWork: CompanionRemoteWorkSummary? = nil
 
     init(
         deviceID: String,
@@ -433,7 +522,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         manualSession: CompanionManualSessionStatus? = nil,
         cooling: CompanionCoolingStatus? = nil,
         safety: CompanionSafetySettings? = nil,
-        operatorSummary: CompanionOperatorSummary? = nil
+        operatorSummary: CompanionOperatorSummary? = nil,
+        remoteWork: CompanionRemoteWorkSummary? = nil
     ) {
         self.deviceID = deviceID
         self.machineFingerprint = machineFingerprint
@@ -463,6 +553,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.cooling = cooling
         self.safety = safety
         self.operatorSummary = operatorSummary
+        self.remoteWork = remoteWork
     }
 
     var id: String { deviceID }
@@ -528,7 +619,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             manualSession: manualSession,
             cooling: cooling,
             safety: safety,
-            operatorSummary: operatorSummary
+            operatorSummary: operatorSummary,
+            remoteWork: remoteWork
         )
     }
 
@@ -538,6 +630,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     func applyingKeepAwake(parameters: [String: String]) -> CompanionMacStatus {
         CompanionMacStatus(
             deviceID: deviceID,
+            machineFingerprint: machineFingerprint,
             displayName: displayName,
             build: build,
             lastSeen: lastSeen,
@@ -566,7 +659,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             manualSession: manualSession,
             cooling: cooling,
             safety: safety,
-            operatorSummary: operatorSummary
+            operatorSummary: operatorSummary,
+            remoteWork: remoteWork
         )
     }
 }

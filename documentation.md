@@ -75,6 +75,10 @@ On the Mac, **Share Result…** offers one user-selected file through a short-li
 ### Current attention routing
 
 The companion can send opt-in local notifications after a fresh iCloud update. It establishes a baseline first, then alerts only when a work item transitions into an evidence-backed `blocked`, `rate limited`, `stalled`, or `failed` state. `finished` and `ready to review` notifications are a separate off-by-default choice. A stale Mac status never causes a catch-up notification. Notifications use the harness and state, not a private task title.
+
+### Preview design gate
+
+Local previews are not shipped yet. The future flow is an explicit Mac registration of one local preview, then companion discovery over an opaque Bonjour service on the same network. It will not expose arbitrary ports or act as a tunnel. Apple requires Local Network purpose text and the specific Bonjour service in the **container app** Info.plist; a real iPhone/iPad is required for testing because the simulator does not support Local Network privacy. A preview release also requires authenticated encrypted transport—an iCloud-delivered URL token alone is not an adequate transport boundary.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;

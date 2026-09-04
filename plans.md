@@ -61,6 +61,14 @@ Scope: opt-in same-network preview registration/discovery and direct secure open
 
 Acceptance: no hidden relay, correct local-network permission disclosure, clear unavailable/offline feedback, and no arbitrary localhost tunnelling.
 
+Release gate:
+
+- A Mac user explicitly registers one loopback preview endpoint; process scanning may suggest a candidate but must never expose it automatically.
+- The Mac publishes an opaque, short-lived Bonjour service identifier—not a project name, path, prompt, or original localhost port—and limits the listener to that registered upstream.
+- The companion can discover only the declared Sleep Switch service type while the app is foregrounded and Local Network permission is granted. It must never attempt discovery in the background before that permission exists.
+- Preview traffic needs an authenticated, encrypted transport with certificate pinning or a system-trusted identity. Plain HTTP plus an iCloud-delivered bearer token is not sufficient for release.
+- iPhone/iPad physical-device testing is mandatory: Apple’s simulator does not implement Local Network privacy. Add `NSLocalNetworkUsageDescription` and the specific `NSBonjourServices` entry to the container app only when this feature ships.
+
 ### 6. Hardening and release [planned]
 
 Scope: CloudKit migration/recovery, bounded cleanup, App Store review notes, tests/builds, and hands-on Mac/iPhone review.
@@ -94,3 +102,4 @@ Acceptance: malformed/expired records fail safely, data is deleted or expires pr
 - 2026-09-04: The Mac now exposes received context as bounded inbox receipts in both its menu window and Operator. Reveal remains a user action; project placement and agent handoff remain deliberately separate.
 - 2026-09-04: Result handoff mirrors intake in the opposite direction. The Mac offers only a user-picked file; the companion sees the name, size, and age first, then explicitly gets a 25 MB/24-hour asset into private local storage before Quick Look or the system share sheet. Offer listing does not retain a CloudKit asset URL.
 - 2026-09-04: Attention routing has begun with opt-in local companion notifications. First sightings establish a baseline; only evidence-backed transitions to blocked, rate-limited, stalled, or failed work alert by default. Finished/review-ready notices are a separate opt-in. Stale Mac snapshots preserve the baseline and never generate catch-up alerts.
+- 2026-09-04: Preview research gate: Apple requires a container-app local-network purpose string and declared Bonjour service type; background discovery cannot prompt for permission and the simulator cannot validate the privacy flow. The first release must use an opaque service registration and authenticated encrypted proxy, not a generic localhost relay.

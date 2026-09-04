@@ -212,13 +212,13 @@ extension OperatorSession {
     func remoteWorkState(now _: Date = Date()) -> CompanionWorkState {
         switch state {
         case .running:
-            .active
+            return .active
         case .finished:
-            .finished
+            return .finished
         case .aborted:
-            .stopped
+            return .stopped
         case .unknown:
-            .unknown
+            return .unknown
         }
     }
 }
@@ -239,15 +239,15 @@ extension CodexThreadMirror {
 
         switch status {
         case .running:
-            .active
+            return .active
         case .finished:
-            .finished
+            return .finished
         case .stopped:
-            .stopped
+            return .stopped
         case .waiting:
-            .waiting
+            return .waiting
         case .unknown:
-            .unknown
+            return .unknown
         }
     }
 

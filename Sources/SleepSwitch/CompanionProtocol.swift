@@ -365,6 +365,44 @@ struct CompanionRemoteWorkSummary: Codable, Equatable {
     }
 }
 
+/// A user-selected item travelling from the companion to one Mac’s private
+/// Remote Inbox. This is deliberately not a filesystem command: it has no
+/// destination path, project identifier, shell command, or agent-session
+/// mutation. The Mac owner decides what to do with an item after receipt.
+struct CompanionContextTransfer: Codable, Equatable, Identifiable {
+    let id: UUID
+    let targetDeviceID: String
+    let requesterDeviceID: String
+    let filename: String
+    let typeIdentifier: String?
+    let byteCount: Int64
+    let createdAt: Date
+    let expiresAt: Date
+
+    var isExpired: Bool { Date() >= expiresAt }
+}
+
+struct CompanionContextTransferResult: Codable, Equatable {
+    let transferID: UUID
+    let accepted: Bool
+    let deliveredAt: Date
+    /// A fixed app-authored status only. Never include an operating-system
+    /// path, file contents, server response, or other diagnostic payload.
+    let message: String?
+}
+
+enum CompanionContextTransferPolicy {
+    /// The first transfer surface is deliberately small. It is for the PDF,
+    /// image, document, or data sample a user wants an agent to consider—not
+    /// bulk backups or a covert remote file manager.
+    static let maximumByteCount: Int64 = 25 * 1_024 * 1_024
+    static let lifetime: TimeInterval = 24 * 60 * 60
+
+    static func isAllowed(byteCount: Int64) -> Bool {
+        (1...maximumByteCount).contains(byteCount)
+    }
+}
+
 struct CompanionManualSessionStatus: Codable, Equatable {
     let startedAt: Date
     let endsAt: Date?

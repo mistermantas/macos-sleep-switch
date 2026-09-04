@@ -49,7 +49,7 @@ After changing `project.yml`, regenerate the project with `xcodegen generate`.
 
 The local data layer, native macOS Operator window, and grouped iPhone summary are implemented. The macOS status menu opens Operator. Its Skills surface filters by text/source/tag/favourite and performs copy, reveal, export, or share only on explicit user action. The app publishes only harness-level session counts, token/duration deltas, static availability codes, and queued finish-action identifiers—not raw sessions, skills, paths, prompts, or events.
 
-Remote Work is the first remote-supervision increment. It is an opt-in private-CloudKit projection of current Codex/Hermes work that distinguishes `active`, `waiting`, `stalled`, `blocked`, `rate limited`, `failed`, `stopped`, `finished`, `ready to review`, and `unknown`. Current adapters emit only states they can prove; unavailable evidence remains `unknown` instead of producing a false alarm. The companion has a compact “Agent work” card and a dedicated list; it is not a transcript viewer.
+Remote Work is the first remote-supervision increment. It is an opt-in private-CloudKit projection of current Codex/Hermes work that currently emits only evidence-backed states: `active`, `waiting`, `rate limited`, `failed`, `stopped`, `finished`, and `unknown`. The broader lifecycle vocabulary (`stalled`, `blocked`, `ready to review`) remains reserved for later slices where the Mac has direct proof. Unavailable evidence stays `unknown` instead of producing a false alarm. The companion has a compact “Agent work” card and a dedicated list; it is not a transcript viewer.
 
 ## Remote supervision foundation — 2026-09-04
 

@@ -246,18 +246,23 @@ final class OperatorViewModel: ObservableObject {
         ["All folders"] + Array(Set(snapshot.codexThreads.map(boardDirectoryName))).sorted()
     }
 
-    var boardStatuses: [String] {
-        ["All statuses"] + CodexThreadStatus.allCases.map { $0.rawValue.capitalized }
-    }
-
-    var boardThreads: [CodexThreadMirror] {
+    private var boardStatusCandidates: [CodexThreadMirror] {
         snapshot.codexThreads
             .filter { includesArchivedThreads || !$0.isArchived }
             .filter { _ in selectedHarness == "All harnesses" || selectedHarness == "Codex" }
             .filter { selectedProject == "All projects" || boardProjectName($0) == selectedProject }
             .filter { selectedDirectory == "All folders" || boardDirectoryName($0) == selectedDirectory }
             .filter { !pinnedThreadsOnly || $0.isPinned }
-            .filter { selectedBoardStatus == "All statuses" || $0.status.rawValue.capitalized == selectedBoardStatus }
+    }
+
+    var boardStatuses: [String] {
+        ["All statuses"] + boardStateOrder.map(\.title)
+            .filter { title in boardStatusCandidates.contains { workState(for: $0).title == title } }
+    }
+
+    var boardThreads: [CodexThreadMirror] {
+        boardStatusCandidates
+            .filter { selectedBoardStatus == "All statuses" || workState(for: $0).title == selectedBoardStatus }
             .sorted {
                 if $0.boardLane != $1.boardLane { return $0.boardLane == "No section" }
                 if $0.sectionPosition != $1.sectionPosition { return ($0.sectionPosition ?? Int.max) < ($1.sectionPosition ?? Int.max) }
@@ -268,7 +273,7 @@ final class OperatorViewModel: ObservableObject {
     var boardLanes: [String] {
         switch boardGrouping {
         case .status:
-            return ["Running", "Waiting", "Stopped", "Finished", "Unknown"]
+            return boardStateOrder.map(\.title)
                 .filter { lane in boardThreads.contains { boardLane(for: $0) == lane } }
         case .workflow:
             return workflowLanes.filter { lane in boardThreads.contains { boardLane(for: $0) == lane } }
@@ -293,9 +298,21 @@ final class OperatorViewModel: ObservableObject {
         ["Inbox", "Planned", "Doing", "Waiting", "Done"]
     }
 
+    var boardStateOrder: [CompanionWorkState] {
+        [.active, .waiting, .rateLimited, .failed, .stopped, .finished, .unknown]
+    }
+
+    func workState(for thread: CodexThreadMirror) -> CompanionWorkState {
+        thread.remoteWorkState(now: snapshot.refreshedAt ?? Date())
+    }
+
+    func workState(for session: OperatorSession) -> CompanionWorkState {
+        session.remoteWorkState(now: snapshot.refreshedAt ?? Date())
+    }
+
     func boardLane(for thread: CodexThreadMirror) -> String {
         switch boardGrouping {
-        case .status: thread.status.rawValue.capitalized
+        case .status: workState(for: thread).title
         case .codexSection: pendingSectionLanes[thread.id] ?? thread.boardLane
         case .workflow: snapshot.threadWorkflowLanes[thread.id] ?? "Inbox"
         }
@@ -579,9 +596,9 @@ private struct OperatorOverview: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
-                    OperatorMetricCard(title: "Working", value: "\(viewModel.boardThreads.filter { $0.status == .running }.count)", symbol: "bolt.fill", tint: .blue)
+                    OperatorMetricCard(title: "Working", value: "\(viewModel.boardThreads.filter { viewModel.workState(for: $0) == .active || viewModel.workState(for: $0) == .waiting }.count)", symbol: "bolt.fill", tint: .blue)
                     OperatorMetricCard(title: "Chats", value: "\(viewModel.boardThreads.count)", symbol: "bubble.left.and.bubble.right", tint: .purple)
-                    OperatorMetricCard(title: "Needs you", value: "\(viewModel.boardThreads.filter { $0.status == .waiting || $0.status == .stopped }.count)", symbol: "exclamationmark.bubble", tint: .orange)
+                    OperatorMetricCard(title: "Needs you", value: "\(viewModel.boardThreads.filter { viewModel.workState(for: $0).requiresAttention }.count)", symbol: "exclamationmark.bubble", tint: .orange)
                 }
                 if !viewModel.attentionItems.isEmpty {
                     OperatorPanel(title: "Needs attention", symbol: "exclamationmark.triangle") {
@@ -626,10 +643,11 @@ private struct OperatorOverview: View {
                         Text("No local session activity yet").foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(viewModel.recentSessions.prefix(4))) { session in
+                            let state = viewModel.workState(for: session)
                             HStack(spacing: 10) {
-                                Circle().fill(session.state == .running ? .blue : .secondary).frame(width: 7, height: 7)
+                                Circle().fill(operatorWorkStateTint(state)).frame(width: 7, height: 7)
                                 Text(session.harnessName).fontWeight(.medium)
-                                Text(session.state.rawValue.capitalized).foregroundStyle(.secondary)
+                                Text(state.title).foregroundStyle(.secondary)
                                 Spacer()
                                 Text(lastActivityText(session)).foregroundStyle(.secondary)
                             }
@@ -879,7 +897,7 @@ private struct OperatorBoardCard: View {
                     .lineLimit(2)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 4)
-                OperatorThreadStatus(status: thread.status)
+                OperatorThreadStatus(state: thread.remoteWorkState())
             }
             if !thread.preview.isEmpty {
                 Text(thread.preview)
@@ -887,6 +905,11 @@ private struct OperatorBoardCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
+            }
+            if let note = thread.remoteWorkNote {
+                Label(note, systemImage: "exclamationmark.circle")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(operatorWorkStateTint(thread.remoteWorkState()))
             }
             HStack(spacing: 6) {
                 Image(systemName: thread.isPinned ? "pin.fill" : "folder")
@@ -904,7 +927,7 @@ private struct OperatorBoardCard: View {
 }
 
 private struct OperatorThreadStatus: View {
-    let status: CodexThreadStatus
+    let state: CompanionWorkState
 
     var body: some View {
         Text(label)
@@ -916,23 +939,11 @@ private struct OperatorThreadStatus: View {
     }
 
     private var label: String {
-        switch status {
-        case .running: "Running"
-        case .finished: "Finished"
-        case .stopped: "Stopped"
-        case .waiting: "Waiting"
-        case .unknown: "Unknown"
-        }
+        state.title
     }
 
     private var tint: Color {
-        switch status {
-        case .running: .blue
-        case .finished: .green
-        case .stopped: .orange
-        case .waiting: .yellow
-        case .unknown: .secondary
-        }
+        operatorWorkStateTint(state)
     }
 }
 
@@ -950,7 +961,7 @@ private struct CodexThreadDetail: View {
                     Text(project).foregroundStyle(.secondary)
                 }
                 Spacer()
-                OperatorThreadStatus(status: thread.status)
+                OperatorThreadStatus(state: thread.remoteWorkState())
                 Button(action: dismiss) {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
@@ -976,6 +987,12 @@ private struct CodexThreadDetail: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
+                }
+
+                if let note = thread.remoteWorkNote {
+                    Label(note, systemImage: "exclamationmark.circle.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(operatorWorkStateTint(thread.remoteWorkState()))
                 }
 
                 if !thread.preview.isEmpty {
@@ -1052,11 +1069,12 @@ private struct OperatorSessions: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List(viewModel.displayedSessions) { session in
+                    let state = viewModel.workState(for: session)
                     HStack(spacing: 12) {
-                        Circle().fill(session.state == .running ? .blue : .secondary).frame(width: 8, height: 8)
+                        Circle().fill(operatorWorkStateTint(state)).frame(width: 8, height: 8)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(session.harnessName).fontWeight(.semibold)
-                            Text(session.state.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
+                            Text(state.title).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Text(formatDuration(session.durationSeconds)).foregroundStyle(.secondary).monospacedDigit()
@@ -1425,6 +1443,27 @@ private struct OperatorEmptyState: View {
             Image(systemName: symbol).font(.system(size: 28)).foregroundStyle(.secondary)
             Text(title).font(.headline).foregroundStyle(.secondary)
         }
+    }
+}
+
+private func operatorWorkStateTint(_ state: CompanionWorkState) -> Color {
+    switch state {
+    case .active:
+        .blue
+    case .waiting:
+        .yellow
+    case .rateLimited:
+        .orange
+    case .failed:
+        .red
+    case .stopped:
+        .secondary
+    case .finished, .reviewReady:
+        .green
+    case .stalled, .blocked:
+        .orange
+    case .unknown:
+        .secondary
     }
 }
 

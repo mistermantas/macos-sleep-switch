@@ -5,6 +5,7 @@ enum RemoteWorkProjectionTests {
         testProjectionKeepsSessionTitlesOptInAndPseudonymous()
         testProjectionPreservesOperationalStateCounts()
         testProjectionUsesStructuredCodexFailuresWithoutInventingStalls()
+        testProjectionTreatsProviderCapacityAsWaiting()
     }
 
     private static func testProjectionKeepsSessionTitlesOptInAndPseudonymous() {
@@ -125,6 +126,37 @@ enum RemoteWorkProjectionTests {
         expect(counts[.finished] == 1, "keeps finished work distinct from review-ready work")
         expect(counts[.stalled] == nil, "does not call a quiet agent stalled without direct evidence")
         expect(projection.attentionCount == 1, "counts only the evidence-backed rate limit as attention")
+    }
+
+    private static func testProjectionTreatsProviderCapacityAsWaiting() {
+        let now = Date(timeIntervalSince1970: 1_788_500_000)
+        let thread = CodexThreadMirror(
+            id: "busy",
+            title: "Retry later",
+            preview: "",
+            cwd: "/private/capacity",
+            projectName: nil,
+            sectionID: nil,
+            sectionName: nil,
+            sectionPosition: nil,
+            isPinned: false,
+            isArchived: false,
+            status: .stopped,
+            latestTurnErrorCode: "serverOverloaded",
+            updatedAt: now.addingTimeInterval(-30),
+            startedAt: now.addingTimeInterval(-300),
+            completedAt: now.addingTimeInterval(-30),
+            messages: []
+        )
+
+        let projection = RemoteWorkProjection.make(
+            sessions: [],
+            codexThreads: [thread],
+            includeTitles: false,
+            now: now
+        )
+        expect(projection.stateCounts.first?.state == .waiting, "keeps provider-capacity issues in a non-destructive waiting state")
+        expect(projection.attentionCount == 0, "does not page the user for a temporary provider-capacity issue")
     }
 
     private static func session(id: String, state: OperatorSessionState, now: Date) -> OperatorSession {

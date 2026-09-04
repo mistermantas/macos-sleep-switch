@@ -21,6 +21,28 @@ struct CompanionPendingCommand {
     }
 }
 
+struct CompanionPendingContextTransfer {
+    let recordName: String
+    let transfer: CompanionContextTransfer?
+    let assetURL: URL?
+    let decodeError: String?
+    fileprivate let record: CKRecord?
+
+    init(
+        recordName: String,
+        transfer: CompanionContextTransfer?,
+        assetURL: URL? = nil,
+        decodeError: String? = nil,
+        record: CKRecord? = nil
+    ) {
+        self.recordName = recordName
+        self.transfer = transfer
+        self.assetURL = assetURL
+        self.decodeError = decodeError
+        self.record = record
+    }
+}
+
 protocol CompanionCloudStoring: AnyObject {
     var lastIssue: String? { get }
 
@@ -42,6 +64,14 @@ protocol CompanionCloudStoring: AnyObject {
         reason: String
     ) async throws
     func pruneCommands(for deviceID: String, before date: Date) async throws -> Int
+    func send(_ transfer: CompanionContextTransfer, assetURL: URL) async throws
+    func fetchPendingContextTransfers(
+        for deviceID: String
+    ) async throws -> [CompanionPendingContextTransfer]
+    func finish(
+        transfer: CompanionPendingContextTransfer,
+        result: CompanionContextTransferResult
+    ) async throws
     func consumeLastIssue() -> String?
 }
 
@@ -64,11 +94,15 @@ final class CompanionCloudStore: CompanionCloudStoring {
     static let statusRecordType = "MacStatus"
     static let historyRecordType = "InsightsHistory"
     static let commandRecordType = "RemoteCommand"
+    static let contextTransferRecordType = "RemoteContextTransfer"
     static let statusRecordPrefix = "mac-status-"
     static let historyRecordPrefix = "mac-history-"
     static let commandStatePending = "pending"
     static let commandStateExecuted = "executed"
     static let commandStateRejected = "rejected"
+    static let contextStatePending = "pending"
+    static let contextStateDelivered = "delivered"
+    static let contextStateRejected = "rejected"
 
     private static let pageLimit = 100
     private static let maxQueryPages = 20
@@ -218,7 +252,12 @@ final class CompanionCloudStore: CompanionCloudStoring {
             type: Self.commandRecordType,
             predicate: NSPredicate(format: "targetDeviceID == %@", deviceID)
         )
+        let transfers = try await fetchRecords(
+            type: Self.contextTransferRecordType,
+            predicate: NSPredicate(format: "targetDeviceID == %@", deviceID)
+        )
         ids.append(contentsOf: commands.map(\.recordID))
+        ids.append(contentsOf: transfers.map(\.recordID))
         for id in ids {
             do {
                 _ = try await database.deleteRecord(withID: id)
@@ -239,6 +278,92 @@ final class CompanionCloudStore: CompanionCloudStoring {
         record["createdAt"] = command.createdAt as CKRecordValue
         record["expiresAt"] = command.expiresAt as CKRecordValue
         record["payload"] = try CompanionJSON.encoder.encode(command) as CKRecordValue
+        try await database.save(record)
+    }
+
+    func send(_ transfer: CompanionContextTransfer, assetURL: URL) async throws {
+        let record = CKRecord(
+            recordType: Self.contextTransferRecordType,
+            recordID: CKRecord.ID(recordName: transfer.id.uuidString)
+        )
+        record["targetDeviceID"] = transfer.targetDeviceID as CKRecordValue
+        record["state"] = Self.contextStatePending as CKRecordValue
+        record["createdAt"] = transfer.createdAt as CKRecordValue
+        record["expiresAt"] = transfer.expiresAt as CKRecordValue
+        record["payload"] = try CompanionJSON.encoder.encode(transfer) as CKRecordValue
+        record["asset"] = CKAsset(fileURL: assetURL)
+        try await database.save(record)
+    }
+
+    func fetchPendingContextTransfers(
+        for deviceID: String
+    ) async throws -> [CompanionPendingContextTransfer] {
+        try await fetchRecords(
+            type: Self.contextTransferRecordType,
+            predicate: NSPredicate(
+                format: "targetDeviceID == %@ AND state == %@",
+                deviceID,
+                Self.contextStatePending
+            )
+        )
+        .map { record in
+            guard let data = record["payload"] as? Data else {
+                let message = "Remote context item is missing its metadata."
+                noteIssue(message)
+                return CompanionPendingContextTransfer(
+                    recordName: record.recordID.recordName,
+                    transfer: nil,
+                    decodeError: message,
+                    record: record
+                )
+            }
+            do {
+                let transfer = try CompanionJSON.decoder.decode(
+                    CompanionContextTransfer.self,
+                    from: data
+                )
+                let assetURL = (record["asset"] as? CKAsset)?.fileURL
+                return CompanionPendingContextTransfer(
+                    recordName: record.recordID.recordName,
+                    transfer: transfer,
+                    assetURL: assetURL,
+                    record: record
+                )
+            } catch {
+                let message = "Remote context metadata could not be decoded."
+                noteIssue(message)
+                return CompanionPendingContextTransfer(
+                    recordName: record.recordID.recordName,
+                    transfer: nil,
+                    decodeError: message,
+                    record: record
+                )
+            }
+        }
+        .sorted {
+            let left = ($0.record?["createdAt"] as? Date) ?? .distantPast
+            let right = ($1.record?["createdAt"] as? Date) ?? .distantPast
+            return left < right
+        }
+    }
+
+    func finish(
+        transfer: CompanionPendingContextTransfer,
+        result: CompanionContextTransferResult
+    ) async throws {
+        guard let record = transfer.record else {
+            throw CompanionCloudStoreError.commandRecordUnavailable(transfer.recordName)
+        }
+        record["state"] = (result.accepted
+            ? Self.contextStateDelivered
+            : Self.contextStateRejected) as CKRecordValue
+        record["processedAt"] = result.deliveredAt as CKRecordValue
+        record["accepted"] = result.accepted as CKRecordValue
+        record["resultMessage"] = (result.message ?? "") as CKRecordValue
+        // The remote Mac has copied the staged asset into its own private
+        // inbox. Orphan it now so CloudKit can reclaim it; the record remains
+        // as a small delivery receipt until normal cleanup is added.
+        record["asset"] = nil
         try await database.save(record)
     }
 

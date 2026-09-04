@@ -284,10 +284,12 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     var accountError: Error?
     var lastIssue: String?
     var pendingCommands: [CompanionPendingCommand] = []
+    var pendingTransfers: [CompanionPendingContextTransfer] = []
     var statusPublishCount = 0
     var historyPublishCount = 0
     var rejectedReasons: [String] = []
     var finishedResults: [CompanionRemoteResult] = []
+    var finishedTransferResults: [CompanionContextTransferResult] = []
     var accountDelayNanoseconds: UInt64 = 0
     var accountStatusCallCount = 0
 
@@ -306,10 +308,17 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
     func fetchHistory(for deviceID: String) async throws -> CompanionHistorySnapshot? { nil }
     func deleteDeviceData(for deviceID: String) async throws {}
     func send(_ command: CompanionRemoteCommand) async throws {}
+    func send(_ transfer: CompanionContextTransfer, assetURL _: URL) async throws {}
     func fetchResult(for commandID: UUID) async throws -> CompanionRemoteResult? { nil }
     func fetchPendingCommands(for deviceID: String) async throws -> [CompanionPendingCommand] {
         if let accountError { throw accountError }
         return pendingCommands
+    }
+    func fetchPendingContextTransfers(
+        for deviceID: String
+    ) async throws -> [CompanionPendingContextTransfer] {
+        if let accountError { throw accountError }
+        return pendingTransfers
     }
 
     func finish(
@@ -317,6 +326,13 @@ private final class FakeCompanionCloudStore: CompanionCloudStoring {
         result: CompanionRemoteResult
     ) async throws {
         finishedResults.append(result)
+    }
+
+    func finish(
+        transfer: CompanionPendingContextTransfer,
+        result: CompanionContextTransferResult
+    ) async throws {
+        finishedTransferResults.append(result)
     }
 
     func reject(

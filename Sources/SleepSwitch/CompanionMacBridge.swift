@@ -21,6 +21,7 @@ struct CompanionSyncDiagnostics: Equatable {
     var publishedHistoryCount = 0
     var processedCommandCount = 0
     var lastCommandAt: Date?
+    var processedContextTransferCount = 0
     var stalledSyncRecoveryCount = 0
 }
 
@@ -32,6 +33,10 @@ final class CompanionMacBridge {
     typealias StatusProvider = () -> CompanionMacStatus
     typealias HistoryProvider = () -> CompanionHistorySnapshot
     typealias CommandHandler = (CompanionRemoteCommand) -> CompanionRemoteResult
+    typealias ContextTransferHandler = (
+        CompanionContextTransfer,
+        URL
+    ) -> CompanionContextTransferResult
 
     private static let logger = Logger(
         subsystem: "lt.mantas.sleepswitch",
@@ -48,6 +53,7 @@ final class CompanionMacBridge {
     private let statusProvider: StatusProvider
     private let historyProvider: HistoryProvider
     private let commandHandler: CommandHandler
+    private let contextTransferHandler: ContextTransferHandler
     private let defaults: UserDefaults
     private let statusHeartbeatInterval: TimeInterval
     private let historyHeartbeatInterval: TimeInterval
@@ -85,6 +91,14 @@ final class CompanionMacBridge {
         statusProvider: @escaping StatusProvider,
         historyProvider: @escaping HistoryProvider,
         commandHandler: @escaping CommandHandler,
+        contextTransferHandler: @escaping ContextTransferHandler = { transfer, _ in
+            CompanionContextTransferResult(
+                transferID: transfer.id,
+                accepted: false,
+                deliveredAt: Date(),
+                message: "Remote Inbox is unavailable on this Mac."
+            )
+        },
         defaults: UserDefaults = .standard,
         statusHeartbeatInterval: TimeInterval = 60,
         historyHeartbeatInterval: TimeInterval? = nil,
@@ -95,6 +109,7 @@ final class CompanionMacBridge {
         self.statusProvider = statusProvider
         self.historyProvider = historyProvider
         self.commandHandler = commandHandler
+        self.contextTransferHandler = contextTransferHandler
         self.defaults = defaults
         self.statusHeartbeatInterval = statusHeartbeatInterval
         self.historyHeartbeatInterval = historyHeartbeatInterval ?? statusHeartbeatInterval * 5
@@ -264,8 +279,9 @@ final class CompanionMacBridge {
         diagnostics.state = .syncing
         do {
             let handledCommands = try await processPendingCommands()
+            let handledTransfers = try await processPendingContextTransfers()
             guard !Task.isCancelled else { return }
-            if handledCommands {
+            if handledCommands || handledTransfers {
                 let updatedStatus = statusProvider().refreshingLastSeen()
                 try await cloud.publish(status: updatedStatus)
                 lastStatusFingerprint = statusFingerprint(updatedStatus)
@@ -410,6 +426,42 @@ final class CompanionMacBridge {
             diagnostics.lastCommandAt = Date()
         }
         return !commands.isEmpty
+    }
+
+    private func processPendingContextTransfers() async throws -> Bool {
+        let transfers = try await cloud.fetchPendingContextTransfers(for: deviceIDValue)
+        for pending in transfers {
+            let result: CompanionContextTransferResult
+            if let decodeError = pending.decodeError {
+                result = CompanionContextTransferResult(
+                    transferID: UUID(uuidString: pending.recordName) ?? UUID(),
+                    accepted: false,
+                    deliveredAt: Date(),
+                    message: decodeError
+                )
+            } else if let transfer = pending.transfer, transfer.isExpired {
+                result = CompanionContextTransferResult(
+                    transferID: transfer.id,
+                    accepted: false,
+                    deliveredAt: Date(),
+                    message: "This context item expired before delivery."
+                )
+            } else if let transfer = pending.transfer, let assetURL = pending.assetURL {
+                result = contextTransferHandler(transfer, assetURL)
+            } else {
+                result = CompanionContextTransferResult(
+                    transferID: pending.transfer?.id
+                        ?? UUID(uuidString: pending.recordName)
+                        ?? UUID(),
+                    accepted: false,
+                    deliveredAt: Date(),
+                    message: "Remote context item is missing its file."
+                )
+            }
+            try await cloud.finish(transfer: pending, result: result)
+            diagnostics.processedContextTransferCount += 1
+        }
+        return !transfers.isEmpty
     }
 
     private func shouldPublishStatus(_ status: CompanionMacStatus, now: Date) -> Bool {

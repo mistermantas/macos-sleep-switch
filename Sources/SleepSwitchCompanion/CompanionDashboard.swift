@@ -11,6 +11,7 @@ struct CompanionDashboardRoot: View {
     @State private var showingPairingHelp = false
     @State private var showingContextImporter = false
     @State private var pendingAction: CompanionRemoteAction?
+    @State private var pendingSharedContextDraft: SharedContextDraft?
 
     private var selectedMac: CompanionMacStatus? {
         CompanionMacSelection.preferred(
@@ -93,6 +94,7 @@ struct CompanionDashboardRoot: View {
             .task { await model.refreshAndWait() }
             .task(id: scenePhase) {
                 guard scenePhase == .active else { return }
+                model.reloadSharedContextDrafts()
                 while !Task.isCancelled {
                     await model.refreshAndWait()
                     try? await Task.sleep(for: .seconds(15))
@@ -137,6 +139,24 @@ struct CompanionDashboardRoot: View {
                 }
                 Button("Cancel", role: .cancel) { pendingAction = nil }
             }
+            .confirmationDialog(
+                "Send shared context?",
+                isPresented: Binding(
+                    get: { pendingSharedContextDraft != nil },
+                    set: { if !$0 { pendingSharedContextDraft = nil } }
+                ),
+                presenting: pendingSharedContextDraft
+            ) { draft in
+                if let mac = selectedMac {
+                    Button("Send to \(mac.displayName)") {
+                        pendingSharedContextDraft = nil
+                        model.sendSharedContextDraft(draft, to: mac)
+                    }
+                }
+                Button("Cancel", role: .cancel) { pendingSharedContextDraft = nil }
+            } message: { draft in
+                Text("Send \(draft.filename) to the selected Mac’s private Remote Inbox?")
+            }
             .fileImporter(
                 isPresented: $showingContextImporter,
                 allowedContentTypes: [.item],
@@ -159,6 +179,14 @@ struct CompanionDashboardRoot: View {
                     lastSyncAt: model.lastSyncAt
                 )
                 if mac.capabilities.canReceiveContextTransfers == true {
+                    if !model.sharedContextDrafts.isEmpty {
+                        SharedContextDraftsCard(
+                            drafts: model.sharedContextDrafts,
+                            mac: mac,
+                            model: model,
+                            confirm: { pendingSharedContextDraft = $0 }
+                        )
+                    }
                     RemoteInboxCard(
                         mac: mac,
                         model: model,
@@ -278,6 +306,12 @@ struct CompanionDashboardRoot: View {
         } description: {
             Text(model.connectionMessage)
         } actions: {
+            if !model.sharedContextDrafts.isEmpty {
+                Text("\(model.sharedContextDrafts.count) shared \(model.sharedContextDrafts.count == 1 ? "item is" : "items are") ready. Pair a Mac to send \(model.sharedContextDrafts.count == 1 ? "it" : "them").")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             Button("Retry", systemImage: "arrow.clockwise") { model.refresh() }
                 .buttonStyle(.borderedProminent)
             Button("Connection Details", systemImage: "stethoscope") {
@@ -798,6 +832,67 @@ private struct RemoteInboxCard: View {
             ? "No recent transfers"
             : model.lastContextTransferStatus
     }
+}
+
+private struct SharedContextDraftsCard: View {
+    let drafts: [SharedContextDraft]
+    let mac: CompanionMacStatus
+    @ObservedObject var model: CompanionAppModel
+    let confirm: (SharedContextDraft) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Shared with Sleep Switch", systemImage: "square.and.arrow.down")
+                    .font(.headline)
+                Spacer()
+                Text("\(drafts.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(drafts.prefix(3)) { draft in
+                HStack(spacing: 10) {
+                    Image(systemName: "doc")
+                        .foregroundStyle(.blue)
+                        .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(draft.filename)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Text("\(ByteCountFormatter.string(fromByteCount: draft.byteCount, countStyle: .file)) · \(sharedContextExpiryText(draft.expiresAt))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if model.isSendingSharedContextDraft(draft) {
+                        ProgressView()
+                    } else {
+                        Button("Send") { confirm(draft) }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.commandInFlight)
+                    }
+                    Button {
+                        model.discardSharedContextDraft(draft)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("Discard \(draft.filename)")
+                    .disabled(model.isSendingSharedContextDraft(draft))
+                }
+            }
+        }
+        .cardStyle()
+    }
+}
+
+private func sharedContextExpiryText(_ date: Date, now: Date = Date()) -> String {
+    let seconds = max(0, Int(date.timeIntervalSince(now)))
+    if seconds < 60 { return "expires soon" }
+    let minutes = seconds / 60
+    if minutes < 60 { return "expires in \(minutes)m" }
+    let hours = minutes / 60
+    return hours < 24 ? "expires in \(hours)h" : "expires in \(hours / 24)d"
 }
 
 private func contextTransferSymbol(_ state: CompanionContextTransferActivityState) -> String {

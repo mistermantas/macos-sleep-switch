@@ -43,5 +43,14 @@
     <array>
         <string>remote-notification</string>
     </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>lt.mantas.sleepswitch.companion</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>sleepswitch-companion</string></array>
+        </dict>
+    </array>
 </dict>
 </plist>

@@ -17,6 +17,7 @@ struct SleepSwitchCompanionApp: App {
     var body: some Scene {
         WindowGroup {
             CompanionDashboardRoot(model: model)
+                .onOpenURL { _ in model.reloadSharedContextDrafts() }
         }
     }
 }
@@ -118,6 +119,8 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var lastContextTransferStatus = "Never"
     @Published private(set) var contextTransferActivities: [CompanionContextTransferActivity]
     @Published private(set) var commandProgress: CompanionCommandProgress?
+    @Published private(set) var sharedContextDrafts: [SharedContextDraft] = []
+    @Published private(set) var sharedContextDraftIDsInFlight: Set<UUID> = []
 
     private lazy var cloud = CompanionCloudClient()
     let heatNotifications = CompanionHeatNotificationManager()
@@ -125,6 +128,7 @@ final class CompanionAppModel: ObservableObject {
     private let liveActivity = CompanionLiveActivityController()
     private let contextTransferHistory = CompanionContextTransferHistoryStore()
     private let artifactDownloadStore = RemoteArtifactDownloadStore()
+    private let sharedContextIntake = SharedContextIntake()
     private let requesterDeviceID = CompanionDeviceIdentity.load(key: "companionIOSDeviceID")
     private var refreshTask: Task<Void, Never>?
     private var commandTask: Task<Void, Never>?
@@ -132,12 +136,14 @@ final class CompanionAppModel: ObservableObject {
 
     #if DEBUG
     private let isScreenshotDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-demo")
+    private let isSharedContextDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-shared-context")
     private let isConnectionDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-connection")
     private let isCommandProgressDemo = ProcessInfo.processInfo.arguments.contains("--screenshot-command-progress")
     #endif
 
     init() {
         contextTransferActivities = contextTransferHistory.items
+        sharedContextDrafts = sharedContextIntake.drafts()
         NotificationCenter.default.addObserver(
             forName: .sleepSwitchStatusPush,
             object: nil,
@@ -151,6 +157,17 @@ final class CompanionAppModel: ObservableObject {
             macs = [demo.mac]
             histories = [demo.mac.deviceID: demo.history]
             artifactOffersByDeviceID = demo.artifactOffersByDeviceID
+            if isSharedContextDemo {
+                sharedContextDrafts = [
+                    SharedContextDraft(
+                        id: UUID(),
+                        filename: "field-notes.pdf",
+                        byteCount: 1_820_000,
+                        receivedAt: Date().addingTimeInterval(-60),
+                        expiresAt: Date().addingTimeInterval(23 * 60 * 60)
+                    )
+                ]
+            }
             message = "Demo data · connected to your private iCloud"
             lastSyncAt = Date()
             lastSuccessfulSyncAt = lastSyncAt
@@ -185,6 +202,7 @@ final class CompanionAppModel: ObservableObject {
     }
 
     func refresh() {
+        reloadSharedContextDrafts()
 #if targetEnvironment(simulator)
         showSimulatorCloudKitMessageIfNeeded()
 #else
@@ -203,6 +221,7 @@ final class CompanionAppModel: ObservableObject {
     }
 
     func refreshAndWait() async {
+        reloadSharedContextDrafts()
 #if targetEnvironment(simulator)
         showSimulatorCloudKitMessageIfNeeded()
 #else
@@ -616,8 +635,15 @@ final class CompanionAppModel: ObservableObject {
 #endif
     }
 
-    func sendContextItem(from sourceURL: URL, to mac: CompanionMacStatus) {
-        guard !commandInFlight else { return }
+    func sendContextItem(
+        from sourceURL: URL,
+        to mac: CompanionMacStatus,
+        completion: ((CompanionContextTransferActivityState) -> Void)? = nil
+    ) {
+        guard !commandInFlight else {
+            completion?(.failed)
+            return
+        }
 
 #if targetEnvironment(simulator)
         lastContextTransferStatus = "Simulated — \(sourceURL.lastPathComponent)"
@@ -629,6 +655,7 @@ final class CompanionAppModel: ObservableObject {
             state: .delivered
         )
         message = "Simulated sending \(sourceURL.lastPathComponent) to \(mac.displayName)."
+        completion?(.delivered)
 #else
         do {
             let draft = try prepareContextTransfer(from: sourceURL, to: mac)
@@ -689,6 +716,7 @@ final class CompanionAppModel: ObservableObject {
                         self.commandProgress = self.commandProgress?.withStage(
                             result.accepted ? .completed : .failed
                         )
+                        completion?(result.accepted ? .delivered : .rejected)
                     } else {
                         completionMessage = "\(draft.transfer.filename) is still queued. The Mac may be offline."
                         self.lastContextTransferStatus = "Pending — \(draft.transfer.filename)"
@@ -700,11 +728,13 @@ final class CompanionAppModel: ObservableObject {
                             state: .pending
                         )
                         self.commandProgress = self.commandProgress?.withStage(.failed)
+                        completion?(.pending)
                     }
                     await self.refreshAndWait()
                     self.message = completionMessage
                     self.dismissCommandProgress(commandID: draft.transfer.id)
                 } catch is CancellationError {
+                    completion?(.failed)
                     return
                 } catch {
                     let issue = CompanionConnectionError(error: error)
@@ -719,6 +749,7 @@ final class CompanionAppModel: ObservableObject {
                     self.lastSyncIssue = issue.userMessage
                     self.message = "Could not send \(draft.transfer.filename). \(issue.recovery)"
                     self.commandProgress = self.commandProgress?.withStage(.failed)
+                    completion?(.failed)
                     self.dismissCommandProgress(commandID: draft.transfer.id)
                 }
             }
@@ -726,6 +757,7 @@ final class CompanionAppModel: ObservableObject {
             let issue = error as? CompanionContextTransferPreparationError
             message = issue?.errorDescription ?? "Sleep Switch could not prepare that file."
             lastContextTransferStatus = "Failed — \(sourceURL.lastPathComponent)"
+            completion?(.failed)
         }
 #endif
     }
@@ -748,6 +780,44 @@ final class CompanionAppModel: ObservableObject {
             }
             message = "Sleep Switch could not open that file."
             lastContextTransferStatus = "Failed — import"
+        }
+    }
+
+    func reloadSharedContextDrafts() {
+#if DEBUG
+        if isSharedContextDemo { return }
+#endif
+        sharedContextDrafts = sharedContextIntake.drafts()
+    }
+
+    func discardSharedContextDraft(_ draft: SharedContextDraft) {
+        sharedContextIntake.discard(draft)
+        reloadSharedContextDrafts()
+    }
+
+    func isSendingSharedContextDraft(_ draft: SharedContextDraft) -> Bool {
+        sharedContextDraftIDsInFlight.contains(draft.id)
+    }
+
+    /// The Share extension only staged this item. Delivery still starts from
+    /// an explicit choice in the companion, addressed to one selected Mac.
+    func sendSharedContextDraft(_ draft: SharedContextDraft, to mac: CompanionMacStatus) {
+        guard !commandInFlight,
+              !sharedContextDraftIDsInFlight.contains(draft.id),
+              let sourceURL = sharedContextIntake.fileURL(for: draft),
+              FileManager.default.fileExists(atPath: sourceURL.path)
+        else {
+            reloadSharedContextDrafts()
+            return
+        }
+        sharedContextDraftIDsInFlight.insert(draft.id)
+        sendContextItem(from: sourceURL, to: mac) { [weak self] state in
+            guard let self else { return }
+            self.sharedContextDraftIDsInFlight.remove(draft.id)
+            if state == .delivered || state == .pending {
+                self.sharedContextIntake.discard(draft)
+            }
+            self.reloadSharedContextDrafts()
         }
     }
 

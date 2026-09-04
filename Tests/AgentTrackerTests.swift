@@ -130,6 +130,7 @@ struct AgentTrackerTests {
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
         RemoteContextInboxTests.run()
+        SharedContextIntakeTests.run()
         do {
             try RemoteArtifactDownloadStoreTests.run()
         } catch {

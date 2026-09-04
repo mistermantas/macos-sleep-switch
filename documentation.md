@@ -66,7 +66,7 @@ Sleep Switch’s next layer stays privacy-first and App Store-safe by treating t
 
 ### Current context handoff
 
-On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator show only those completed inbox receipts. **Reveal** opens the private receipt; **Place…** opens a folder picker and copies the item into the folder the Mac owner selects, preserving existing files with a suffix. Neither action chooses a repository, runs a command, nor contacts an agent.
+On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The Share Sheet action **Send to Sleep Switch** uses the same limit and stores one short-lived private App Group receipt; opening the companion shows the item and requires a separate explicit confirmation to send it to the selected Mac. It never uploads from the extension. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator show only those completed inbox receipts. **Reveal** opens the private receipt; **Place…** opens a folder picker and copies the item into the folder the Mac owner selects, preserving existing files with a suffix. Neither action chooses a repository, runs a command, nor contacts an agent.
 
 ### Current result handoff
 

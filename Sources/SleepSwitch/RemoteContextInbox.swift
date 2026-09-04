@@ -14,6 +14,23 @@ struct RemoteContextInboxItem: Identifiable, Equatable {
 /// Mac. The receiver never chooses a repository, invokes an agent, or opens
 /// the file. Those are separate, visible user decisions made after delivery.
 struct RemoteContextInbox {
+    enum PlacementError: LocalizedError, Equatable {
+        case sourceUnavailable
+        case invalidDestination
+        case placementFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .sourceUnavailable:
+                "This Remote Inbox item is no longer available."
+            case .invalidDestination:
+                "Choose a folder where Sleep Switch can place the item."
+            case .placementFailed:
+                "Sleep Switch could not copy the item to that folder."
+            }
+        }
+    }
+
     let rootURL: URL
 
     init(fileManager: FileManager = .default) {
@@ -117,6 +134,59 @@ struct RemoteContextInbox {
         } catch {
             return rejected(transfer, at: now, message: "Sleep Switch could not store this context item.")
         }
+    }
+
+    /// Copies an inbox item into a folder the Mac owner explicitly selected.
+    /// This is intentionally a local file action only: it does not select an
+    /// agent session, alter a prompt, or execute anything after placement.
+    func place(
+        _ item: RemoteContextInboxItem,
+        in directory: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let source = item.fileURL.resolvingSymlinksInPath().standardizedFileURL
+        guard source.path.hasPrefix(root),
+              fileManager.fileExists(atPath: source.path)
+        else {
+            throw PlacementError.sourceUnavailable
+        }
+        guard (try? directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+            throw PlacementError.invalidDestination
+        }
+
+        let destination = availableDestination(
+            filename: safeFilename(item.filename),
+            in: directory.standardizedFileURL,
+            fileManager: fileManager
+        )
+        let temporary = directory.appendingPathComponent(".sleep-switch-placement-\(UUID().uuidString)")
+        do {
+            try fileManager.copyItem(at: source, to: temporary)
+            try fileManager.moveItem(at: temporary, to: destination)
+            return destination
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw PlacementError.placementFailed
+        }
+    }
+
+    private func availableDestination(
+        filename: String,
+        in directory: URL,
+        fileManager: FileManager
+    ) -> URL {
+        let original = directory.appendingPathComponent(filename, isDirectory: false)
+        guard fileManager.fileExists(atPath: original.path) else { return original }
+
+        let base = (filename as NSString).deletingPathExtension
+        let ext = (filename as NSString).pathExtension
+        for suffix in 2...999 {
+            let name = ext.isEmpty ? "\(base) \(suffix)" : "\(base) \(suffix).\(ext)"
+            let candidate = directory.appendingPathComponent(name, isDirectory: false)
+            if !fileManager.fileExists(atPath: candidate.path) { return candidate }
+        }
+        return directory.appendingPathComponent("\(UUID().uuidString)-\(filename)", isDirectory: false)
     }
 
     private func accepted(

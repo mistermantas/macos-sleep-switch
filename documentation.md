@@ -11,7 +11,7 @@ Operator is the read-only operations layer inside Sleep Switch. On the Mac it ma
 - A source `SKILL.md` is never changed by Operator. Copy, reveal, export, and share happen only after a user action.
 - iCloud summaries are bounded and private: live counts, safe token/duration deltas, machine state, alert state, and existing finish actions. They exclude raw skills, file paths, prompts, and event details.
 - **Remote Work** is separately opt-in in Mac Settings → Data & iPhone. It adds a bounded per-work-item operational projection. Local IDs are pseudonymized; titles have their own off-by-default switch. Prompts, excerpts, paths, commands, artifacts, and logs never enter this projection.
-- Phone-to-Mac context is an explicit, short-lived, 25 MB maximum transfer. The Mac validates and copies it into a private `Application Support/Sleep Switch/Remote Inbox` directory; it never chooses a project or feeds an agent automatically.
+- Phone-to-Mac context is an explicit, short-lived, 25 MB maximum transfer. The Mac validates and copies it into a private `Application Support/Sleep Switch/Remote Inbox` directory. A later **Place…** action requires the Mac owner to choose a folder and makes a non-overwriting local copy; it never chooses a project or feeds an agent automatically.
 - Mac-to-phone results are equally explicit: a Mac owner chooses one file to offer, and the companion shows only its name, size, and age until the user taps **Get**. The downloaded copy lives privately in the companion’s Application Support directory before Quick Look or the system share sheet opens it.
 
 ## Current sources
@@ -66,7 +66,7 @@ Sleep Switch’s next layer stays privacy-first and App Store-safe by treating t
 
 ### Current context handoff
 
-On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator both show only those completed inbox receipts and offer an explicit **Reveal** action. They never choose a repository, run a command, or contact an agent.
+On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator show only those completed inbox receipts. **Reveal** opens the private receipt; **Place…** opens a folder picker and copies the item into the folder the Mac owner selects, preserving existing files with a suffix. Neither action chooses a repository, runs a command, nor contacts an agent.
 
 ### Current result handoff
 

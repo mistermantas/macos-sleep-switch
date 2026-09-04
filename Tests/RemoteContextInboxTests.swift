@@ -6,6 +6,7 @@ enum RemoteContextInboxTests {
         testRejectsExpiredTransfer()
         testRejectsEmptyAsset()
         testListsNewestItemsFirstAndIgnoresNoise()
+        testPlacesAnExplicitCopyWithoutOverwriting()
     }
 
     private static func testReceivesOneSafeCopy() {
@@ -104,6 +105,32 @@ enum RemoteContextInboxTests {
         expect(items.count == 1, "applies the requested inbox item limit")
         expect(items.first?.transferID == newerTransfer.id, "sorts inbox items from newest to oldest")
         expect(items.first?.filename == "newer.txt", "returns the delivered payload filename")
+    }
+
+    private static func testPlacesAnExplicitCopyWithoutOverwriting() {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("input.txt")
+        let payload = Data("phone-provided context".utf8)
+        try? payload.write(to: source)
+        let inbox = RemoteContextInbox(rootURL: root.appendingPathComponent("inbox"))
+        let transfer = makeTransfer(filename: "reference.txt")
+        _ = inbox.receive(transfer, assetURL: source)
+        guard let item = inbox.items().first else {
+            fatalError("Test failed: received item should be listed")
+        }
+        let project = root.appendingPathComponent("project", isDirectory: true)
+        try? FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+        let original = project.appendingPathComponent("reference.txt")
+        try? Data("existing project file".utf8).write(to: original)
+
+        guard let destination = try? inbox.place(item, in: project) else {
+            fatalError("Test failed: selected project folder should receive a copy")
+        }
+        expect(destination.lastPathComponent == "reference 2.txt", "does not overwrite an existing project file")
+        expect((try? Data(contentsOf: destination)) == payload, "places an exact local copy")
+        expect((try? Data(contentsOf: original)) == Data("existing project file".utf8), "leaves project files untouched")
+        expect(FileManager.default.fileExists(atPath: item.fileURL.path), "retains the private inbox original")
     }
 
     private static func makeTransfer(

@@ -31,6 +31,7 @@ final class RemoteInboxWindowController: NSWindowController {
 @MainActor
 private final class RemoteInboxViewModel: ObservableObject {
     @Published private(set) var items: [RemoteContextInboxItem] = []
+    @Published private(set) var placementStatus: String?
 
     private let inbox: RemoteContextInbox
 
@@ -44,6 +45,30 @@ private final class RemoteInboxViewModel: ObservableObject {
 
     func reveal(_ item: RemoteContextInboxItem) {
         NSWorkspace.shared.activateFileViewerSelecting([item.fileURL])
+    }
+
+    func place(_ item: RemoteContextInboxItem) {
+        let panel = NSOpenPanel()
+        panel.title = "Place Context Item"
+        panel.message = "Choose the folder that should receive this copy."
+        panel.prompt = "Place"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+
+        let accessing = directory.startAccessingSecurityScopedResource()
+        defer {
+            if accessing { directory.stopAccessingSecurityScopedResource() }
+        }
+        do {
+            let destination = try inbox.place(item, in: directory)
+            placementStatus = "Copied \(destination.lastPathComponent)"
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+        } catch {
+            placementStatus = (error as? LocalizedError)?.errorDescription
+                ?? "Sleep Switch could not place this item."
+        }
     }
 }
 
@@ -70,6 +95,16 @@ private struct RemoteInboxView: View {
 
             Divider()
 
+            if let status = viewModel.placementStatus {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                Divider()
+            }
+
             if viewModel.items.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "tray")
@@ -95,6 +130,8 @@ private struct RemoteInboxView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button("Place…") { viewModel.place(item) }
+                            .buttonStyle(.bordered)
                         Button("Reveal") { viewModel.reveal(item) }
                             .buttonStyle(.bordered)
                     }

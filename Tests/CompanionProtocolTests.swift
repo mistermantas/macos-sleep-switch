@@ -4,6 +4,8 @@ enum CompanionProtocolTests {
     static func run() {
         testPreciseElapsedTimeText()
         testCommandProgressStages()
+        testContextTransferHistoryKeepsLatestState()
+        testContextTransferHistoryFiltersByDevice()
         testSelectsFreshReplacementForStalePersistedMac()
         testDoesNotSwitchAStaleSelectionToAnotherMac()
         testWidgetRefreshPlan()
@@ -436,6 +438,110 @@ enum CompanionProtocolTests {
         expect(waiting.fraction < completed.fraction, "finishes progress after confirmation")
         expect(completed.isTerminal, "marks completed command progress as terminal")
         expect(completed.statusText == "Done", "uses a concise completed status")
+    }
+
+    private static func testContextTransferHistoryKeepsLatestState() {
+        let suiteName = "CompanionContextTransferHistory-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            fatalError("Test failed: creates isolated defaults suite")
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionContextTransferHistoryStore(
+            defaults: defaults,
+            storageKey: "history",
+            maximumItems: 2
+        )
+        let transferID = UUID()
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: transferID,
+            targetDeviceID: "mac-1",
+            targetDisplayName: "Studio Mac",
+            filename: "brief.pdf",
+            byteCount: 1_024,
+            updatedAt: Date(timeIntervalSince1970: 10),
+            state: .sending
+        ))
+        let recorded = store.record(CompanionContextTransferActivity(
+            transferID: transferID,
+            targetDeviceID: "mac-1",
+            targetDisplayName: "Studio Mac",
+            filename: "brief.pdf",
+            byteCount: 1_024,
+            updatedAt: Date(timeIntervalSince1970: 20),
+            state: .delivered
+        ))
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: UUID(),
+            targetDeviceID: "mac-2",
+            targetDisplayName: "Travel Mac",
+            filename: "todo.txt",
+            byteCount: 512,
+            updatedAt: Date(timeIntervalSince1970: 30),
+            state: .pending
+        ))
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: UUID(),
+            targetDeviceID: "mac-3",
+            targetDisplayName: "Lab Mac",
+            filename: "notes.md",
+            byteCount: 256,
+            updatedAt: Date(timeIntervalSince1970: 40),
+            state: .failed
+        ))
+
+        expect(recorded.count == 1, "replaces an existing transfer entry instead of duplicating it")
+        expect(store.items.count == 2, "trims transfer history to the configured maximum")
+        expect(store.items.last?.transferID != transferID, "drops the oldest history item when trimming")
+        expect(
+            CompanionContextTransferActivityState.delivered.title == "Delivered",
+            "exposes concise transfer state labels"
+        )
+    }
+
+    private static func testContextTransferHistoryFiltersByDevice() {
+        let suiteName = "CompanionContextTransferHistoryFilter-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            fatalError("Test failed: creates isolated defaults suite")
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = CompanionContextTransferHistoryStore(
+            defaults: defaults,
+            storageKey: "history",
+            maximumItems: 8
+        )
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: UUID(),
+            targetDeviceID: "mac-1",
+            targetDisplayName: "Studio Mac",
+            filename: "alpha.txt",
+            byteCount: 120,
+            updatedAt: Date(timeIntervalSince1970: 10),
+            state: .delivered
+        ))
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: UUID(),
+            targetDeviceID: "mac-2",
+            targetDisplayName: "Travel Mac",
+            filename: "beta.txt",
+            byteCount: 220,
+            updatedAt: Date(timeIntervalSince1970: 20),
+            state: .failed
+        ))
+        _ = store.record(CompanionContextTransferActivity(
+            transferID: UUID(),
+            targetDeviceID: "mac-1",
+            targetDisplayName: "Studio Mac",
+            filename: "gamma.txt",
+            byteCount: 320,
+            updatedAt: Date(timeIntervalSince1970: 30),
+            state: .waitingForMac
+        ))
+
+        let filtered = store.recentItems(for: "mac-1", limit: 5)
+
+        expect(filtered.map(\.filename) == ["gamma.txt", "alpha.txt"], "returns recent items only for the chosen Mac")
     }
 
     private static func testWidgetRefreshPlan() {

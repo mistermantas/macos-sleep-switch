@@ -67,6 +67,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionContextTransferHistory.swift" \
   "$script_dir/Sources/SleepSwitch/RemoteContextInbox.swift" \
   "$script_dir/Sources/Shared/CompanionWidgetShared.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionCloudStore.swift" \

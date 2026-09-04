@@ -1218,7 +1218,8 @@ private enum CompanionScreenshotDemo {
                         startedAt: now.addingTimeInterval(-2_760),
                         updatedAt: now.addingTimeInterval(-10),
                         durationSeconds: 2_760,
-                        title: "Refine checkout review"
+                        title: "Refine checkout review",
+                        projectName: "Storefront"
                     ),
                     CompanionWorkItemSummary(
                         id: "demo-codex-waiting",
@@ -1228,7 +1229,8 @@ private enum CompanionScreenshotDemo {
                         startedAt: now.addingTimeInterval(-1_040),
                         updatedAt: now.addingTimeInterval(-95),
                         durationSeconds: 1_040,
-                        title: "Audit release notes"
+                        title: "Audit release notes",
+                        projectName: "Release"
                     ),
                     CompanionWorkItemSummary(
                         id: "demo-hermes-finished",

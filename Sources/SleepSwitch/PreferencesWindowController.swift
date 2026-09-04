@@ -24,6 +24,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var showsDockIcon: Bool
     var remoteWorkSharingEnabled: Bool
     var remoteWorkTitlesEnabled: Bool
+    var remoteWorkProjectNamesEnabled: Bool
 
     static let empty = SleepSwitchPreferencesSnapshot(
         keepDisplayAwake: true, activateOnLaunch: false, defaultDurationSeconds: 0,
@@ -38,7 +39,8 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
         statusBarAppearance: StatusBarAppearance(iconStyle: .adaptive, showsColoredStatusDots: true),
         showsDockIcon: false,
         remoteWorkSharingEnabled: false,
-        remoteWorkTitlesEnabled: false
+        remoteWorkTitlesEnabled: false,
+        remoteWorkProjectNamesEnabled: false
     )
 }
 
@@ -63,6 +65,7 @@ enum SleepSwitchPreferencesMutation {
     case showsDockIcon(Bool)
     case remoteWorkSharingEnabled(Bool)
     case remoteWorkTitlesEnabled(Bool)
+    case remoteWorkProjectNamesEnabled(Bool)
 }
 
 @MainActor
@@ -481,7 +484,12 @@ private struct PreferencesWindowView: View {
                     set: { .remoteWorkTitlesEnabled($0) }
                 ))
                 .disabled(!viewModel.snapshot.remoteWorkSharingEnabled)
-                Text("State, timing, and harness names go through your private iCloud database. Prompts, message text, paths, commands, files, and logs stay on this Mac.")
+                Toggle("Include Codex project labels", isOn: binding(
+                    get: { viewModel.snapshot.remoteWorkProjectNamesEnabled },
+                    set: { .remoteWorkProjectNamesEnabled($0) }
+                ))
+                .disabled(!viewModel.snapshot.remoteWorkSharingEnabled)
+                Text("State, timing, and harness names go through your private iCloud database. Titles and project labels are separate choices. Prompts, message text, paths, commands, files, and logs stay on this Mac.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

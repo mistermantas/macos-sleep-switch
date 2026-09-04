@@ -345,6 +345,30 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
     let updatedAt: Date
     let durationSeconds: TimeInterval
     let title: String?
+    /// A user-approved project label, never a directory or workspace path.
+    let projectName: String?
+
+    init(
+        id: String,
+        harnessID: String,
+        harnessName: String,
+        state: CompanionWorkState,
+        startedAt: Date,
+        updatedAt: Date,
+        durationSeconds: TimeInterval,
+        title: String?,
+        projectName: String? = nil
+    ) {
+        self.id = id
+        self.harnessID = harnessID
+        self.harnessName = harnessName
+        self.state = state
+        self.startedAt = startedAt
+        self.updatedAt = updatedAt
+        self.durationSeconds = durationSeconds
+        self.title = title
+        self.projectName = projectName
+    }
 }
 
 /// A bounded remote-work projection. It is optional in Mac status for

@@ -8,6 +8,7 @@ enum RemoteWorkProjection {
         sessions: [OperatorSession],
         codexThreads: [CodexThreadMirror],
         includeTitles: Bool,
+        includeProjectNames: Bool = false,
         now: Date = Date(),
         maximumItems: Int = 24
     ) -> CompanionRemoteWorkSummary {
@@ -36,7 +37,8 @@ enum RemoteWorkProjection {
                         0,
                         (thread.completedAt ?? now).timeIntervalSince(thread.startedAt ?? thread.updatedAt)
                     ),
-                    title: includeTitles ? nonEmpty(thread.title) : nil
+                    title: includeTitles ? nonEmpty(thread.title) : nil,
+                    projectName: includeProjectNames ? nonEmpty(thread.projectName ?? "") : nil
                 )
             }
         }
@@ -76,7 +78,8 @@ enum RemoteWorkProjection {
             durationSeconds: max(0, (session.endedAt ?? now).timeIntervalSince(session.startedAt)),
             // Local adapters deliberately do not retain titles for harnesses
             // other than the user’s explicit Codex mirror opt-in.
-            title: nil
+            title: nil,
+            projectName: nil
         )
     }
 

@@ -22,6 +22,9 @@ enum SleepSwitchPreferenceKey {
     /// exposing a task’s wording on another device.
     static let remoteWorkSharingEnabled = "remoteWorkSharingEnabled"
     static let remoteWorkTitlesEnabled = "remoteWorkTitlesEnabled"
+    /// Project labels are independently opt-in because they can reveal a
+    /// client's name or the nature of work even when chat titles stay private.
+    static let remoteWorkProjectNamesEnabled = "remoteWorkProjectNamesEnabled"
 }
 
 struct LidClosedSafetyConfiguration: Equatable {

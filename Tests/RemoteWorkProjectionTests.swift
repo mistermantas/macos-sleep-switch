@@ -39,11 +39,14 @@ enum RemoteWorkProjectionTests {
             sessions: [],
             codexThreads: [thread],
             includeTitles: true,
+            includeProjectNames: true,
             now: now
         )
 
         expect(privateProjection.items.first?.title == nil, "does not share Codex titles by default")
+        expect(privateProjection.items.first?.projectName == nil, "does not share project labels by default")
         expect(titledProjection.items.first?.title == "Private redesign discussion", "shares a title only after opt-in")
+        expect(titledProjection.items.first?.projectName == "Private project", "shares a project label only after separate opt-in")
         expect(
             !(privateProjection.items.first?.id.contains("thread-local-123") ?? true),
             "uses a pseudonymous identifier instead of the local thread ID"

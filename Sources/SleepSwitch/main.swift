@@ -373,7 +373,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             SleepSwitchPreferenceKey.showsColoredStatusDots: true,
             SleepSwitchPreferenceKey.statusBarDotEmphasis: StatusBarDotEmphasis.standard.rawValue,
             SleepSwitchPreferenceKey.remoteWorkSharingEnabled: false,
-            SleepSwitchPreferenceKey.remoteWorkTitlesEnabled: false
+            SleepSwitchPreferenceKey.remoteWorkTitlesEnabled: false,
+            SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled: false
         ]
 #if !APP_STORE
         registeredDefaults[coolingAgentsOnlyKey] = false
@@ -970,6 +971,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     codexThreads: lastOperatorRefreshResult?.codexMirror.threads ?? [],
                     includeTitles: defaults.bool(
                         forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled
+                    ),
+                    includeProjectNames: defaults.bool(
+                        forKey: SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled
                     )
                 )
                 : nil
@@ -2160,7 +2164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             statusBarAppearance: StatusBarAppearance(defaults: defaults),
             showsDockIcon: defaults.bool(forKey: showsDockIconKey),
             remoteWorkSharingEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkSharingEnabled),
-            remoteWorkTitlesEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled)
+            remoteWorkTitlesEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled),
+            remoteWorkProjectNamesEnabled: defaults.bool(
+                forKey: SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled
+            )
         )
     }
 
@@ -2237,6 +2244,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             companionBridge.publishStatusChange()
         case .remoteWorkTitlesEnabled(let enabled):
             defaults.set(enabled, forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled)
+            companionBridge.publishStatusChange()
+        case .remoteWorkProjectNamesEnabled(let enabled):
+            defaults.set(enabled, forKey: SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled)
             companionBridge.publishStatusChange()
         case .aggressiveComfortTarget(let celsius):
 #if !APP_STORE

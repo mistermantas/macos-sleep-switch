@@ -1071,7 +1071,7 @@ private struct CompanionRemoteWorkRow: View {
                 Text(item.title ?? "\(item.harnessName) session")
                     .font(.body.weight(.medium))
                     .lineLimit(1)
-                Text("\(item.harnessName) · \(CompanionTimeText.elapsed(since: item.updatedAt))")
+                Text(workItemDetail(item))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1082,6 +1082,12 @@ private struct CompanionRemoteWorkRow: View {
         }
         .padding(.vertical, 3)
     }
+}
+
+private func workItemDetail(_ item: CompanionWorkItemSummary) -> String {
+    let project = item.projectName?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let context = project?.isEmpty == false ? "\(item.harnessName) · \(project!)" : item.harnessName
+    return "\(context) · \(CompanionTimeText.elapsed(since: item.updatedAt))"
 }
 
 private func stateSymbol(_ state: CompanionWorkState) -> String {

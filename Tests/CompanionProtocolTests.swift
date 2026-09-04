@@ -211,6 +211,30 @@ enum CompanionProtocolTests {
         )
         expect(decodedStatus == status, "round-trips detailed companion telemetry")
 
+        let workItemWithProject = CompanionWorkItemSummary(
+            id: "private-work-item",
+            harnessID: "codex",
+            harnessName: "Codex",
+            state: .active,
+            startedAt: now.addingTimeInterval(-90),
+            updatedAt: now,
+            durationSeconds: 90,
+            title: "Approved title",
+            projectName: "Approved project"
+        )
+        var legacyWorkItem = try! JSONSerialization.jsonObject(
+            with: CompanionJSON.encoder.encode(workItemWithProject)
+        ) as! [String: Any]
+        legacyWorkItem.removeValue(forKey: "projectName")
+        let decodedLegacyWorkItem = try! CompanionJSON.decoder.decode(
+            CompanionWorkItemSummary.self,
+            from: JSONSerialization.data(withJSONObject: legacyWorkItem)
+        )
+        expect(
+            decodedLegacyWorkItem.projectName == nil,
+            "decodes remote work records written before project labels existed"
+        )
+
         var legacyObject = try! JSONSerialization.jsonObject(with: encodedStatus) as! [String: Any]
         legacyObject.removeValue(forKey: "agents")
         legacyObject.removeValue(forKey: "manualSession")

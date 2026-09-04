@@ -3,6 +3,7 @@ import Foundation
 enum SharedContextIntakeTests {
     static func run() {
         testStagesAnExactPrivateCopy()
+        testStagesAWebLinkWithoutFetchingIt()
         testRejectsOversizedAndExpiredItems()
     }
 
@@ -25,6 +26,31 @@ enum SharedContextIntakeTests {
         expect(intake.drafts(now: Date(timeIntervalSince1970: 11)) == [draft], "lists the staged receipt")
         intake.discard(draft)
         expect(intake.drafts(now: Date(timeIntervalSince1970: 11)).isEmpty, "discards only on explicit completion")
+    }
+
+    private static func testStagesAWebLinkWithoutFetchingIt() {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let intake = SharedContextIntake(rootURL: root.appendingPathComponent("shared"))
+        let now = Date(timeIntervalSince1970: 10)
+        let link = URL(string: "https://github.com/openai/codex/issues/123?source=share")!
+        guard let draft = try? intake.stage(url: link, now: now),
+              let stored = intake.fileURL(for: draft) else {
+            fatalError("Test failed: stages a supported web link")
+        }
+        expect(draft.filename == "github.com.url", "gives a web link a safe local filename")
+        expect(
+            String(data: (try? Data(contentsOf: stored)) ?? Data(), encoding: .utf8) == link.absoluteString,
+            "keeps the exact link locally without fetching it"
+        )
+        do {
+            _ = try intake.stage(url: URL(string: "ftp://example.com/private")!, now: now)
+            fatalError("Test failed: unsupported link schemes cannot be staged")
+        } catch let error as SharedContextIntakeError {
+            expect(error == .linkNotSupported, "rejects unsupported link schemes")
+        } catch {
+            fatalError("Test failed: unexpected link staging error")
+        }
     }
 
     private static func testRejectsOversizedAndExpiredItems() {

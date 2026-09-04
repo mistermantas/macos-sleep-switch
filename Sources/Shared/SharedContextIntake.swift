@@ -16,6 +16,7 @@ enum SharedContextIntakeError: LocalizedError, Equatable {
     case folderNotSupported
     case fileTooLarge
     case sourceUnavailable
+    case linkNotSupported
     case stagingFailed
 
     var errorDescription: String? {
@@ -24,6 +25,7 @@ enum SharedContextIntakeError: LocalizedError, Equatable {
         case .folderNotSupported: "Share one file at a time, not a folder."
         case .fileTooLarge: "Shared context is limited to 25 MB."
         case .sourceUnavailable: "That shared item is no longer available."
+        case .linkNotSupported: "Share a standard http or https link."
         case .stagingFailed: "Sleep Switch could not safely stage that item."
         }
     }
@@ -123,6 +125,52 @@ struct SharedContextIntake {
             try fileManager.moveItem(at: temporary, to: destination)
             let manifest = try JSONEncoder().encode(draft)
             try manifest.write(to: manifestURL(for: directory), options: [.atomic])
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
+            try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: manifestURL(for: directory).path)
+            return draft
+        } catch {
+            try? fileManager.removeItem(at: directory)
+            throw SharedContextIntakeError.stagingFailed
+        }
+    }
+
+    /// Stores a link as a small local `.url` context item. It intentionally
+    /// does not fetch the page or contact a network service from the extension.
+    func stage(
+        url: URL,
+        fileManager: FileManager = .default,
+        now: Date = Date()
+    ) throws -> SharedContextDraft {
+        guard let rootURL else { throw SharedContextIntakeError.unavailable }
+        guard let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host?.isEmpty == false
+        else {
+            throw SharedContextIntakeError.linkNotSupported
+        }
+        let data = Data(url.absoluteString.utf8)
+        guard Int64(data.count) <= Self.maximumBytes else {
+            throw SharedContextIntakeError.fileTooLarge
+        }
+
+        let host = safeFilename(url.host ?? "shared-link")
+        let draft = SharedContextDraft(
+            id: UUID(),
+            filename: safeFilename("\(host).url"),
+            byteCount: Int64(data.count),
+            receivedAt: now,
+            expiresAt: now.addingTimeInterval(Self.lifetime)
+        )
+        let directory = rootURL.appendingPathComponent(draft.id.uuidString, isDirectory: true)
+        let destination = directory.appendingPathComponent(draft.filename, isDirectory: false)
+        do {
+            try fileManager.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            try data.write(to: destination, options: [.atomic])
+            try JSONEncoder().encode(draft).write(to: manifestURL(for: directory), options: [.atomic])
             try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
             try? fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: manifestURL(for: directory).path)
             return draft

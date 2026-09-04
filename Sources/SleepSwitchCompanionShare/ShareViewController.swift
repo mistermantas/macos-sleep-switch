@@ -13,7 +13,7 @@ final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         configureView()
-        importFirstSharedFile()
+        importFirstSharedItem()
     }
 
     private func configureView() {
@@ -49,17 +49,23 @@ final class ShareViewController: UIViewController {
         ])
     }
 
-    private func importFirstSharedFile() {
+    private func importFirstSharedItem() {
         let items = (extensionContext?.inputItems ?? [])
             .compactMap { $0 as? NSExtensionItem }
         let providers: [NSItemProvider] = items.flatMap { $0.attachments ?? [] }
-        guard let provider = providers.first(where: { supportedTypeIdentifier(for: $0) != nil }),
-              let typeIdentifier = supportedTypeIdentifier(for: provider)
-        else {
-            showFailure("Share a single file, image, PDF, or document to Sleep Switch.")
+        if let provider = providers.first(where: { supportedTypeIdentifier(for: $0) != nil }),
+           let typeIdentifier = supportedTypeIdentifier(for: provider) {
+            importFile(from: provider, typeIdentifier: typeIdentifier)
             return
         }
+        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.url.identifier) }) {
+            importLink(from: provider)
+            return
+        }
+        showFailure("Share one file, image, document, or web link to Sleep Switch.")
+    }
 
+    private func importFile(from provider: NSItemProvider, typeIdentifier: String) {
         provider.loadFileRepresentation(forTypeIdentifier: typeIdentifier) { [weak self] url, error in
             guard let self else { return }
             let result: Result<SharedContextDraft, Error>
@@ -81,10 +87,29 @@ final class ShareViewController: UIViewController {
         }
     }
 
+    private func importLink(from provider: NSItemProvider) {
+        provider.loadObject(ofClass: NSURL.self) { [weak self] object, error in
+            guard let self else { return }
+            let result: Result<SharedContextDraft, Error>
+            if let url = object as? NSURL {
+                result = Result { try self.intake.stage(url: url as URL) }
+            } else {
+                result = .failure(error ?? SharedContextIntakeError.sourceUnavailable)
+            }
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let draft): self.showReady(draft)
+                case .failure(let error): self.showFailure(error.localizedDescription)
+                }
+            }
+        }
+    }
+
     private func supportedTypeIdentifier(for provider: NSItemProvider) -> String? {
         provider.registeredTypeIdentifiers.first { identifier in
             guard let type = UTType(identifier) else { return false }
-            return type.conforms(to: .data) || type.conforms(to: .image) || type.conforms(to: .audiovisualContent)
+            return !type.conforms(to: .url)
+                && (type.conforms(to: .data) || type.conforms(to: .image) || type.conforms(to: .audiovisualContent))
         }
     }
 

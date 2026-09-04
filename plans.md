@@ -91,3 +91,4 @@ Acceptance: malformed/expired records fail safely, data is deleted or expires pr
 - 2026-09-04: Operator remains the read-only local data layer. This plan builds on it but does not turn Operator into an agent runner.
 - 2026-09-04: Remote work status is opt-in. Titles are separately opt-in. The first projection includes only evidence-backed active, waiting, rate-limited, failed, stopped, finished, and unknown states.
 - 2026-09-04: Context transfer uses an explicit 25 MB, 24-hour private-CloudKit asset handoff. This is a small, deliberate context path—not a bulk artifact transport or file browser.
+- 2026-09-04: The Mac now exposes received context as bounded inbox receipts in both its menu window and Operator. Reveal remains a user action; project placement and agent handoff remain deliberately separate.

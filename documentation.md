@@ -19,6 +19,7 @@ Operator is the read-only operations layer inside Sleep Switch. On the Mac it ma
 - `Sources/SleepSwitch/HermesSessionTracker.swift` observes Hermes active leases.
 - `Sources/SleepSwitch/AgentTracker.swift` remains responsible for awake-session detection; Operator adapters must not change that safety behavior.
 - `Sources/SleepSwitch/CompanionProtocol.swift` and `CompanionMacBridge.swift` provide the existing private-CloudKit path.
+- `Sources/SleepSwitch/RemoteContextInbox.swift` is the private Mac receipt store; `RemoteInboxWindowController.swift` and Operator expose received items without traversing user directories.
 - `Sources/SleepSwitch/OperatorModels.swift`, `OperatorStore.swift`, and `OperatorCoordinator.swift` hold the normalized local records, SQLite metadata database, and bounded refresh path.
 - `Sources/SleepSwitch/CodexOperatorAdapter.swift` and `HermesOperatorAdapter.swift` whitelist lifecycle/token fields. Hermes never reads its message or FTS tables.
 - `Sources/SleepSwitch/OperatorSkillIndexer.swift` indexes `SKILL.md` files without changing them.
@@ -58,9 +59,13 @@ Sleep Switch’s next layer stays privacy-first and App Store-safe by treating t
 
 - Safe foundation now:
   - private CloudKit status and history records for bounded machine/session summaries;
-  - an explicit, small, 24-hour CloudKit-asset context transfer to the Mac’s private inbox;
+- an explicit, small, 24-hour CloudKit-asset context transfer to the Mac’s private inbox;
   - an iOS/iPadOS file-picker intake path; a Share extension can reuse the same contract later;
   - Quick Look, artifact offers, push, preview access, and approvals remain planned rather than implied.
+
+### Current context handoff
+
+On iPhone/iPad, the capability-gated **Remote Inbox** control picks one file, validates the 25 MB limit, stages it privately, then shows sending, waiting, delivered, rejected, or pending feedback. The selected Mac validates expiry and size before retaining a copy in `Application Support/Sleep Switch/Remote Inbox`. The Mac menu and Operator both show only those completed inbox receipts and offer an explicit **Reveal** action. They never choose a repository, run a command, or contact an agent.
 - Product boundary:
   - do not sync prompts, transcript text, paths, commands, logs, or raw local history by default;
   - do not market the feature as generic remote desktop, remote shell, or remote file manager;

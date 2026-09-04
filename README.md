@@ -274,6 +274,7 @@ Manual sessions have a live countdown in the app and a Live Activity; Home Scree
 - **Keep Awake for Agents** and **Wake Display When Agents Finish** — change the existing agent preferences.
 - **Lock, Restart, and Shut Down** — direct-download build only, with an explicit iOS confirmation. The sandboxed Mac App Store build does not advertise shell-backed destructive actions.
 - **Stop Sleep Switch Controls** — immediately clears the Mac's manual and automatic keep-awake controls.
+- **Remote Inbox** — explicitly sends one context item up to 25 MB from iPhone/iPad to the selected Mac. The item expires after 24 hours, lands in Sleep Switch’s private inbox, and is never added to a project or agent session automatically.
 
 The Mac must be awake and signed into the same iCloud account for status and commands to move. Commands expire after 90 seconds and are addressed to a persisted per-device ID; the Mac rejects expired, misaddressed, unsupported, or replayed commands.
 

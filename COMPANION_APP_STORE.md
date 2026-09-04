@@ -13,8 +13,11 @@ In CloudKit Dashboard, create or select that container and add these record type
 | `MacStatus` | `payload` (Bytes), `deviceID` (String), `lastSeen` (Date), `expiresAt` (Date) |
 | `InsightsHistory` | `payload` (Bytes), `deviceID` (String), `updatedAt` (Date), `expiresAt` (Date) |
 | `RemoteCommand` | `targetDeviceID` (String), `action` (String), `state` (String), `createdAt` (Date), `expiresAt` (Date), `payload` (Bytes), `processedAt` (Date, optional), `accepted` (Int, optional), `resultMessage` (String, optional) |
+| `RemoteContextTransfer` | `targetDeviceID` (String), `state` (String), `createdAt` (Date), `expiresAt` (Date), `payload` (Bytes), `asset` (Asset), `processedAt` (Date, optional), `accepted` (Int, optional), `resultMessage` (String, optional) |
 
-Create query indexes for `MacStatus.deviceID`, `MacStatus.expiresAt`, `InsightsHistory.deviceID`, `InsightsHistory.expiresAt`, `RemoteCommand.targetDeviceID`, and `RemoteCommand.state`. Deploy the development schema, then promote the same schema to **Production** before archiving. Release builds use the production CloudKit environment; Debug builds continue to use Development. The app only uses the private database; there is no public record exposure.
+Create query indexes for `MacStatus.deviceID`, `MacStatus.expiresAt`, `InsightsHistory.deviceID`, `InsightsHistory.expiresAt`, `RemoteCommand.targetDeviceID`, `RemoteCommand.state`, `RemoteContextTransfer.targetDeviceID`, and `RemoteContextTransfer.state`. Deploy the development schema, then promote the same schema to **Production** before archiving. Release builds use the production CloudKit environment; Debug builds continue to use Development. The app only uses the private database; there is no public record exposure.
+
+`RemoteContextTransfer` is an explicit iPhone/iPad-to-Mac handoff, not a file browser. A user picks one item (maximum 25 MB); it expires after 24 hours. The Mac validates it, copies it to its private Remote Inbox, clears the CloudKit asset, and never places it in a repository or sends it to an agent automatically.
 
 `InsightsHistory` is intentionally bounded: it contains at most the last 24 hours of five-minute energy buckets plus 30 daily kWh summaries and coarse agent-hours summaries. It never contains prompts, output, process names, file names, or one-minute readings. When **Save Energy & Agent History** is off on the Mac, the published payload is empty and the companion shows that history is unavailable.
 
@@ -53,7 +56,7 @@ Suggested App Store Connect metadata:
 
   Setup is simple: install and open Sleep Switch on the paired computer, sign in to the same Apple Account on both devices with iCloud enabled, keep the computer awake and online, then open Sleep Switch Companion and tap Retry.
 
-  All status data and commands use your private iCloud database. Sleep Switch Companion does not create accounts, require a subscription or payment, or operate a developer server. It never sends prompts, files, or terminal output.
+  All status data and commands use your private iCloud database. Sleep Switch Companion does not create accounts, require a subscription or payment, or operate a developer server. It never sends prompts, terminal output, or arbitrary file access. When you explicitly choose one small context file, it is delivered only to the selected Mac’s private Remote Inbox and is never placed in a project automatically.
 
 - **Keywords:** remote,energy,thermal,fan,computer,coding,uptime
 - **Primary category:** Utilities

@@ -71,6 +71,7 @@ struct CodexThreadMirrorAdapter {
                 isPinned: sqlite3_column_int(statement, 6) != 0,
                 isArchived: sqlite3_column_int(statement, 5) != 0,
                 status: status(latestTurn?.status, completedAt: completedAt),
+                latestTurnErrorCode: latestTurn.flatMap(errorCode),
                 updatedAt: date(statement, 11) ?? Date.distantPast,
                 startedAt: latestTurn?.startedAt,
                 completedAt: completedAt,
@@ -112,9 +113,12 @@ struct CodexThreadMirrorAdapter {
         return messages.reversed()
     }
 
-    private func latestTurn(for threadID: String, database: OpaquePointer) -> (status: String?, startedAt: Date?, completedAt: Date?)? {
+    private func latestTurn(
+        for threadID: String,
+        database: OpaquePointer
+    ) -> (status: String?, errorJSON: String?, startedAt: Date?, completedAt: Date?)? {
         let sql = """
-        SELECT status, started_at, completed_at
+        SELECT status, error_json, started_at, completed_at
         FROM thread_turns
         WHERE thread_id = ?
         ORDER BY rollout_ordinal DESC LIMIT 1;
@@ -127,9 +131,29 @@ struct CodexThreadMirrorAdapter {
         guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
         return (
             optionalText(statement, 0),
-            optionalDate(statement, 1),
-            optionalDate(statement, 2)
+            optionalText(statement, 1),
+            optionalDate(statement, 2),
+            optionalDate(statement, 3)
         )
+    }
+
+    private func errorCode(from latestTurn: (
+        status: String?,
+        errorJSON: String?,
+        startedAt: Date?,
+        completedAt: Date?
+    )) -> String? {
+        guard let raw = latestTurn.errorJSON,
+              let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+        if let text = dictionary["codexErrorInfo"] as? String,
+           !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return text
+        }
+        return nil
     }
 
     private func messageText(_ raw: String) -> String? {

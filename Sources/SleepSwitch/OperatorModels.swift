@@ -46,6 +46,7 @@ struct CodexThreadMirror: Equatable, Identifiable {
     let isPinned: Bool
     let isArchived: Bool
     let status: CodexThreadStatus
+    let latestTurnErrorCode: String?
     let updatedAt: Date
     let startedAt: Date?
     let completedAt: Date?
@@ -204,5 +205,60 @@ enum OperatorPrivacy {
     /// skill content, filesystem location, prompts, or event payload.
     static func compactTokenDelta(from sessions: [OperatorSession]) -> Int {
         sessions.reduce(0) { $0 + $1.totalTokens }
+    }
+}
+
+extension OperatorSession {
+    func remoteWorkState(now _: Date = Date()) -> CompanionWorkState {
+        switch state {
+        case .running:
+            .active
+        case .finished:
+            .finished
+        case .aborted:
+            .stopped
+        case .unknown:
+            .unknown
+        }
+    }
+}
+
+extension CodexThreadMirror {
+    func remoteWorkState(now _: Date = Date()) -> CompanionWorkState {
+        if let code = latestTurnErrorCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !code.isEmpty {
+            switch code {
+            case "usageLimitExceeded":
+                return .rateLimited
+            case "serverOverloaded":
+                return .waiting
+            default:
+                return .failed
+            }
+        }
+
+        switch status {
+        case .running:
+            .active
+        case .finished:
+            .finished
+        case .stopped:
+            .stopped
+        case .waiting:
+            .waiting
+        case .unknown:
+            .unknown
+        }
+    }
+
+    var remoteWorkNote: String? {
+        switch latestTurnErrorCode {
+        case "usageLimitExceeded":
+            return "Usage limit reached"
+        case "serverOverloaded":
+            return "Provider busy"
+        default:
+            return nil
+        }
     }
 }

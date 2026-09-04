@@ -4,7 +4,7 @@ enum RemoteWorkProjectionTests {
     static func run() {
         testProjectionKeepsSessionTitlesOptInAndPseudonymous()
         testProjectionPreservesOperationalStateCounts()
-        testProjectionUsesStructuredCodexFailuresAndStallHeuristics()
+        testProjectionUsesStructuredCodexFailuresWithoutInventingStalls()
     }
 
     private static func testProjectionKeepsSessionTitlesOptInAndPseudonymous() {
@@ -73,7 +73,7 @@ enum RemoteWorkProjectionTests {
         expect(projection.attentionCount == 0, "does not invent an attention state from an aborted session")
     }
 
-    private static func testProjectionUsesStructuredCodexFailuresAndStallHeuristics() {
+    private static func testProjectionUsesStructuredCodexFailuresWithoutInventingStalls() {
         let now = Date(timeIntervalSince1970: 1_788_500_000)
         let threads = [
             CodexThreadMirror(
@@ -92,24 +92,6 @@ enum RemoteWorkProjectionTests {
                 updatedAt: now.addingTimeInterval(-60),
                 startedAt: now.addingTimeInterval(-600),
                 completedAt: now.addingTimeInterval(-60),
-                messages: []
-            ),
-            CodexThreadMirror(
-                id: "stale",
-                title: "Quiet build",
-                preview: "",
-                cwd: "/private/stale",
-                projectName: nil,
-                sectionID: nil,
-                sectionName: nil,
-                sectionPosition: nil,
-                isPinned: false,
-                isArchived: false,
-                status: .running,
-                latestTurnErrorCode: nil,
-                updatedAt: now.addingTimeInterval(-15 * 60),
-                startedAt: now.addingTimeInterval(-20 * 60),
-                completedAt: nil,
                 messages: []
             ),
             CodexThreadMirror(
@@ -140,9 +122,9 @@ enum RemoteWorkProjectionTests {
         )
         let counts = Dictionary(uniqueKeysWithValues: projection.stateCounts.map { ($0.state, $0.count) })
         expect(counts[.rateLimited] == 1, "maps Codex usage-limit failures to a rate-limited state")
-        expect(counts[.stalled] == 1, "marks old in-progress work as stalled")
-        expect(counts[.reviewReady] == 1, "treats completed Codex work as ready for review")
-        expect(projection.attentionCount == 2, "counts only actionable failure and stall states as attention")
+        expect(counts[.finished] == 1, "keeps finished work distinct from review-ready work")
+        expect(counts[.stalled] == nil, "does not call a quiet agent stalled without direct evidence")
+        expect(projection.attentionCount == 1, "counts only the evidence-backed rate limit as attention")
     }
 
     private static func session(id: String, state: OperatorSessionState, now: Date) -> OperatorSession {

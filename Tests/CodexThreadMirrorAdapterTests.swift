@@ -25,7 +25,7 @@ enum CodexThreadMirrorAdapterTests {
             historyDatabaseURL: historyURL
         ).snapshot()
         expect(snapshot.isAvailable, "opens the local Codex catalog read-only")
-        expect(snapshot.threads.count == 3, "mirrors visible Codex chats")
+        expect(snapshot.threads.count == 4, "mirrors visible Codex chats")
 
         let running = snapshot.threads.first { $0.id == "running" }
         expect(running?.title == "Make the board useful", "uses Codex chat titles")
@@ -33,10 +33,15 @@ enum CodexThreadMirrorAdapterTests {
         expect(running?.projectName == "Sleep Switch", "uses Codex project names")
         expect(running?.isPinned == true, "uses Codex pin state")
         expect(running?.status == .running, "maps active turn progress to running")
+        expect(running?.latestTurnErrorCode == nil, "keeps empty error state absent")
         expect(running?.messages.map(\.text) == ["Show actual tasks", "I am reading the local catalog."], "keeps recent local messages in display memory")
 
         expect(snapshot.threads.first { $0.id == "finished" }?.status == .finished, "maps completed turns")
         expect(snapshot.threads.first { $0.id == "stopped" }?.status == .stopped, "maps cancelled turns")
+        expect(
+            snapshot.threads.first { $0.id == "failed" }?.latestTurnErrorCode == "usageLimitExceeded",
+            "reads structured Codex error codes without keeping the full error payload"
+        )
         testMovingThreadUpdatesOnlyCodexSidebarAssignment()
     }
 
@@ -104,7 +109,8 @@ enum CodexThreadMirrorAdapterTests {
         INSERT INTO threads VALUES
           ('running', 'Generated title', 'Make the board useful', 'Show actual tasks', 'Show actual tasks', '/work/sleep-switch', 0, 1, 'rnd', 2, 'sleep-switch', 1788500000000),
           ('finished', 'Ship the companion', NULL, 'Build passed', 'Ship the companion', '/work/sleep-switch', 0, 0, NULL, NULL, 'sleep-switch', 1788400000000),
-          ('stopped', 'Try a fan curve', '', 'Stopped safely', 'Try a fan curve', '/work/lab', 1, 0, NULL, NULL, NULL, 1788300000000);
+          ('stopped', 'Try a fan curve', '', 'Stopped safely', 'Try a fan curve', '/work/lab', 1, 0, NULL, NULL, NULL, 1788300000000),
+          ('failed', 'Resume later', NULL, 'Usage limit hit', 'Resume later', '/work/rate-limit', 0, 0, NULL, NULL, NULL, 1788200000000);
         """
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
             throw NSError(domain: "CodexMirrorTest", code: 2)
@@ -120,16 +126,17 @@ enum CodexThreadMirrorAdapterTests {
         let sql = """
         CREATE TABLE thread_turns (
           thread_id TEXT, turn_id TEXT, rollout_ordinal INTEGER, status TEXT,
-          started_at INTEGER, completed_at INTEGER
+          error_json TEXT, started_at INTEGER, completed_at INTEGER
         );
         CREATE TABLE thread_items (
           thread_id TEXT, turn_id TEXT, item_id TEXT, rollout_ordinal INTEGER,
           created_at_ms INTEGER, item_json TEXT, item_type TEXT
         );
         INSERT INTO thread_turns VALUES
-          ('running', 'r1', 1, 'in_progress', 1788500000000, NULL),
-          ('finished', 'f1', 1, 'completed', 1788400000000, 1788400100000),
-          ('stopped', 's1', 1, 'interrupted', 1788300000000, NULL);
+          ('running', 'r1', 1, 'in_progress', NULL, 1788500000000, NULL),
+          ('finished', 'f1', 1, 'completed', NULL, 1788400000000, 1788400100000),
+          ('stopped', 's1', 1, 'interrupted', NULL, 1788300000000, NULL),
+          ('failed', 'x1', 1, 'failed', '{"codexErrorInfo":"usageLimitExceeded","message":"limit"}', 1788200000000, 1788200100000);
         INSERT INTO thread_items VALUES
           ('running', 'r1', 'm1', 1, 1788500000000, '{"type":"userMessage","text":"Show actual tasks"}', 'userMessage'),
           ('running', 'r1', 'm2', 2, 1788500001000, '{"type":"agentMessage","text":"I am reading the local catalog."}', 'agentMessage');

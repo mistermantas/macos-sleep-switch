@@ -178,6 +178,23 @@ enum CompanionProtocolTests {
                 durationDeltaSeconds: 1_800,
                 finishAction: CompanionRemoteAction.sleepMacWhenAgentsFinish.rawValue,
                 alertCodes: ["operator.hermes-agent.permission_required"]
+            ),
+            remoteWork: CompanionRemoteWorkSummary(
+                updatedAt: now,
+                items: [
+                    CompanionWorkItemSummary(
+                        id: "private-work-item",
+                        harnessID: "codex",
+                        harnessName: "Codex",
+                        state: .reviewReady,
+                        startedAt: now.addingTimeInterval(-1_800),
+                        updatedAt: now.addingTimeInterval(-60),
+                        durationSeconds: 1_740,
+                        title: nil
+                    )
+                ],
+                stateCounts: [CompanionWorkStateCount(state: .reviewReady, count: 1)],
+                attentionCount: 0
             )
         )
         expect(
@@ -197,6 +214,7 @@ enum CompanionProtocolTests {
         legacyObject.removeValue(forKey: "manualSession")
         legacyObject.removeValue(forKey: "cooling")
         legacyObject.removeValue(forKey: "operatorSummary")
+        legacyObject.removeValue(forKey: "remoteWork")
         if var legacyCapabilities = legacyObject["capabilities"] as? [String: Any] {
             legacyCapabilities.removeValue(forKey: "canControlManualSession")
             legacyCapabilities.removeValue(forKey: "canSetCoolingProfile")
@@ -211,6 +229,10 @@ enum CompanionProtocolTests {
         expect(
             legacyStatus.operatorSummary == nil,
             "decodes status written before Operator summaries existed"
+        )
+        expect(
+            legacyStatus.remoteWork == nil,
+            "decodes status written before Remote Work sharing existed"
         )
 
         let projectedStatus = status.applyingKeepAwake(parameters: ["enabled": "false"])

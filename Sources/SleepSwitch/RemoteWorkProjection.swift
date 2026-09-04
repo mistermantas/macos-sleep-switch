@@ -4,8 +4,6 @@ import Foundation
 /// data. The Mac remains authoritative: this projection never reads prompts,
 /// transcript text, paths, artifacts, or command payloads.
 enum RemoteWorkProjection {
-    private static let staleRunningWindow: TimeInterval = 8 * 60
-
     static func make(
         sessions: [OperatorSession],
         codexThreads: [CodexThreadMirror],
@@ -21,7 +19,7 @@ enum RemoteWorkProjection {
         if codexThreads.isEmpty {
             items += sessions
                 .filter { $0.harnessID == "codex" }
-                .map { sessionItem(from: $0, now: now) }
+                .map { sessionItem($0, now: now) }
         } else {
             items += codexThreads.map { thread in
                 CompanionWorkItemSummary(
@@ -31,7 +29,7 @@ enum RemoteWorkProjection {
                     ),
                     harnessID: "codex",
                     harnessName: "Codex",
-                    state: state(for: thread, now: now),
+                    state: state(for: thread),
                     startedAt: thread.startedAt ?? thread.updatedAt,
                     updatedAt: thread.completedAt ?? thread.updatedAt,
                     durationSeconds: max(
@@ -45,7 +43,7 @@ enum RemoteWorkProjection {
 
         items += sessions
             .filter { $0.harnessID != "codex" }
-            .map { sessionItem(from: $0, now: now) }
+            .map { sessionItem($0, now: now) }
 
         let ordered = items.sorted(by: order)
         let stateCounts = CompanionWorkState.allCases.compactMap { state -> CompanionWorkStateCount? in
@@ -61,7 +59,7 @@ enum RemoteWorkProjection {
     }
 
     private static func sessionItem(
-        from session: OperatorSession,
+        _ session: OperatorSession,
         now: Date
     ) -> CompanionWorkItemSummary {
         let updatedAt = session.endedAt ?? session.lastActivityAt ?? session.startedAt
@@ -72,7 +70,7 @@ enum RemoteWorkProjection {
             ),
             harnessID: session.harnessID,
             harnessName: session.harnessName,
-            state: state(for: session, now: now),
+            state: state(for: session),
             startedAt: session.startedAt,
             updatedAt: updatedAt,
             durationSeconds: max(0, (session.endedAt ?? now).timeIntervalSince(session.startedAt)),
@@ -82,42 +80,29 @@ enum RemoteWorkProjection {
         )
     }
 
-    private static func state(for session: OperatorSession, now: Date) -> CompanionWorkState {
-        let base: CompanionWorkState = switch session.state {
+    private static func state(for session: OperatorSession) -> CompanionWorkState {
+        return switch session.state {
         case .running: .active
         case .finished: .finished
         case .aborted: .stopped
         case .unknown: .unknown
         }
-        return refinedForStall(
-            base,
-            lastUpdateAt: session.lastActivityAt ?? session.startedAt,
-            now: now
-        )
     }
 
-    private static func state(for thread: CodexThreadMirror, now: Date) -> CompanionWorkState {
+    private static func state(for thread: CodexThreadMirror) -> CompanionWorkState {
         if let errorCode = thread.latestTurnErrorCode?.lowercased() {
             if errorCode.contains("usagelimitexceeded") || errorCode.contains("rate") {
                 return .rateLimited
             }
-            if errorCode.contains("serveroverloaded") {
-                return .waiting
-            }
         }
 
-        let lastUpdateAt = max(
-            thread.messages.last?.createdAt ?? .distantPast,
-            thread.completedAt ?? thread.updatedAt
-        )
-        let base: CompanionWorkState = switch thread.status {
+        return switch thread.status {
         case .running: .active
         case .waiting: .waiting
-        case .finished: .reviewReady
+        case .finished: .finished
         case .stopped: thread.latestTurnErrorCode == nil ? .stopped : .failed
         case .unknown: .unknown
         }
-        return refinedForStall(base, lastUpdateAt: lastUpdateAt, now: now)
     }
 
     private static func nonEmpty(_ text: String) -> String? {
@@ -132,12 +117,4 @@ enum RemoteWorkProjection {
         return left.updatedAt > right.updatedAt
     }
 
-    private static func refinedForStall(
-        _ state: CompanionWorkState,
-        lastUpdateAt: Date,
-        now: Date
-    ) -> CompanionWorkState {
-        guard state == .active || state == .waiting else { return state }
-        return now.timeIntervalSince(lastUpdateAt) >= staleRunningWindow ? .stalled : state
-    }
 }

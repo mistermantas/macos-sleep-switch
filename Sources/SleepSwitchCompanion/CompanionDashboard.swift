@@ -53,7 +53,7 @@ struct CompanionDashboardRoot: View {
                   let mac = selectedMac,
                   let summary = mac.remoteWork {
             NavigationStack {
-                CompanionRemoteWorkScreen(summary: summary, isStale: mac.isStale)
+                CompanionRemoteWorkScreen(mac: mac, summary: summary, isStale: mac.isStale)
             }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-settings") {
             CompanionPreferencesView(model: model) {}
@@ -235,6 +235,7 @@ struct CompanionDashboardRoot: View {
                 if let remoteWork = mac.remoteWork {
                     NavigationLink {
                         CompanionRemoteWorkScreen(
+                            mac: mac,
                             summary: remoteWork,
                             isStale: mac.isStale
                         )
@@ -715,8 +716,30 @@ private struct CompanionRemoteWorkCard: View {
 }
 
 private struct CompanionRemoteWorkScreen: View {
+    let mac: CompanionMacStatus
     let summary: CompanionRemoteWorkSummary
     let isStale: Bool
+
+    private var powerStateLabel: String {
+        if isStale {
+            return "Last reported"
+        }
+        if summary.activeCount == 0 {
+            return "No active work"
+        }
+        if mac.isKeepingAwake {
+            return "Awake for agents"
+        }
+        return "\(summary.activeCount) active"
+    }
+
+    private var powerSymbol: String {
+        isStale ? "clock.arrow.circlepath" : (mac.isKeepingAwake ? "bolt.circle.fill" : "laptopcomputer")
+    }
+
+    private var powerColor: Color {
+        isStale ? .secondary : (mac.isKeepingAwake ? .blue : .primary)
+    }
 
     private var attention: [CompanionWorkItemSummary] {
         summary.items.filter { $0.state.requiresAttention }
@@ -736,6 +759,17 @@ private struct CompanionRemoteWorkScreen: View {
                 Label("Showing the last update from this Mac", systemImage: "clock.arrow.circlepath")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section {
+                HStack(spacing: 10) {
+                    Label(mac.displayName, systemImage: powerSymbol)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Spacer(minLength: 12)
+                    Text(powerStateLabel)
+                        .lineLimit(1)
+                        .foregroundStyle(powerColor)
+                }
             }
             if !attention.isEmpty {
                 Section("Attention") {

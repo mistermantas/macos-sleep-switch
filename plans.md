@@ -10,7 +10,7 @@
 - [x] Mac exposes received context safely and offers an explicit user-chosen handoff action—never automatic repository or agent injection.
 - [x] Artifact offers support explicit Mac-to-mobile delivery, Quick Look, save, and share.
 - [ ] Attention events and notifications distinguish useful attention from required action.
-- [ ] Session/machine relationship and power consequence are understandable on mobile.
+- [x] Session/machine relationship and power consequence are understandable on mobile.
 - [ ] Local-preview discovery and access design is opt-in, network-safe, and separately reviewed.
 - [ ] Approval and follow-up flows have a narrow, evidence-backed command model.
 - [ ] Full privacy audit, recovery limits, macOS/iOS builds, and release notes pass.
@@ -102,4 +102,5 @@ Acceptance: malformed/expired records fail safely, data is deleted or expires pr
 - 2026-09-04: The Mac now exposes received context as bounded inbox receipts in both its menu window and Operator. **Place…** requires the Mac owner to choose a destination folder, copies without overwriting an existing project file, then reveals that copy. It never chooses an agent, alters a prompt, or executes work.
 - 2026-09-04: Result handoff mirrors intake in the opposite direction. The Mac offers only a user-picked file; the companion sees the name, size, and age first, then explicitly gets a 25 MB/24-hour asset into private local storage before Quick Look or the system share sheet. Offer listing does not retain a CloudKit asset URL.
 - 2026-09-04: Attention routing has begun with opt-in local companion notifications. First sightings establish a baseline; only evidence-backed transitions to blocked, rate-limited, stalled, or failed work alert by default. Finished/review-ready notices are a separate opt-in. Stale Mac snapshots preserve the baseline and never generate catch-up alerts.
+- 2026-09-04: The dedicated iPhone/iPad Agent Work view identifies the reporting Mac and says whether it is currently being kept awake for agent work. This derives from the existing status snapshot and is explicitly marked as last reported when stale.
 - 2026-09-04: Preview research gate: Apple requires a container-app local-network purpose string and declared Bonjour service type; background discovery cannot prompt for permission and the simulator cannot validate the privacy flow. The first release must use an opaque service registration and authenticated encrypted proxy, not a generic localhost relay.

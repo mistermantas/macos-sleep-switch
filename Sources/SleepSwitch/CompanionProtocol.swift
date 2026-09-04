@@ -139,6 +139,7 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "stop.circle"
         }
     }
+
 }
 
 enum CompanionCommandStage: String, Equatable {
@@ -343,6 +344,17 @@ enum CompanionWorkActivity: String, Codable, CaseIterable, Equatable {
         case .editingFiles: "Edited files"
         case .usingTool: "Used tool"
         case .webSearch: "Web search"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .reasoning: "brain.head.profile"
+        case .commandRunning: "terminal"
+        case .commandFinished: "terminal.badge.checkmark"
+        case .editingFiles: "pencil.line"
+        case .usingTool: "wrench.and.screwdriver"
+        case .webSearch: "magnifyingglass"
         }
     }
 }

@@ -950,6 +950,12 @@ private struct OperatorBoardCard: View {
                     .lineLimit(2)
                     .foregroundStyle(.primary)
                 Spacer(minLength: 4)
+                if let activity = thread.recentActivity {
+                    Image(systemName: activity.symbol)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(activity.title)
+                }
                 OperatorThreadStatus(state: thread.remoteWorkState())
             }
             if !thread.preview.isEmpty {
@@ -1046,6 +1052,12 @@ private struct CodexThreadDetail: View {
                     Label(note, systemImage: "exclamationmark.circle.fill")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(operatorWorkStateTint(thread.remoteWorkState()))
+                }
+
+                if let activity = thread.recentActivity {
+                    Label(activity.title, systemImage: activity.symbol)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if !thread.preview.isEmpty {

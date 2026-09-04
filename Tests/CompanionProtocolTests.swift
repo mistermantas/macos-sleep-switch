@@ -221,12 +221,14 @@ enum CompanionProtocolTests {
             updatedAt: now,
             durationSeconds: 90,
             title: "Approved title",
-            projectName: "Approved project"
+            projectName: "Approved project",
+            attentionSummary: "Usage limit reached"
         )
         var legacyWorkItem = try! JSONSerialization.jsonObject(
             with: CompanionJSON.encoder.encode(workItemWithProject)
         ) as! [String: Any]
         legacyWorkItem.removeValue(forKey: "projectName")
+        legacyWorkItem.removeValue(forKey: "attentionSummary")
         let decodedLegacyWorkItem = try! CompanionJSON.decoder.decode(
             CompanionWorkItemSummary.self,
             from: JSONSerialization.data(withJSONObject: legacyWorkItem)
@@ -234,6 +236,10 @@ enum CompanionProtocolTests {
         expect(
             decodedLegacyWorkItem.projectName == nil,
             "decodes remote work records written before project labels existed"
+        )
+        expect(
+            decodedLegacyWorkItem.attentionSummary == nil,
+            "decodes remote work records written before attention summaries existed"
         )
 
         var legacyObject = try! JSONSerialization.jsonObject(with: encodedStatus) as! [String: Any]

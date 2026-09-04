@@ -257,6 +257,8 @@ extension CodexThreadMirror {
             return "Usage limit reached"
         case "serverOverloaded":
             return "Provider busy"
+        case let code? where !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
+            return "Latest Codex turn failed"
         default:
             return nil
         }

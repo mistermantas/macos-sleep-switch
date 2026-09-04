@@ -38,7 +38,8 @@ enum RemoteWorkProjection {
                         (thread.completedAt ?? now).timeIntervalSince(thread.startedAt ?? thread.updatedAt)
                     ),
                     title: includeTitles ? nonEmpty(thread.title) : nil,
-                    projectName: includeProjectNames ? nonEmpty(thread.projectName ?? "") : nil
+                    projectName: includeProjectNames ? nonEmpty(thread.projectName ?? "") : nil,
+                    attentionSummary: thread.remoteWorkNote
                 )
             }
         }
@@ -79,7 +80,8 @@ enum RemoteWorkProjection {
             // Local adapters deliberately do not retain titles for harnesses
             // other than the user’s explicit Codex mirror opt-in.
             title: nil,
-            projectName: nil
+            projectName: nil,
+            attentionSummary: nil
         )
     }
 

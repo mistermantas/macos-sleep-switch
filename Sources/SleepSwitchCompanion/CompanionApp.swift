@@ -1226,12 +1226,13 @@ private enum CompanionScreenshotDemo {
                         id: "demo-codex-waiting",
                         harnessID: "codex",
                         harnessName: "Codex",
-                        state: .waiting,
+                        state: .rateLimited,
                         startedAt: now.addingTimeInterval(-1_040),
                         updatedAt: now.addingTimeInterval(-95),
                         durationSeconds: 1_040,
                         title: "Audit release notes",
-                        projectName: "Release"
+                        projectName: "Release",
+                        attentionSummary: "Usage limit reached"
                     ),
                     CompanionWorkItemSummary(
                         id: "demo-hermes-finished",
@@ -1246,7 +1247,7 @@ private enum CompanionScreenshotDemo {
                 ],
                 stateCounts: [
                     CompanionWorkStateCount(state: .active, count: 1),
-                    CompanionWorkStateCount(state: .waiting, count: 1),
+                    CompanionWorkStateCount(state: .rateLimited, count: 1),
                     CompanionWorkStateCount(state: .finished, count: 1)
                 ],
                 attentionCount: 0

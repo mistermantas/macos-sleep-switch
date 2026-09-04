@@ -347,6 +347,9 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
     let title: String?
     /// A user-approved project label, never a directory or workspace path.
     let projectName: String?
+    /// A fixed app-authored explanation of an actionable state. It is never a
+    /// raw provider error, command, prompt, or transcript excerpt.
+    let attentionSummary: String?
 
     init(
         id: String,
@@ -357,7 +360,8 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
         updatedAt: Date,
         durationSeconds: TimeInterval,
         title: String?,
-        projectName: String? = nil
+        projectName: String? = nil,
+        attentionSummary: String? = nil
     ) {
         self.id = id
         self.harnessID = harnessID
@@ -368,6 +372,7 @@ struct CompanionWorkItemSummary: Codable, Equatable, Identifiable {
         self.durationSeconds = durationSeconds
         self.title = title
         self.projectName = projectName
+        self.attentionSummary = attentionSummary
     }
 }
 

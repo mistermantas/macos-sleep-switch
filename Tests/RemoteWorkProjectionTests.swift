@@ -45,6 +45,7 @@ enum RemoteWorkProjectionTests {
 
         expect(privateProjection.items.first?.title == nil, "does not share Codex titles by default")
         expect(privateProjection.items.first?.projectName == nil, "does not share project labels by default")
+        expect(privateProjection.items.first?.attentionSummary == nil, "does not invent an attention summary for active work")
         expect(titledProjection.items.first?.title == "Private redesign discussion", "shares a title only after opt-in")
         expect(titledProjection.items.first?.projectName == "Private project", "shares a project label only after separate opt-in")
         expect(
@@ -126,6 +127,10 @@ enum RemoteWorkProjectionTests {
         )
         let counts = Dictionary(uniqueKeysWithValues: projection.stateCounts.map { ($0.state, $0.count) })
         expect(counts[.rateLimited] == 1, "maps Codex usage-limit failures to a rate-limited state")
+        expect(
+            projection.items.first(where: { $0.state == .rateLimited })?.attentionSummary == "Usage limit reached",
+            "shares only the fixed usage-limit explanation"
+        )
         expect(counts[.finished] == 1, "keeps finished work distinct from review-ready work")
         expect(counts[.stalled] == nil, "does not call a quiet agent stalled without direct evidence")
         expect(projection.attentionCount == 1, "counts only the evidence-backed rate limit as attention")
@@ -159,6 +164,10 @@ enum RemoteWorkProjectionTests {
             now: now
         )
         expect(projection.stateCounts.first?.state == .waiting, "keeps provider-capacity issues in a non-destructive waiting state")
+        expect(
+            projection.items.first?.attentionSummary == "Provider busy",
+            "shares the fixed provider-capacity explanation without an error payload"
+        )
         expect(projection.attentionCount == 0, "does not page the user for a temporary provider-capacity issue")
     }
 

@@ -788,7 +788,7 @@ private struct CompanionRemoteWorkScreen: View {
                 }
             }
             if !attention.isEmpty {
-                Section("Attention") {
+                Section("Action needed") {
                     ForEach(attention) { item in CompanionRemoteWorkRow(item: item) }
                 }
             }
@@ -1124,6 +1124,12 @@ private struct CompanionRemoteWorkRow: View {
                 Text(workItemDetail(item))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let attention = item.attentionSummary, item.state.requiresAttention {
+                    Text(attention)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             Text(item.state.title)

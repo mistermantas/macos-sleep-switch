@@ -74,7 +74,7 @@ On the Mac, **Share Result…** offers one user-selected file through a short-li
 
 ### Current attention routing
 
-The companion can send opt-in local notifications after a fresh iCloud update. It establishes a baseline first, then alerts only when a work item transitions into an evidence-backed `blocked`, `rate limited`, `stalled`, or `failed` state. `finished` and `ready to review` notifications are a separate off-by-default choice. A stale Mac status never causes a catch-up notification. Notifications use the harness and state, not a private task title.
+The companion can send opt-in local notifications after a fresh iCloud update. It establishes a baseline first, then alerts only when a work item transitions into an evidence-backed `blocked`, `rate limited`, `stalled`, or `failed` state. `finished` and `ready to review` notifications are a separate off-by-default choice. A stale Mac status never causes a catch-up notification. Notifications use the harness and state, not a private task title. The in-app Agent Work view may also show a fixed safe reason for a known Codex condition (for example, “Usage limit reached”); it never sends raw error JSON, prompt text, or logs.
 
 ### Preview design gate
 

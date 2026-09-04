@@ -31,6 +31,23 @@ struct RemoteContextInbox {
         }
     }
 
+    enum RemovalError: LocalizedError, Equatable {
+        case sourceUnavailable
+        case invalidReceipt
+        case removalFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .sourceUnavailable:
+                "This Remote Inbox item is no longer available."
+            case .invalidReceipt:
+                "Sleep Switch could not remove this Remote Inbox item safely."
+            case .removalFailed:
+                "Sleep Switch could not remove this Remote Inbox item."
+            }
+        }
+    }
+
     let rootURL: URL
 
     init(fileManager: FileManager = .default) {
@@ -168,6 +185,31 @@ struct RemoteContextInbox {
         } catch {
             try? fileManager.removeItem(at: temporary)
             throw PlacementError.placementFailed
+        }
+    }
+
+    /// Removes one private inbox receipt after the Mac owner explicitly asks.
+    /// The operation is constrained to the receipt directory matching the
+    /// transfer identifier; it can never traverse into a selected project.
+    func remove(
+        _ item: RemoteContextInboxItem,
+        fileManager: FileManager = .default
+    ) throws {
+        let root = rootURL.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let directory = item.fileURL.deletingLastPathComponent()
+        let normalizedDirectory = directory.standardizedFileURL
+        guard normalizedDirectory.path.hasPrefix(root),
+              normalizedDirectory.lastPathComponent == item.transferID.uuidString
+        else {
+            throw RemovalError.invalidReceipt
+        }
+        guard fileManager.fileExists(atPath: item.fileURL.path) else {
+            throw RemovalError.sourceUnavailable
+        }
+        do {
+            try fileManager.removeItem(at: directory)
+        } catch {
+            throw RemovalError.removalFailed
         }
     }
 

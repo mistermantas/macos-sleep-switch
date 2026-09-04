@@ -7,6 +7,7 @@ enum RemoteContextInboxTests {
         testRejectsEmptyAsset()
         testListsNewestItemsFirstAndIgnoresNoise()
         testPlacesAnExplicitCopyWithoutOverwriting()
+        testRemovesOnlyTheExplicitPrivateReceipt()
     }
 
     private static func testReceivesOneSafeCopy() {
@@ -131,6 +132,27 @@ enum RemoteContextInboxTests {
         expect((try? Data(contentsOf: destination)) == payload, "places an exact local copy")
         expect((try? Data(contentsOf: original)) == Data("existing project file".utf8), "leaves project files untouched")
         expect(FileManager.default.fileExists(atPath: item.fileURL.path), "retains the private inbox original")
+    }
+
+    private static func testRemovesOnlyTheExplicitPrivateReceipt() {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("input.txt")
+        try? Data("phone-provided context".utf8).write(to: source)
+        let inbox = RemoteContextInbox(rootURL: root.appendingPathComponent("inbox"))
+        let transfer = makeTransfer(filename: "remove-me.txt")
+        _ = inbox.receive(transfer, assetURL: source)
+        guard let item = inbox.items().first else {
+            fatalError("Test failed: received item should be listed")
+        }
+
+        try? inbox.remove(item)
+
+        expect(inbox.items().isEmpty, "removes the selected private inbox receipt")
+        expect(
+            (try? Data(contentsOf: source)) == Data("phone-provided context".utf8),
+            "does not affect the original transfer source"
+        )
     }
 
     private static func makeTransfer(

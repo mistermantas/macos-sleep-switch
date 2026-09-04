@@ -32,6 +32,7 @@ final class RemoteInboxWindowController: NSWindowController {
 private final class RemoteInboxViewModel: ObservableObject {
     @Published private(set) var items: [RemoteContextInboxItem] = []
     @Published private(set) var placementStatus: String?
+    @Published var removalCandidate: RemoteContextInboxItem?
 
     private let inbox: RemoteContextInbox
 
@@ -68,6 +69,17 @@ private final class RemoteInboxViewModel: ObservableObject {
         } catch {
             placementStatus = (error as? LocalizedError)?.errorDescription
                 ?? "Sleep Switch could not place this item."
+        }
+    }
+
+    func remove(_ item: RemoteContextInboxItem) {
+        do {
+            try inbox.remove(item)
+            placementStatus = "Removed \(item.filename)"
+            reload()
+        } catch {
+            placementStatus = (error as? LocalizedError)?.errorDescription
+                ?? "Sleep Switch could not remove this item."
         }
     }
 }
@@ -134,11 +146,33 @@ private struct RemoteInboxView: View {
                             .buttonStyle(.bordered)
                         Button("Reveal") { viewModel.reveal(item) }
                             .buttonStyle(.bordered)
+                        Button(role: .destructive) {
+                            viewModel.removalCandidate = item
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Remove \(item.filename) from Remote Inbox")
                     }
                     .padding(.vertical, 4)
                 }
                 .listStyle(.inset)
             }
+        }
+        .confirmationDialog(
+            "Remove this item from Remote Inbox?",
+            isPresented: Binding(
+                get: { viewModel.removalCandidate != nil },
+                set: { if !$0 { viewModel.removalCandidate = nil } }
+            ),
+            presenting: viewModel.removalCandidate
+        ) { item in
+            Button("Remove", role: .destructive) {
+                viewModel.remove(item)
+                viewModel.removalCandidate = nil
+            }
+        } message: { item in
+            Text(item.filename)
         }
     }
 }

@@ -121,7 +121,7 @@ struct CodexOperatorAdapter: OperatorAdapter {
         guard let data = tailData(at: url) else {
             return .failure(CocoaError(.fileReadUnknown))
         }
-        let sessionID = url.deletingPathExtension().lastPathComponent
+        var sessionID = url.deletingPathExtension().lastPathComponent
         var startedAt: Date?
         var endedAt: Date?
         var lastActivityAt: Date?
@@ -140,6 +140,12 @@ struct CodexOperatorAdapter: OperatorAdapter {
             lastActivityAt = max(lastActivityAt ?? timestamp, timestamp)
             let eventType = ((record["payload"] as? [String: Any])?["type"] as? String)
                 ?? (record["type"] as? String)
+            if eventType == "session_meta",
+               let payload = record["payload"] as? [String: Any],
+               let canonicalID = payload["id"] as? String,
+               !canonicalID.isEmpty {
+                sessionID = canonicalID
+            }
             switch eventType {
             case "task_started":
                 startedAt = min(startedAt ?? timestamp, timestamp)

@@ -127,6 +127,15 @@ enum OperatorAvailability: String, Codable, Equatable {
     case unavailable
     case permissionRequired
     case malformedSource
+
+    var displayTitle: String {
+        switch self {
+        case .available: "Ready"
+        case .unavailable: "Unavailable"
+        case .permissionRequired: "Access needed"
+        case .malformedSource: "Unreadable data"
+        }
+    }
 }
 
 struct HarnessCapability: Codable, Equatable, Identifiable {
@@ -232,6 +241,8 @@ struct OperatorAdapterSnapshot: Equatable {
     let capabilities: [HarnessCapability]
     let sessions: [OperatorSession]
     let events: [OperatorEvent]
+    var issue: String? = nil
+    var diagnostic: String? = nil
 }
 
 protocol OperatorAdapter {

@@ -236,6 +236,7 @@ final class OperatorViewModel: ObservableObject {
     var attentionItems: [String] {
         var items = snapshot.adapterSnapshots.compactMap { adapter -> String? in
             guard adapter.availability != .available else { return nil }
+            if let issue = adapter.issue { return issue }
             return switch adapter.availability {
             case .permissionRequired: "\(adapter.harnessName) needs access"
             case .malformedSource: "\(adapter.harnessName) data needs attention"
@@ -647,9 +648,11 @@ private struct OperatorOverview: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                 Spacer()
-                                Text(liveCount == 0 ? (adapter.availability == .available ? "Ready" : adapter.availability.rawValue) : "\(liveCount) live")
-                                    .foregroundStyle(liveCount > 0 ? .blue : .secondary)
+                                Text(adapter.availability == .available && liveCount > 0
+                                     ? "\(liveCount) live" : adapter.availability.displayTitle)
+                                    .foregroundStyle(adapter.availability == .available && liveCount > 0 ? .blue : .secondary)
                                     .monospacedDigit()
+                                    .help([adapter.issue, adapter.diagnostic].compactMap { $0 }.joined(separator: "\n"))
                             }
                             .padding(.vertical, 4)
                         }

@@ -5,6 +5,8 @@ enum OperatorAdapterTests {
     static func run() {
         testCodexAdapterReadsOnlyNormalizedLifecycleAndTokenFields()
         testHermesAdapterReadsWhitelistedSessionCounters()
+        testHermesBusyDatabaseRecoversWithoutClaimingCorruption()
+        testHermesDatabaseErrorsKeepTheirActualCause()
         testOperatorStoreKeepsSkillMetadataOutOfSourceFiles()
     }
 
@@ -100,6 +102,63 @@ enum OperatorAdapterTests {
             !String(describing: snapshot).contains("private title"),
             "does not select Hermes title, path, or prompt columns"
         )
+    }
+
+    private static func testHermesBusyDatabaseRecoversWithoutClaimingCorruption() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("hermes-busy-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("state.db")
+        var writer: OpaquePointer?
+        expect(sqlite3_open(url.path, &writer) == SQLITE_OK, "creates locked Hermes fixture")
+        defer { sqlite3_close(writer) }
+        expect(sqlite3_exec(writer, """
+            CREATE TABLE sessions (id TEXT PRIMARY KEY, source TEXT, started_at REAL,
+            ended_at REAL, last_activity_at REAL, input_tokens INTEGER, output_tokens INTEGER,
+            cache_read_tokens INTEGER, cache_write_tokens INTEGER, reasoning_tokens INTEGER);
+            INSERT INTO sessions VALUES ('h-1', 'cli', 1000, 1100, 1100, 10, 20, 0, 0, 0);
+            BEGIN EXCLUSIVE;
+            """, nil, nil, nil) == SQLITE_OK, "holds an exclusive Hermes writer transaction")
+        let adapter = HermesOperatorAdapter(databaseURL: url)
+        let busy = adapter.snapshot()
+        expect(busy.availability == .unavailable,
+               "a temporary database lock is unavailable, not malformed data")
+        expect(busy.issue?.contains("retry automatically") == true,
+               "explains that a temporary Hermes lock will be retried")
+        expect(busy.diagnostic?.contains("database is locked") == true,
+               "retains SQLite's actual failure for diagnosis")
+        expect(sqlite3_exec(writer, "COMMIT;", nil, nil, nil) == SQLITE_OK, "releases writer lock")
+        let recovered = adapter.snapshot()
+        expect(recovered.availability == .available && recovered.sessions.count == 1,
+               "automatically reads Hermes sessions once the writer releases its lock")
+        expect(recovered.issue == nil && recovered.diagnostic == nil, "clears the error after recovery")
+    }
+
+    private static func testHermesDatabaseErrorsKeepTheirActualCause() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("hermes-errors-\(UUID().uuidString)")
+        try! FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("state.db")
+        let adapter = HermesOperatorAdapter(databaseURL: url)
+
+        let missing = adapter.snapshot()
+        expect(missing.availability == .unavailable, "a missing Hermes database does not imply corruption")
+        expect(!FileManager.default.fileExists(atPath: url.path), "reading absent Hermes history does not create it")
+
+        var database: OpaquePointer?
+        expect(sqlite3_open(url.path, &database) == SQLITE_OK, "creates an empty Hermes database")
+        sqlite3_close(database)
+        let empty = adapter.snapshot()
+        expect(empty.availability == .unavailable, "a missing sessions table is not database corruption")
+        expect(empty.diagnostic?.contains("no such table: sessions") == true, "preserves the schema error")
+
+        let invalidData = Data("This is not a SQLite database.".utf8)
+        try! invalidData.write(to: url)
+        let unreadable = adapter.snapshot()
+        expect(unreadable.availability == .malformedSource, "distinguishes genuinely unreadable database data")
+        expect(unreadable.diagnostic?.contains("not a database") == true, "preserves the unreadable database error")
+        expect(unreadable.sessions.isEmpty && unreadable.events.isEmpty, "does not report partial data as available")
+        expect(try! Data(contentsOf: url) == invalidData, "does not modify Hermes source data while handling errors")
     }
 
     private static func testOperatorStoreKeepsSkillMetadataOutOfSourceFiles() {

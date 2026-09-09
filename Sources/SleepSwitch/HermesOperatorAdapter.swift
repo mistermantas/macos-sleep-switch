@@ -33,7 +33,8 @@ struct HermesOperatorAdapter: OperatorAdapter {
             HarnessCapability(harnessID: harnessID, kind: .tokenUsage, isSupported: true)
         ]
         guard FileManager.default.fileExists(atPath: databaseURL.path) else {
-            return result(.permissionRequired, refreshedAt, capabilities)
+            return result(.unavailable, refreshedAt, capabilities,
+                          issue: "Hermes session history hasn't been created on this Mac yet.")
         }
 
         var database: OpaquePointer?
@@ -44,8 +45,9 @@ struct HermesOperatorAdapter: OperatorAdapter {
             nil
         )
         guard openResult == SQLITE_OK, let database else {
+            let failure = databaseFailure(openResult, database, refreshedAt, capabilities)
             if let database { sqlite3_close(database) }
-            return result(.unavailable, refreshedAt, capabilities)
+            return failure
         }
         defer { sqlite3_close(database) }
         sqlite3_busy_timeout(database, 1_000)
@@ -59,15 +61,20 @@ struct HermesOperatorAdapter: OperatorAdapter {
         LIMIT 500;
         """
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+        let prepareResult = sqlite3_prepare_v2(database, sql, -1, &statement, nil)
+        guard prepareResult == SQLITE_OK,
               let statement else {
-            return result(.malformedSource, refreshedAt, capabilities)
+            let failure = databaseFailure(prepareResult, database, refreshedAt, capabilities)
+            sqlite3_finalize(statement)
+            return failure
         }
         defer { sqlite3_finalize(statement) }
 
         var sessions: [OperatorSession] = []
         var events: [OperatorEvent] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        var stepResult = sqlite3_step(statement)
+        while stepResult == SQLITE_ROW {
+            defer { stepResult = sqlite3_step(statement) }
             let id = text(statement, 0)
             guard !id.isEmpty else { continue }
             let startedAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 2))
@@ -109,6 +116,9 @@ struct HermesOperatorAdapter: OperatorAdapter {
                 ))
             }
         }
+        guard stepResult == SQLITE_DONE else {
+            return databaseFailure(stepResult, database, refreshedAt, capabilities)
+        }
         return OperatorAdapterSnapshot(
             harnessID: harnessID,
             harnessName: harnessName,
@@ -123,7 +133,9 @@ struct HermesOperatorAdapter: OperatorAdapter {
     private func result(
         _ availability: OperatorAvailability,
         _ refreshedAt: Date,
-        _ capabilities: [HarnessCapability]
+        _ capabilities: [HarnessCapability],
+        issue: String? = nil,
+        diagnostic: String? = nil
     ) -> OperatorAdapterSnapshot {
         OperatorAdapterSnapshot(
             harnessID: harnessID,
@@ -132,8 +144,40 @@ struct HermesOperatorAdapter: OperatorAdapter {
             refreshedAt: refreshedAt,
             capabilities: capabilities,
             sessions: [],
-            events: []
+            events: [],
+            issue: issue,
+            diagnostic: diagnostic
         )
+    }
+
+    private func databaseFailure(
+        _ code: Int32,
+        _ database: OpaquePointer?,
+        _ refreshedAt: Date,
+        _ capabilities: [HarnessCapability]
+    ) -> OperatorAdapterSnapshot {
+        // Extended SQLite result codes retain their primary code in the low byte.
+        // A busy writer or an unsupported schema does not mean the data is corrupt.
+        let availability: OperatorAvailability
+        let issue: String
+        switch code & 0xff {
+        case SQLITE_BUSY, SQLITE_LOCKED:
+            availability = .unavailable
+            issue = "Hermes database is busy. Sleep Switch will retry automatically."
+        case SQLITE_PERM, SQLITE_AUTH:
+            availability = .permissionRequired
+            issue = "Sleep Switch needs read access to Hermes session history."
+        case SQLITE_CORRUPT, SQLITE_NOTADB:
+            availability = .malformedSource
+            issue = "Hermes session history could not be read."
+        default:
+            availability = .unavailable
+            issue = "Sleep Switch couldn't read Hermes session history."
+        }
+        let message = database.map { String(cString: sqlite3_errmsg($0)) }
+            ?? String(cString: sqlite3_errstr(code))
+        return result(availability, refreshedAt, capabilities, issue: issue,
+                      diagnostic: "SQLite \(code): \(message)")
     }
 
     private func text(_ statement: OpaquePointer, _ column: Int32) -> String {

@@ -56,12 +56,12 @@ struct CodexThreadMirrorAdapter {
         while sqlite3_step(statement) == SQLITE_ROW {
             let id = text(statement, 0)
             guard !id.isEmpty else { continue }
-            let latestTurn = history.flatMap { latestTurn(for: id, database: $0) }
+            let latestTurn = history.flatMap { self.latestTurn(for: id, database: $0) }
             let completedAt = latestTurn?.completedAt
             let threadStatus = status(latestTurn?.status, completedAt: completedAt)
             let messages = history.map { recentMessages(for: id, database: $0) } ?? []
-            let recentActivity = threadStatus == .running
-                ? history.flatMap { recentActivity(for: id, database: $0) }
+            let recentActivity: CompanionWorkActivity? = threadStatus == .running
+                ? history.flatMap { self.recentActivity(for: id, database: $0) }
                 : nil
             threads.append(CodexThreadMirror(
                 id: id,

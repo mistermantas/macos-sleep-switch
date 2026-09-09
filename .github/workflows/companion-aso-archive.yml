@@ -1,0 +1,51 @@
+name: Companion App Store archive
+
+on:
+  push:
+    branches: [codex/companion-aso-release-20260909]
+    paths:
+      - '.github/workflows/companion-aso-archive.yml'
+      - 'Sources/SleepSwitchCompanion/**'
+      - 'Sources/SleepSwitchCompanionWidgets/**'
+      - 'SleepSwitch.xcodeproj/**'
+      - 'Companion/**'
+      - 'CompanionWidgets/**'
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-26
+    timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify public release toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          test "$(/usr/libexec/PlistBuddy -c 'Print ProductBuildVersion' /Applications/Xcode_26.6.app/Contents/version.plist)" = '17F113'
+      - name: Archive companion for local signing
+        run: |
+          xcodebuild -quiet -project SleepSwitch.xcodeproj \
+            -scheme SleepSwitchCompanion -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SleepSwitchCompanion-2.4.0-34.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO archive
+      - name: Package unsigned archive and provenance
+        run: |
+          git rev-parse HEAD > "$RUNNER_TEMP/source-commit.txt"
+          xcodebuild -version > "$RUNNER_TEMP/toolchain.txt"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$RUNNER_TEMP/SleepSwitchCompanion-2.4.0-34.xcarchive" \
+            "$RUNNER_TEMP/SleepSwitchCompanion-2.4.0-34.xcarchive.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SleepSwitchCompanion-2.4.0-34-unsigned
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/SleepSwitchCompanion-2.4.0-34.xcarchive.zip
+            ${{ runner.temp }}/source-commit.txt
+            ${{ runner.temp }}/toolchain.txt

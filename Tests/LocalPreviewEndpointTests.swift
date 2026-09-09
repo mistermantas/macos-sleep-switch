@@ -1,6 +1,9 @@
 import Foundation
 
 enum LocalPreviewEndpointTests {
+    private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
+        guard condition() else { fatalError("Test failed: \(message)") }
+    }
     static func run() {
         do {
             let endpoint = try LocalPreviewEndpoint.register("http://localhost:3000/dashboard?demo=1")

@@ -219,6 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let coolingWarningShownKey = "coolingWarningShown"
     private let coolingAgentsOnlyKey = "coolingAgentsOnly"
     private var coolingThermalAbortSuppressesAwake = false
+    private var coolingProfileRequestPending = false
 #endif
     private let agentScanQueue = DispatchQueue(
         label: "lt.mantas.sleepswitch.agent-scan",
@@ -263,6 +264,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 #endif
         registerDefaults()
+        ApplicationMenu.install(
+            target: self, settings: #selector(showPreferences),
+            showOperator: #selector(showOperator), refresh: #selector(refreshState)
+        )
 #if APP_STORE
         codexDirectoryAccess.restoreAccess()
 #endif
@@ -324,7 +329,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 #else
         companionBridge.start()
+        if CommandLine.arguments.contains("--show-operator") {
+            DispatchQueue.main.async { [weak self] in self?.showOperator() }
+        }
 #endif
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { showOperator() }
+        return true
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -632,7 +645,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 #if !APP_STORE
     private func configureCoolingMenu() {
-        coolingStatusItem.isEnabled = false
+        coolingStatusItem.target = self
+        coolingStatusItem.action = #selector(showCoolingDetails)
         coolingStatusItem.image = NSImage(
             systemSymbolName: "fan",
             accessibilityDescription: "Verified cooling state"
@@ -2630,6 +2644,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let self else { return }
                 self.updateCoolingPresentation()
                 self.coolingDetailsWindow?.update(presentation)
+                if presentation.hasActiveLease
+                    || (!presentation.controlEnabled && presentation.failureReason == nil) {
+                    self.coolingProfileRequestPending = false
+                }
+            }
+        }
+        coolingCoordinator.onFailure = { [weak self] presentation in
+            DispatchQueue.main.async {
+                guard let self, self.coolingProfileRequestPending else { return }
+                self.coolingProfileRequestPending = false
+                self.presentCoolingFailure(presentation)
             }
         }
         coolingCoordinator.onProfileApplicationChange = { [weak self] in
@@ -2650,7 +2675,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateCoolingPresentation() {
         let presentation = coolingCoordinator.presentation
         let profile = presentation.selectedProfile
-        let snapshot = presentation.helperSnapshot
 
         coolingItem.title = "Cooling · \(presentation.effectiveTitle)"
         coolingItem.image = NSImage(
@@ -2660,6 +2684,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             accessibilityDescription: "Cooling controls"
         )
         coolingStatusItem.title = coolingStatusTitle(presentation)
+        coolingStatusItem.toolTip = presentation.failureReason
+        coolingItem.toolTip = presentation.failureReason
         coolingStatusItem.image = NSImage(
             systemSymbolName: coolingStatusSymbol(presentation),
             accessibilityDescription: coolingStatusItem.title
@@ -2674,22 +2700,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             else {
                 continue
             }
-            item.state = itemProfile == profile ? .on : .off
-
-            if itemProfile == .systemControl {
-                item.isEnabled = true
-            } else if presentation.registrationState
-                        == .requiresSignedBuild {
-                item.isEnabled = false
-            } else if presentation.registrationState != .enabled {
-                item.isEnabled = true
-            } else if let qualification = snapshot?.qualification {
-                item.isEnabled = itemProfile == .maximum
-                    ? qualification.permitsMaximumControl
-                    : qualification.permitsAggressiveControl
-            } else {
-                item.isEnabled = true
-            }
+            item.state = itemProfile != profile ? .off
+                : (profile == .systemControl || presentation.hasActiveLease ? .on : .mixed)
+            // Failed choices remain actionable so selecting one explains the cause.
+            item.isEnabled = true
+            item.toolTip = itemProfile == profile && item.state == .mixed
+                ? "Selected, but not active. \(presentation.failureReason ?? "Waiting for agents.")"
+                : nil
         }
 
         coolingHelperItem.title = switch presentation.registrationState {
@@ -2704,11 +2721,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .enabled:
             "Cooling Helper Settings…"
         }
-        coolingDetailsItem.isEnabled = snapshot != nil
-            || ![
-                FanHelperRegistrationState.notFound,
-                .requiresSignedBuild
-            ].contains(presentation.registrationState)
+        coolingDetailsItem.isEnabled = true
         coolingDetailsWindow?.update(presentation)
     }
 
@@ -2745,7 +2758,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .externalControllerConflict:
             "Macs Fan Control Is Open"
         case .unavailable:
-            "Cooling Unavailable"
+            "Cooling Failed · Details…"
         case .restoreFailed:
             "Restoration Needs Attention"
         }
@@ -2818,6 +2831,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             UserDefaults.standard.set(true, forKey: coolingWarningShownKey)
         }
 
+        coolingProfileRequestPending = profile != .systemControl
+            && fanHelperClient.registrationState == .enabled
         coolingCoordinator.selectProfile(profile)
         guard profile != .systemControl else {
             coolingThermalAbortSuppressesAwake = false
@@ -2905,6 +2920,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ?? CoolingDetailsWindowController()
         coolingDetailsWindow = controller
         controller.show(coolingCoordinator.presentation)
+    }
+
+    private func presentCoolingFailure(_ presentation: CoolingPresentationSnapshot) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "\(presentation.selectedProfile.menuTitle) cooling could not start"
+        alert.informativeText = [
+            presentation.failureReason ?? "Sleep Switch could not verify fan control.",
+            presentation.recoverySuggestion
+        ].joined(separator: "\n\n")
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cooling Details")
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.keyWindow ?? operatorWindowController?.window,
+           window.isVisible {
+            alert.beginSheetModal(for: window) { [weak self] response in
+                if response == .alertSecondButtonReturn { self?.showCoolingDetails() }
+            }
+            return
+        }
+        if alert.runModal() == .alertSecondButtonReturn { showCoolingDetails() }
     }
 
     private func handleCoolingThermalAbort(
@@ -3148,9 +3184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 struct SleepSwitchApplication {
     static func main() {
 #if !APP_STORE
-        if CommandLine.arguments.contains(
-            CoolingHelperMaintenance.refreshArgument
-        ) {
+        if CoolingHelperMaintenance.arguments.contains(where: CommandLine.arguments.contains) {
             let app = NSApplication.shared
             let delegate = CoolingHelperMaintenance()
             app.delegate = delegate

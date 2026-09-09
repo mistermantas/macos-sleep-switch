@@ -157,10 +157,10 @@ final class FanHelperClient: FanHelperClienting {
 
         let connection = connection ?? makeConnection()
         guard let proxy = connection.remoteObjectProxyWithErrorHandler({
-            [weak self] _ in
+            [weak self] error in
             self?.invalidateConnection()
             DispatchQueue.main.async {
-                completion(self?.unavailableResponse() ?? Self.fallbackResponse())
+                completion(Self.connectionFailureResponse(error))
             }
         }) as? FanHelperProtocol else {
             completion(unavailableResponse())
@@ -203,6 +203,14 @@ final class FanHelperClient: FanHelperClienting {
 
     private func unavailableResponse() -> FanHelperResponse {
         Self.fallbackResponse(model: "Unavailable")
+    }
+
+    static func connectionFailureResponse(_ error: Error) -> FanHelperResponse {
+        let error = error as NSError
+        return fallbackResponse(message:
+            "Sleep Switch could not connect to its cooling helper. "
+            + "\(error.localizedDescription) (\(error.domain) \(error.code))."
+        )
     }
 
     private static let currentApplicationCanUseHelper: Bool = {
@@ -272,7 +280,8 @@ final class FanHelperClient: FanHelperClienting {
     }()
 
     private static func fallbackResponse(
-        model: String = "Unavailable"
+        model: String = "Unavailable",
+        message: String = "Sleep Switch could not reach its cooling helper."
     ) -> FanHelperResponse {
         FanHelperResponse(
             succeeded: false,
@@ -288,9 +297,9 @@ final class FanHelperClient: FanHelperClienting {
                 verifiedDemand: nil,
                 systemControlVerified: false,
                 leaseExpiresAt: nil,
-                detail: "The cooling helper is unavailable."
+                detail: message
             ),
-            message: "The cooling helper is unavailable."
+            message: message
         )
     }
 }

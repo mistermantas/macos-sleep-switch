@@ -57,12 +57,12 @@ final class CoolingDetailsWindowController: NSWindowController {
         fansValue.stringValue = fanText(snapshot?.fans ?? [])
         helperValue.stringValue = helperText(presentation.registrationState)
         updateSensors(snapshot?.diagnosticMetadata)
-        noteLabel.textColor = snapshot?.state == .restoreFailed
-            ? .systemRed
+        noteLabel.textColor = presentation.failureReason != nil
+            ? .labelColor
             : .secondaryLabelColor
-        noteLabel.stringValue = snapshot?.state == .restoreFailed
-            ? "Fan restoration could not be verified. Quit other fan tools and restart the Mac."
-            : "Use cooling only with open airflow on a hard surface."
+        noteLabel.stringValue = presentation.failureReason.map {
+            "\($0)\n\(presentation.recoverySuggestion)"
+        } ?? "Use cooling only with open airflow on a hard surface."
     }
 
     private func buildContent() {
@@ -125,7 +125,7 @@ final class CoolingDetailsWindowController: NSWindowController {
         sensorScroll.drawsBackground = false
         sensorScroll.borderType = .noBorder
 
-        noteLabel.maximumNumberOfLines = 2
+        noteLabel.maximumNumberOfLines = 0
         noteLabel.textColor = .secondaryLabelColor
         noteLabel.font = .systemFont(ofSize: 12)
         noteLabel.setContentCompressionResistancePriority(

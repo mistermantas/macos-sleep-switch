@@ -9,6 +9,59 @@ struct CoolingPresentationSnapshot {
     let controlEnabled: Bool
     let hasActiveLease: Bool
 
+    var failureReason: String? {
+        switch registrationState {
+        case .requiresSignedBuild:
+            return "This copy of Sleep Switch is not signed for cooling."
+        case .notRegistered, .notFound:
+            return "The cooling helper is not installed for this copy of Sleep Switch."
+        case .requiresApproval:
+            return "macOS is waiting for you to approve the cooling helper."
+        case .enabled:
+            break
+        }
+        guard let snapshot = helperSnapshot else { return nil }
+        switch snapshot.state {
+        case .externalControllerConflict:
+            return "Macs Fan Control is open, so Sleep Switch has paused its fan controls."
+        case .unsupported:
+            return "This Mac has no supported controllable fans."
+        case .monitoringOnly:
+            return message ?? snapshot.detail ?? "Fan control has not been verified for this Mac."
+        case .unavailable:
+            return message ?? snapshot.detail ?? "Sleep Switch could not read the cooling helper's status."
+        case .restoreFailed:
+            return message ?? snapshot.detail ?? "Sleep Switch could not verify that macOS regained fan control."
+        case .systemControl:
+            return message
+        case .cooling:
+            return nil
+        }
+    }
+
+    var recoverySuggestion: String {
+        switch registrationState {
+        case .requiresSignedBuild:
+            return "Install the signed Sleep Switch app, then try again."
+        case .notRegistered, .notFound:
+            return "Choose Install Cooling Helper in the Cooling menu."
+        case .requiresApproval:
+            return "Open System Settings → General → Login Items & Extensions and allow Sleep Switch to run in the background."
+        case .enabled:
+            break
+        }
+        switch helperSnapshot?.state {
+        case .externalControllerConflict:
+            return "Quit Macs Fan Control, then choose your cooling mode again."
+        case .monitoringOnly, .unsupported:
+            return "Use System Control. Cooling Details shows this Mac's hardware support."
+        case .restoreFailed:
+            return "Quit other fan-control apps and restart the Mac before trying again."
+        default:
+            return "Try your cooling mode again. If it still fails, quit Sleep Switch and reopen the signed copy in Applications."
+        }
+    }
+
     var effectiveTitle: String {
         guard let helperSnapshot else {
             return switch registrationState {
@@ -37,7 +90,7 @@ struct CoolingPresentationSnapshot {
         case .externalControllerConflict:
             "Macs Fan Control"
         case .unavailable:
-            "Unavailable"
+            "Needs Attention"
         case .restoreFailed:
             "Check Fan Control"
         }
@@ -65,6 +118,7 @@ final class CoolingCoordinator {
     var onChange: ((CoolingPresentationSnapshot) -> Void)?
     var onProfileApplicationChange: (() -> Void)?
     var onThermalAbort: ((CoolingAbortReason) -> Void)?
+    var onFailure: ((CoolingPresentationSnapshot) -> Void)?
 
     init(
         client: FanHelperClienting,
@@ -278,6 +332,14 @@ final class CoolingCoordinator {
         let requestedProfile: FanHelperRequestedProfile =
             selectedProfile == .maximum ? .maximum : .aggressive
         if let helperSnapshot,
+           [.unavailable, .restoreFailed, .externalControllerConflict, .unsupported]
+                .contains(helperSnapshot.state) {
+            leaseStartBlocked = true
+            publish()
+            onFailure?(presentation)
+            return
+        }
+        if let helperSnapshot,
            !qualification(
                helperSnapshot.qualification,
                permits: requestedProfile
@@ -285,6 +347,7 @@ final class CoolingCoordinator {
             leaseStartBlocked = true
             message = "Cooling control is not qualified for this Mac."
             publish()
+            onFailure?(presentation)
             return
         }
         requestInFlight = true
@@ -336,6 +399,9 @@ final class CoolingCoordinator {
             : nil
         message = response.message
         publish()
+        if !response.succeeded || presentation.failureReason != nil {
+            onFailure?(presentation)
+        }
     }
 
     private var registrationMessage: String? {

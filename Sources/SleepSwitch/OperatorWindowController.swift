@@ -502,7 +502,6 @@ final class OperatorViewModel: ObservableObject {
 @MainActor
 final class OperatorWindowController: NSWindowController, NSWindowDelegate {
     private let viewModel: OperatorViewModel
-    private var commandMonitor: Any?
 
     init(viewModel: OperatorViewModel) {
         self.viewModel = viewModel
@@ -513,36 +512,15 @@ final class OperatorWindowController: NSWindowController, NSWindowDelegate {
         window.setContentSize(NSSize(width: 1_060, height: 700))
         window.minSize = NSSize(width: 860, height: 560)
         window.isReleasedWhenClosed = false
+        window.collectionBehavior.insert(.fullScreenPrimary)
+        window.tabbingMode = .disallowed
+        if !window.setFrameUsingName("OperatorWindow") { window.center() }
+        window.setFrameAutosaveName("OperatorWindow")
         super.init(window: window)
         window.delegate = self
-        commandMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self,
-                  event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command),
-                  !event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.option),
-                  let key = event.charactersIgnoringModifiers?.lowercased() else {
-                return event
-            }
-            switch key {
-            case "h":
-                NSApp.hide(nil)
-                return nil
-            case "m":
-                self.window?.miniaturize(nil)
-                return nil
-            case "w":
-                self.window?.performClose(nil)
-                return nil
-            default:
-                return event
-            }
-        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    deinit {
-        if let commandMonitor { NSEvent.removeMonitor(commandMonitor) }
-    }
 
     func show() {
         viewModel.refresh()
@@ -556,12 +534,9 @@ final class OperatorWindowController: NSWindowController, NSWindowDelegate {
                 x: visibleFrame.minX + 80,
                 y: visibleFrame.maxY - frame.height - 80
             ))
-        } else {
-            window?.center()
         }
-#else
-        window?.center()
 #endif
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

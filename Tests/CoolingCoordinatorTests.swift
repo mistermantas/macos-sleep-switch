@@ -70,6 +70,56 @@ enum CoolingCoordinatorTests {
         testFailedRenewalDoesNotRestartLease()
         testFailedProfileRestoreDoesNotStartReplacementLease()
         testSustainedHighTemperatureEndsLease()
+        testUnavailableStatusPreservesCause()
+        testCoolingFailurePresentation()
+    }
+
+    private static func testUnavailableStatusPreservesCause() {
+        let suite = "SleepSwitch.CoolingConnectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let client = FakeFanHelperClient()
+        let coordinator = CoolingCoordinator(client: client, defaults: defaults)
+        var failures: [CoolingPresentationSnapshot] = []
+        coordinator.onFailure = { failures.append($0) }
+        client.statusResponse = FanHelperResponse(
+            succeeded: false, errorCode: .unavailable, leaseToken: nil,
+            snapshot: FanHelperSnapshot(
+                model: "Unavailable", state: .unavailable, qualification: .monitoringOnly,
+                aggregateTemperatureCelsius: nil, temperatureRecordedAt: nil,
+                fans: [], verifiedDemand: nil, systemControlVerified: false,
+                leaseExpiresAt: nil, detail: "The helper connection was interrupted."
+            ), message: "The helper connection was interrupted."
+        )
+        coordinator.refreshStatus()
+        coordinator.selectProfile(.maximum)
+        coordinator.updateControlEnabled(true)
+        expect(
+            coordinator.presentation.message == "The helper connection was interrupted.",
+            "a failed connection is not relabeled as unqualified hardware when cooling is selected"
+        )
+        expect(client.beginProfiles.isEmpty, "never writes after unavailable telemetry")
+        expect(!failures.isEmpty, "reports asynchronous helper failure to the requesting UI")
+        expect(failures.last?.failureReason == "The helper connection was interrupted.", "failure UI retains the actual reason")
+    }
+
+    private static func testCoolingFailurePresentation() {
+        let response = FanHelperClient.connectionFailureResponse(
+            NSError(domain: NSCocoaErrorDomain, code: 4099, userInfo: [NSLocalizedDescriptionKey: "Connection interrupted"])
+        )
+        expect(response.message?.contains("4099") == true, "connection errors retain the macOS error code")
+        expect(response.message?.contains("Connection interrupted") == true, "connection errors retain the original explanation")
+        let conflict = CoolingPresentationSnapshot(
+            selectedProfile: .maximum, registrationState: .enabled,
+            helperSnapshot: FanHelperSnapshot(
+                model: "Mac16,7", state: .externalControllerConflict, qualification: .adaptiveQualified,
+                aggregateTemperatureCelsius: 60, temperatureRecordedAt: Date(),
+                fans: [], verifiedDemand: nil, systemControlVerified: false,
+                leaseExpiresAt: nil, detail: nil
+            ), message: nil, controlEnabled: true, hasActiveLease: false
+        )
+        expect(conflict.failureReason?.contains("Macs Fan Control") == true, "a conflicting controller is named even when the helper sends no error message")
+        expect(conflict.recoverySuggestion.contains("Quit Macs Fan Control"), "the conflict tells the user how to recover")
     }
 
     private static func testFailedLeaseDoesNotRetry() {
@@ -222,9 +272,10 @@ private final class FakeFanHelperClient: FanHelperClienting {
     var renewSucceeds = true
     var endSucceeds = true
     var beginTemperature: Double? = 55
+    var statusResponse: FanHelperResponse?
 
     func status(_ completion: @escaping (FanHelperResponse) -> Void) {
-        completion(snapshot(temperature: 55, leaseToken: nil))
+        completion(statusResponse ?? snapshot(temperature: 55, leaseToken: nil))
     }
 
     func beginLease(

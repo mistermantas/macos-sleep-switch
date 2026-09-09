@@ -2,6 +2,16 @@ import CryptoKit
 import Foundation
 
 enum LocalPreviewSecurityTests {
+    private static func expect(
+        _ condition: @autoclosure () throws -> Bool,
+        _ message: String
+    ) {
+        do {
+            guard try condition() else { fatalError("Test failed: \(message)") }
+        } catch {
+            fatalError("Test failed: \(message): \(error)")
+        }
+    }
     static func run() {
         let id = UUID(uuidString: "7F5F4585-1A7B-48D5-8968-3D2E94A12419")!
         let macPrivateKey = Curve25519.KeyAgreement.PrivateKey()

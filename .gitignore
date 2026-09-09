@@ -8,3 +8,6 @@ verification/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Per-user Xcode workspace state.
+xcuserdata/

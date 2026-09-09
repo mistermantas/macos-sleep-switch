@@ -1,0 +1,9 @@
+{
+  "id" : "258f6df2-d563-4eaf-bd42-d73af56d3f85",
+  "targets" : [
+    {
+      "id" : "0e4ef30e-61a4-4654-a73c-8ad8fec3ce1a",
+      "name" : "SleepSwitch"
+    }
+  ]
+}

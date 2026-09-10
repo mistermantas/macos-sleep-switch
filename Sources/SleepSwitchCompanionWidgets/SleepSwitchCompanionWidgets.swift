@@ -136,8 +136,8 @@ private struct SleepSwitchMetricWidget: Widget {
         AppIntentConfiguration(kind: kind, intent: SleepSwitchWidgetConfigurationIntent.self, provider: SleepSwitchStatusProvider()) { entry in
             SleepSwitchWidgetView(entry: entry, fixedMetric: fixedMetric)
         }
-        .configurationDisplayName(displayName)
-        .description(description)
+        .configurationDisplayName(String(localized: displayName))
+        .description(String(localized: description))
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }

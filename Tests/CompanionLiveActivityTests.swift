@@ -15,7 +15,7 @@ enum CompanionLiveActivityTests {
         expect(CompanionSystemLoadMath.cpuPercent(previous: [0, 0, 0, 0], current: [0, 0, 100, 0]) == 0, "a real idle reading is zero")
         expect(CompanionSystemLoadMath.cpuPercent(previous: [0, 0, 0, 0], current: [0, 0, 0, 0]) == nil, "no sample interval is unavailable")
         expect(CompanionSystemLoadMath.cpuPercent(previous: [], current: [1, 2, 3, 4]) == nil, "first CPU sample needs a baseline")
-        expect(CompanionSystemLoadMath.cpuPercent(previous: [.max - 4, 0, .max - 4, 0], current: [5, 0, 5, 0]) == 50, "32-bit counter wrap is handled")
+        expect(CompanionSystemLoadMath.cpuPercent(previous: [UInt32.max - 4, 0, UInt32.max - 4, 0], current: [5, 0, 5, 0]) == 50, "32-bit counter wrap is handled")
         expect(CompanionSystemLoadMath.memoryUsed(active: 40, inactive: 20, wired: 10, compressed: 10, purgeable: 5, fileBacked: 15, pageSize: 4096, total: 409600) == 60 * 4096, "reclaimable file cache is excluded from used memory")
         expect(CompanionSystemLoadMath.memoryUsed(active: 0, inactive: 0, wired: 0, compressed: 0, purgeable: 1, fileBacked: 0, pageSize: 4096, total: 409600) == nil, "invalid counters never underflow")
         expect(CompanionSystemLoadMath.memoryUsed(active: .max, inactive: 1, wired: 0, compressed: 0, purgeable: 0, fileBacked: 0, pageSize: 4096, total: 409600) == nil, "corrupt counters never overflow")

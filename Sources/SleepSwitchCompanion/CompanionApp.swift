@@ -85,9 +85,14 @@ private enum CompanionWidgetBackgroundRefresher {
     static func refresh() async -> UIBackgroundFetchResult {
         do {
             let cloud = CompanionCloudClient()
-            guard try await cloud.accountStatus() == .available else { return .failed }
+            let account = try await cloud.accountStatus()
+            guard account == .available else {
+                if account == .noAccount || account == .restricted { await CompanionLiveActivityController.shared.endAll() }
+                return .failed
+            }
             let macs = try await cloud.fetchMacs()
             CompanionWidgetPublisher.publish(macs)
+            await CompanionLiveActivityController.shared.synchronize(with: macs)
             CompanionWorkNotificationManager().evaluate(CompanionMacSelection.canonicalDevices(macs))
             return macs.isEmpty ? .noData : .newData
         } catch is CancellationError {
@@ -127,7 +132,7 @@ final class CompanionAppModel: ObservableObject {
     private lazy var cloud = CompanionCloudClient()
     let heatNotifications = CompanionHeatNotificationManager()
     let workNotifications = CompanionWorkNotificationManager()
-    private let liveActivity = CompanionLiveActivityController()
+    let liveActivity = CompanionLiveActivityController.shared
     private let contextTransferHistory = CompanionContextTransferHistoryStore()
     private let artifactDownloadStore = RemoteArtifactDownloadStore()
     private let sharedContextIntake = SharedContextIntake()
@@ -158,6 +163,13 @@ final class CompanionAppModel: ObservableObject {
             let demo = CompanionScreenshotDemo.make()
             var demoMac = demo.mac
             demoMac.operatorSnapshot = CompanionOperatorDemo.make()
+            if !ProcessInfo.processInfo.arguments.contains("--screenshot-no-telemetry") {
+                demoMac.systemLoad = CompanionSystemLoad(sampledAt: demoMac.lastSeen, cpuPercent: 23, memoryUsedBytes: 20_615_843_021, memoryTotalBytes: 34_359_738_368)
+            }
+            if ProcessInfo.processInfo.arguments.contains("--screenshot-live-stale") {
+                demoMac = demoMac.refreshingLastSeen(at: Date().addingTimeInterval(-600))
+                demoMac.systemLoad = nil
+            }
             macs = [demoMac]
             histories = [demo.mac.deviceID: demo.history]
             artifactOffersByDeviceID = demo.artifactOffersByDeviceID
@@ -252,6 +264,7 @@ final class CompanionAppModel: ObservableObject {
                 operatorContents = [:]
                 lastSyncAt = Date()
                 syncStage = "iCloud unavailable"
+                if currentAccountStatus == .noAccount || currentAccountStatus == .restricted { await liveActivity.endAll() }
                 return
             }
 
@@ -308,7 +321,7 @@ final class CompanionAppModel: ObservableObject {
         CompanionWidgetPublisher.publish(macs)
         let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
         let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
-        liveActivity.synchronize(with: selected)
+        Task { await liveActivity.synchronize(with: macs, automaticDeviceID: selected?.deviceID, allowAutomaticStart: true) }
         heatNotifications.evaluate(macs)
         workNotifications.evaluate(macs)
     }
@@ -1226,7 +1239,7 @@ private enum CompanionScreenshotDemo {
         let mac = CompanionMacStatus(
             deviceID: deviceID,
             displayName: "Mantas’ MacBook Pro",
-            build: "2.4.2 (38)",
+            build: "2.4.2 (39)",
             lastSeen: now,
             uptimeSeconds: 2.4 * 24 * 3_600,
             powerSource: .ac,

@@ -17,6 +17,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources/SleepSwitch
+      - path: Sources/Shared/CompanionLiveActivityModels.swift
       - path: Sources/SleepSwitchFanProtocol
       - path: AppStore/Assets.xcassets
         buildPhase: resources
@@ -29,7 +30,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: C43F5MKJF2
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 38
+        CURRENT_PROJECT_VERSION: 39
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
@@ -55,6 +56,7 @@ targets:
       - path: Sources/SleepSwitchCompanion
       - path: Sources/SleepSwitch/CompanionProtocol.swift
       - path: Sources/SleepSwitch/CompanionOperatorModels.swift
+      - path: Sources/SleepSwitch/CompanionLiveActivityProjection.swift
       - path: Sources/SleepSwitch/LocalPreviewSecurity.swift
       - path: Sources/SleepSwitch/InsightsModels.swift
       - path: Sources/SleepSwitch/AppLinks.swift
@@ -68,6 +70,8 @@ targets:
         buildPhase: sources
       - path: Sources/Shared/CompanionWidgetShared.swift
       - path: Sources/Shared/ManualSessionActivityAttributes.swift
+      - path: Sources/Shared/CompanionLiveActivityModels.swift
+      - path: Sources/Shared/CompanionLiveActivityView.swift
       - path: Sources/Shared/SharedContextIntake.swift
       - path: Companion/Assets.xcassets
         buildPhase: resources
@@ -76,7 +80,7 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 38
+        CURRENT_PROJECT_VERSION: 39
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
@@ -109,7 +113,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionShare/SleepSwitchCompanionShare.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 38
+        CURRENT_PROJECT_VERSION: 39
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionShare/Info.plist
         MARKETING_VERSION: 2.4.2
@@ -127,12 +131,14 @@ targets:
       - path: Sources/SleepSwitchCompanionWidgets
       - path: Sources/Shared/CompanionWidgetShared.swift
       - path: Sources/Shared/ManualSessionActivityAttributes.swift
+      - path: Sources/Shared/CompanionLiveActivityModels.swift
+      - path: Sources/Shared/CompanionLiveActivityView.swift
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 38
+        CURRENT_PROJECT_VERSION: 39
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionWidgets/Info.plist
         MARKETING_VERSION: 2.4.2

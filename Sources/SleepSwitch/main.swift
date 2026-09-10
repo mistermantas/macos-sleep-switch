@@ -910,6 +910,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private let systemLoadSampler = SystemLoadSampler()
+
     private func companionStatus() -> CompanionMacStatus {
         let reading = IOKitPowerTelemetryProvider().read()
         let defaults = UserDefaults.standard
@@ -998,7 +1000,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     )
                 )
                 : nil,
-            operatorSnapshot: companionOperatorSnapshot()
+            operatorSnapshot: companionOperatorSnapshot(),
+            systemLoad: systemLoadSampler.sample()
         )
     }
 

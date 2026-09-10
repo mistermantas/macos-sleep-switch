@@ -666,6 +666,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     /// Only present when Remote Work sharing is enabled on the Mac.
     var remoteWork: CompanionRemoteWorkSummary? = nil
     var operatorSnapshot: CompanionOperatorSnapshot? = nil
+    var systemLoad: CompanionSystemLoad? = nil
 
     init(
         deviceID: String,
@@ -698,7 +699,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         safety: CompanionSafetySettings? = nil,
         operatorSummary: CompanionOperatorSummary? = nil,
         remoteWork: CompanionRemoteWorkSummary? = nil,
-        operatorSnapshot: CompanionOperatorSnapshot? = nil
+        operatorSnapshot: CompanionOperatorSnapshot? = nil,
+        systemLoad: CompanionSystemLoad? = nil
     ) {
         self.deviceID = deviceID
         self.machineFingerprint = machineFingerprint
@@ -731,6 +733,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.operatorSummary = operatorSummary
         self.remoteWork = remoteWork
         self.operatorSnapshot = operatorSnapshot
+        self.systemLoad = systemLoad
     }
 
     var id: String { deviceID }
@@ -799,7 +802,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             safety: safety,
             operatorSummary: operatorSummary,
             remoteWork: remoteWork,
-            operatorSnapshot: operatorSnapshot
+            operatorSnapshot: operatorSnapshot,
+            systemLoad: systemLoad
         )
     }
 
@@ -841,7 +845,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             safety: safety,
             operatorSummary: operatorSummary,
             remoteWork: remoteWork,
-            operatorSnapshot: operatorSnapshot
+            operatorSnapshot: operatorSnapshot,
+            systemLoad: systemLoad
         )
     }
 }

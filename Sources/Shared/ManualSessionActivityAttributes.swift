@@ -2,12 +2,11 @@ import ActivityKit
 import Foundation
 
 struct ManualSessionActivityAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
-        var macName: String
-        var endsAt: Date?
-        var isIndefinite: Bool
-        var updatedAt: Date
-    }
+    typealias ContentState = CompanionLiveActivityContentState
 
     var macName: String
+    var deviceID: String? = nil
+    var origin: CompanionLiveActivityOrigin? = nil
+    var startedAt: Date? = nil
+    var automaticTriggerID: String? = nil
 }

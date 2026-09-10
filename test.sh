@@ -69,6 +69,9 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/Shared/CompanionLiveActivityModels.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionLiveActivityProjection.swift" \
+  "$script_dir/Sources/SleepSwitch/SystemLoadSampler.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionMachineFingerprint.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionOperatorModels.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionOperatorProjection.swift" \
@@ -117,6 +120,7 @@ xcrun swiftc \
   "$script_dir/Tests/CoolingDiagnosticsTests.swift" \
   "$script_dir/Tests/InsightsHistoryTests.swift" \
   "$script_dir/Tests/CompanionProtocolTests.swift" \
+  "$script_dir/Tests/CompanionLiveActivityTests.swift" \
   "$script_dir/Tests/LocalPreviewSecurityTests.swift" \
   "$script_dir/Tests/LocalPreviewEndpointTests.swift" \
   "$script_dir/Tests/RemoteContextInboxTests.swift" \

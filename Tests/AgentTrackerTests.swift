@@ -130,6 +130,7 @@ struct AgentTrackerTests {
         CoolingDiagnosticsTests.run()
         InsightsHistoryTests.run()
         CompanionProtocolTests.run()
+        CompanionLiveActivityTests.run()
         LocalPreviewSecurityTests.run()
         LocalPreviewEndpointTests.run()
         RemoteContextInboxTests.run()

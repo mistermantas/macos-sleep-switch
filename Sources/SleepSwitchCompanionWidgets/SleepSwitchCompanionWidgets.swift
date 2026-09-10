@@ -299,27 +299,29 @@ private struct SleepSwitchWidgetView: View {
 private struct ManualSessionLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ManualSessionActivityAttributes.self) { context in
-            HStack(spacing: 12) {
-                Image(systemName: "cup.and.saucer.fill").foregroundStyle(.tint)
-                VStack(alignment: .leading) {
-                    Text(context.attributes.macName).font(.headline)
-                    Text("Manual session active").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                sessionTimer(context.state)
-            }
-            .padding().activityBackgroundTint(Color(.secondarySystemBackground))
+            CompanionLiveActivityView(state: context.state, isStale: context.isStale)
+                .activityBackgroundTint(Color(.secondarySystemBackground))
+                .widgetURL(activityURL(context.attributes.deviceID))
         } dynamicIsland: { context in
             DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) { Image(systemName: "cup.and.saucer.fill") }
-                DynamicIslandExpandedRegion(.center) { Text(context.attributes.macName).lineLimit(1) }
-                DynamicIslandExpandedRegion(.trailing) { sessionTimer(context.state) }
-                DynamicIslandExpandedRegion(.bottom) { Text("Sleep Switch manual session") }
-            } compactLeading: { Image(systemName: "cup.and.saucer.fill") } compactTrailing: { sessionTimer(context.state) } minimal: { Image(systemName: "cup.and.saucer.fill") }
+                DynamicIslandExpandedRegion(.bottom) {
+                    CompanionLiveActivityView(state: context.state, isStale: context.isStale)
+                }
+            } compactLeading: {
+                Image(systemName: context.isStale ? "clock.badge.exclamationmark" : context.state.primary.symbol)
+                    .foregroundStyle(context.isStale ? .orange : .blue)
+            } compactTrailing: {
+                CompanionLiveMetricValue(state: context.state, metric: context.state.primary, isStale: context.isStale)
+                    .monospacedDigit().frame(maxWidth: 62).lineLimit(1).minimumScaleFactor(0.7)
+            } minimal: {
+                Image(systemName: context.isStale ? "clock.badge.exclamationmark" : context.state.primary.symbol)
+            }
+            .widgetURL(activityURL(context.attributes.deviceID))
         }
     }
-
-    @ViewBuilder private func sessionTimer(_ state: ManualSessionActivityAttributes.ContentState) -> some View {
-        if let endsAt = state.endsAt { Text(timerInterval: .now...endsAt, countsDown: true).monospacedDigit() } else { Text("On") }
+    private func activityURL(_ deviceID: String?) -> URL? {
+        var components = URLComponents(string: "sleepswitch-companion://live-activity")!
+        components.queryItems = deviceID.map { [URLQueryItem(name: "deviceID", value: $0)] }
+        return components.url
     }
 }

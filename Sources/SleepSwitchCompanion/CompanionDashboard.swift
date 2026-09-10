@@ -8,6 +8,8 @@ struct CompanionDashboardRoot: View {
     @ObservedObject var model: CompanionAppModel
     @AppStorage("selectedMacDeviceID") private var selectedMacDeviceID = ""
     @State private var showingSettings = false
+    @State private var showingLiveActivity = false
+    @State private var liveActivityDeviceID: String?
     @State private var showingPairingHelp = false
     @State private var showingContextImporter = false
     @State private var showingFollowUpComposer = false
@@ -65,6 +67,8 @@ struct CompanionDashboardRoot: View {
             NavigationStack {
                 CompanionRemoteWorkScreen(mac: mac, summary: summary, isStale: mac.isStale)
             }
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-live-activity") {
+            NavigationStack { CompanionLiveActivityScreen(model: model, deviceID: selectedMac?.deviceID) }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-settings") {
             CompanionPreferencesView(model: model) {}
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-follow-up"),
@@ -128,6 +132,18 @@ struct CompanionDashboardRoot: View {
             .sheet(isPresented: $showingSettings) {
                 CompanionPreferencesView(model: model) {
                     showingSettings = false
+                }
+            }
+            .onOpenURL { url in
+                guard url.scheme == "sleepswitch-companion", url.host == "live-activity" else { return }
+                liveActivityDeviceID = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "deviceID" }?.value
+                if let id = liveActivityDeviceID { model.selectDashboardMac(id) }
+                showingLiveActivity = true
+            }
+            .sheet(isPresented: $showingLiveActivity) {
+                NavigationStack {
+                    CompanionLiveActivityScreen(model: model, deviceID: liveActivityDeviceID)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showingLiveActivity = false } } }
                 }
             }
             .sheet(isPresented: $showingPairingHelp) {
@@ -233,6 +249,7 @@ struct CompanionDashboardRoot: View {
                 }
                 .buttonStyle(.plain)
                 ManualSessionCard(mac: mac, model: model)
+                CompanionLiveActivityLink(mac: mac, model: model)
                 if mac.capabilities.canSetSafetyPreferences == true, let safety = mac.safety {
                     NavigationLink {
                         CompanionLiveMacView(deviceID: mac.deviceID, model: model) { CompanionSafetyScreen(mac: $0, safety: $0.safety ?? safety, model: model) }
@@ -2607,6 +2624,14 @@ private struct CompanionPreferencesView: View {
                     LabeledContent("Last checked", value: model.lastSyncAt?.formatted(date: .abbreviated, time: .shortened) ?? "Never")
                     ShareLink(item: model.diagnosticsReport) {
                         Label("Share Diagnostics", systemImage: "square.and.arrow.up")
+                    }
+                }
+
+                Section("Live Activities") {
+                    NavigationLink {
+                        CompanionLiveActivityScreen(model: model, deviceID: UserDefaults.standard.string(forKey: "selectedMacDeviceID"))
+                    } label: {
+                        Label("Configure Live Activity", systemImage: "waveform.path")
                     }
                 }
 

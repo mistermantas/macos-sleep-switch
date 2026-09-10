@@ -25,7 +25,9 @@ Sleep Switch has:
 - no developer-operated server; and
 - no bundled third-party SDKs.
 
-When you use the companion, the Mac publishes status, bounded daily energy and agent-hour summaries, and recent five-minute energy buckets. It reads short-lived, named commands from your private iCloud database. A stable machine identifier distinguishes your Macs and prevents duplicate listings after reinstalling. The developer cannot read your private database.
+When you use the companion, the Mac publishes status (including CPU and memory use, battery, and current agent activity), bounded daily energy and agent-hour summaries, and recent five-minute energy buckets. It reads short-lived, named commands from your private iCloud database. A stable machine identifier distinguishes your Macs and prevents duplicate listings after reinstalling. The developer cannot read your private database.
+
+Live Activities can display your chosen Mac name, usage readings, session timer, and agent counts on the iPhone Lock Screen and Dynamic Island. They contain no prompts or chat content. Configuration is stored locally on the iPhone, and you can stop monitoring from Live Activity in the app.
 
 Operator content sharing is off by default. If you enable it in Operator’s sharing settings on iPhone or Settings on Mac, board titles, project and folder names, skill metadata, and workflow state sync through private iCloud. Opening a chat or skill requests bounded message excerpts or skill text from your Mac. Full filesystem paths and source identifiers are not included in this projection. You can disable sharing on either device; this stops further content requests and clears the companion’s in-memory content when it receives the updated state. Previously sent command records remain subject to the private database’s command retention period.
 

@@ -57,6 +57,7 @@ for arch in arm64 x86_64; do
     -framework ServiceManagement \
     -lsqlite3 \
     "$script_dir/Sources/SleepSwitch/"*.swift \
+    "$script_dir/Sources/Shared/CompanionLiveActivityModels.swift" \
     "$script_dir/Sources/SleepSwitchFanProtocol/"*.swift \
     -o "$arch_dir/SleepSwitch-$arch"
 

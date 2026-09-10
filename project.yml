@@ -97,6 +97,28 @@ targets:
       - target: SleepSwitchCompanionWidgets
       - target: SleepSwitchCompanionShare
 
+  SleepSwitchCompanionShare:
+    type: app-extension
+    productName: Sleep Switch Share
+    platform: iOS
+    sources:
+      - path: Sources/SleepSwitchCompanionShare
+      - path: Sources/Shared/SharedContextIntake.swift
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: CompanionShare/SleepSwitchCompanionShare.entitlements
+        DEVELOPMENT_TEAM: C43F5MKJF2
+        CURRENT_PROJECT_VERSION: 38
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: CompanionShare/Info.plist
+        MARKETING_VERSION: 2.4.2
+        PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.share
+        PRODUCT_NAME: Sleep Switch Share
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+
   SleepSwitchCompanionWidgets:
     type: app-extension
     productName: Sleep Switch Widgets
@@ -116,28 +138,6 @@ targets:
         MARKETING_VERSION: 2.4.2
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.widgets
         PRODUCT_NAME: Sleep Switch Widgets
-        SWIFT_VERSION: "5.0"
-        TARGETED_DEVICE_FAMILY: "1,2"
-        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
-
-  SleepSwitchCompanionShare:
-    type: app-extension
-    productName: Sleep Switch Share
-    platform: iOS
-    sources:
-      - path: Sources/SleepSwitchCompanionShare
-      - path: Sources/Shared/SharedContextIntake.swift
-    settings:
-      base:
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_ENTITLEMENTS: CompanionShare/SleepSwitchCompanionShare.entitlements
-        DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 38
-        GENERATE_INFOPLIST_FILE: NO
-        INFOPLIST_FILE: CompanionShare/Info.plist
-        MARKETING_VERSION: 2.4.2
-        PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.share
-        PRODUCT_NAME: Sleep Switch Share
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO

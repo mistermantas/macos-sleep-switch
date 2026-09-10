@@ -25,6 +25,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
     var remoteWorkSharingEnabled: Bool
     var remoteWorkTitlesEnabled: Bool
     var remoteWorkProjectNamesEnabled: Bool
+    var companionOperatorSharingEnabled = false
 
     static let empty = SleepSwitchPreferencesSnapshot(
         keepDisplayAwake: true, activateOnLaunch: false, defaultDurationSeconds: 0,
@@ -45,6 +46,7 @@ struct SleepSwitchPreferencesSnapshot: Equatable {
 }
 
 enum SleepSwitchPreferencesMutation {
+    case companionOperatorSharingEnabled(Bool)
     case keepDisplayAwake(Bool)
     case activateOnLaunch(Bool)
     case defaultDuration(Int)
@@ -473,6 +475,14 @@ private struct PreferencesWindowView: View {
                 Text("The iPhone must use the same Apple Account with iCloud enabled. A Mac must be awake, online, and running Sleep Switch to receive remote actions.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section("Operator on iPhone") {
+                Toggle("Share chats and skills", isOn: binding(
+                    get: { viewModel.snapshot.companionOperatorSharingEnabled },
+                    set: { .companionOperatorSharingEnabled($0) }
+                ))
+                Text("Board titles and skill metadata sync through your private iCloud. Chat messages and skill text are sent when you open them on iPhone.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Remote Work") {
                 Toggle("Share operational agent state", isOn: binding(

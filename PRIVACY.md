@@ -1,8 +1,8 @@
 # Sleep Switch Privacy Policy
 
-**Last updated: August 12, 2026**
+**Last updated: September 10, 2026**
 
-Sleep Switch does not collect personal data for the developer, sell data, or share it with third parties. The optional companion uses the user's private iCloud database for coarse status and history synchronization.
+Sleep Switch does not collect personal data for the developer or sell data. The optional companion uses the user's private iCloud database for status, history, remote commands, and content the user chooses to share between their devices.
 
 ## Information used on your Mac
 
@@ -13,7 +13,7 @@ Sleep Switch processes only the local information needed to provide its features
 - The Mac App Store version reads Codex task markers only after you select a `.codex` folder. Access is read-only and is stored as an app-scoped macOS security bookmark.
 - Version 2.2.0 can save estimated power readings and coarse agent activity intervals in a local SQLite database so Insights can show history after a restart. Saving is enabled by default, can be paused in **Insights** or **Settings**, and can be deleted from either place. The database is bounded and does not contain prompts, output, file names, command lines, usernames, or serial numbers.
 
-This local information stays on your Mac. It is not sent to the developer or any third party.
+Local information is not sent to the developer. The optional companion shares the information described below through Apple’s private iCloud storage.
 
 ## Data collection and tracking
 
@@ -25,7 +25,13 @@ Sleep Switch has:
 - no developer-operated server; and
 - no bundled third-party SDKs.
 
-The app does not upload prompts, output, file names, command lines, or raw local history. Version 2.2 includes an optional private CloudKit transport for the iOS companion. When you use the companion, the Mac publishes a coarse status snapshot, bounded daily kWh/agent-hour summaries, and the last 24 hours of five-minute energy buckets; it reads short-lived, named commands from the user's private iCloud database. The developer does not operate a server and cannot read the user's private database. When local history saving is disabled, the companion history payload is empty. Local preferences, history, and folder-access bookmarks remain on your Mac until you change them, delete them, reset the app, or remove the app’s data.
+When you use the companion, the Mac publishes status, bounded daily energy and agent-hour summaries, and recent five-minute energy buckets. It reads short-lived, named commands from your private iCloud database. A stable machine identifier distinguishes your Macs and prevents duplicate listings after reinstalling. The developer cannot read your private database.
+
+Operator content sharing is off by default. If you enable it in Operator’s sharing settings on iPhone or Settings on Mac, board titles, project and folder names, skill metadata, and workflow state sync through private iCloud. Opening a chat or skill requests bounded message excerpts or skill text from your Mac. Full filesystem paths and source identifiers are not included in this projection. You can disable sharing on either device; this stops further content requests and clears the companion’s in-memory content when it receives the updated state. Previously sent command records remain subject to the private database’s command retention period.
+
+Files, text, and context you explicitly send between your devices also travel through your private iCloud database. These transfers are separate from Operator content sharing. Content you export, copy, or share using the system share sheet goes to the destination you choose.
+
+When local history saving is disabled, the companion history payload is empty. Local preferences, history, and folder-access bookmarks remain on your Mac until you change them, delete them, reset the app, or remove the app’s data.
 
 ## External links
 

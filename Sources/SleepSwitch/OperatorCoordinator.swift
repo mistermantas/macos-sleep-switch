@@ -113,7 +113,7 @@ final class OperatorCoordinator {
     }
 
     func sessions(limit: Int = 200) -> [OperatorSession] {
-        (try? store?.sessions(limit: limit)) ?? []
+        ((try? store?.sessions(limit: limit)) ?? []).map { $0.current(at: now()) }
     }
 
     func skills() -> [OperatorSkillRecord] {

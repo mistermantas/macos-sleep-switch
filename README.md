@@ -259,13 +259,13 @@ xcodebuild -project SleepSwitch.xcodeproj \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and build `2.4.0 (29)`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. If an upgrade or reinstall creates a replacement Mac identity, the companion automatically prefers the freshest online record with the same Mac name instead of remaining pinned to the stale one. It never silently retargets remote controls to a different Mac.
+The companion target is `SleepSwitchCompanion`, a SwiftUI iOS/iPadOS app owned by MB Uncascade with bundle identifier `lt.mantas.sleepswitch.companion`, display name Sleep Switch, deployment target iOS 17, and version `2.4.2`. It uses the same private CloudKit container as the Mac target (`iCloud.lt.mantas.sleepswitch`) so the already-shipped Mac identifier remains compatible. Mac identity is derived from the hardware, so reinstalling or changing distribution does not create another current device. Records with the same hardware fingerprint appear once. The companion preserves the selected Mac by identity; matching display names never redirect controls. Older offline records remain accessible in the Offline Macs menu.
 
 ### Companion actions
 
 The iOS dashboard shows the Mac's online/stale state, uptime, thermal state, power source, estimated watts, battery, agent count, keep-awake state, and bounded history. The History view shows five-minute kWh buckets for the last 24 hours, or daily kWh and agent activity hours for the last 7 or 30 days. Actions are limited by the Mac's advertised capabilities and require confirmation for sleep, lock, restart, and shutdown:
 
-Manual sessions have a live countdown in the app and a Live Activity; Home Screen and Lock Screen widgets show the selected Mac’s battery, temperature, and active agent sessions. Optional heat alerts use conservative defaults: 85°C while a non-system cooling profile is active, with separate 30- and 60-minute milestones. Alert permission and every threshold are controlled in the iPhone settings screen.
+Manual-session completion returns the resulting Mac state in the command acknowledgement. The Start/Stop control updates immediately, and delayed status queries cannot undo a confirmed result. Manual sessions have a live countdown in the app and a Live Activity; Home Screen and Lock Screen widgets show the selected Mac’s battery, temperature, and active agent sessions. Optional heat alerts use conservative defaults: 85°C while a non-system cooling profile is active, with separate 30- and 60-minute milestones. Alert permission and every threshold are controlled in the iPhone settings screen.
 
 - **Sleep Mac** — puts the whole Mac to sleep.
 - **Sleep Display** — turns off only the display in the direct-download Mac build; agents keep running.
@@ -279,6 +279,14 @@ Manual sessions have a live countdown in the app and a Live Activity; Home Scree
 The Mac must be awake and signed into the same iCloud account for status and commands to move. Commands expire after 90 seconds and are addressed to a persisted per-device ID; the Mac rejects expired, misaddressed, unsupported, or replayed commands.
 
 While the Mac is awake, Sleep Switch checks for remote commands every three seconds without rebuilding or uploading Insights history. The companion keeps each action visible as **Sending**, **Waiting for Mac**, **Confirming**, or **Done**, so normal iCloud propagation is distinguishable from a failed control. A fully sleeping or offline Mac cannot receive a CloudKit command until it wakes.
+
+### Operator on iPhone and iPad
+
+Operator opens into Overview, Board, Sessions, Skills, Machine, and Automations. Board supports Codex sections, workflow lanes, status grouping, search, project filtering, pinned chats, and archived chats. Sessions expose lifecycle, timestamps, and token counters. Skills support source/tag filters, favourites, copied text, recorded usage, and tag edits. Workflow and section moves use the Mac’s existing Operator and Codex data stores.
+
+Normalized session metadata is available with Mac status. Sharing chat titles, project names, and skill metadata is a separate opt-in under **Operator → Sharing** on iPhone or **Settings → Operator on iPhone** on Mac. Opening a chat or skill requests bounded text through the user’s private iCloud. Paths and arbitrary commands are never accepted from the companion; requests resolve opaque identifiers against the Mac’s indexed items. Content stays out of the persistent command replay ledger. Turning sharing off blocks subsequent reads and clears the companion’s in-memory content cache when the updated state arrives.
+
+Unavailable cooling is shown as managed by macOS, with its availability reason instead of a disabled profile picker. Missing power readings remain unavailable rather than becoming zero kWh. Small readings use Wh. Interrupted agent history closes at its last confirmed observation on restart; legacy records without an observation time retain their identity with unknown duration rather than accruing days of invented activity.
 
 ## License
 

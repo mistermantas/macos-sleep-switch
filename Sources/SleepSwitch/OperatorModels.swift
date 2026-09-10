@@ -10,11 +10,11 @@ enum OperatorSessionState: String, Codable, CaseIterable {
     case unknown
 }
 
-/// A local-only view of the Codex desktop thread catalog. Unlike the compact
+/// A local view of the Codex desktop thread catalog. Unlike the compact
 /// Operator session metrics, this intentionally includes titles and message
 /// excerpts so the Mac can act as a useful mirror. It is never persisted by
-/// `OperatorStore`. Only a fixed, non-sensitive activity category may enter
-/// the opt-in iCloud companion summary; titles remain separately opt-in.
+/// `OperatorStore`. The companion receives bounded titles and excerpts only
+/// when the user separately enables Operator content sharing.
 enum CodexThreadStatus: String, Codable, CaseIterable {
     case running
     case finished
@@ -260,6 +260,12 @@ enum OperatorPrivacy {
 }
 
 extension OperatorSession {
+    func current(at now: Date) -> OperatorSession {
+        guard state == .running,
+              now.timeIntervalSince(lastActivityAt ?? startedAt) > 15 * 60 else { return self }
+        return OperatorSession(id: id, harnessID: harnessID, harnessName: harnessName, state: .unknown, startedAt: startedAt, endedAt: endedAt, lastActivityAt: lastActivityAt, inputTokens: inputTokens, outputTokens: outputTokens, reasoningTokens: reasoningTokens, cachedTokens: cachedTokens)
+    }
+
     func remoteWorkState(now _: Date = Date()) -> CompanionWorkState {
         switch state {
         case .running:

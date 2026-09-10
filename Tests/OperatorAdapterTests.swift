@@ -8,6 +8,22 @@ enum OperatorAdapterTests {
         testHermesBusyDatabaseRecoversWithoutClaimingCorruption()
         testHermesDatabaseErrorsKeepTheirActualCause()
         testOperatorStoreKeepsSkillMetadataOutOfSourceFiles()
+        testOldRunningRecordsAreNotLive()
+    }
+
+    private static func testOldRunningRecordsAreNotLive() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        do {
+            let store = try OperatorStore(databaseURL: root.appendingPathComponent("Operator.sqlite"))
+            let old = now.addingTimeInterval(-86_400)
+            let session = OperatorSession(id: "orphan", harnessID: "codex", harnessName: "Codex", state: .running, startedAt: old, endedAt: nil, lastActivityAt: old, inputTokens: 200, outputTokens: 0, reasoningTokens: 0, cachedTokens: 0)
+            try store.ingest(OperatorAdapterSnapshot(harnessID: "codex", harnessName: "Codex", availability: .available, refreshedAt: old, capabilities: [], sessions: [session], events: []))
+            let coordinator = OperatorCoordinator(store: store, now: { now })
+            expect(coordinator.companionSummary(finishAction: nil).activeSessionCount == 0, "an old unclosed rollout must not remain live forever in the companion")
+            expect(coordinator.sessions().count == 1, "aging a live record must preserve session history")
+        } catch { fatalError("Operator liveness fixture failed: \(error)") }
     }
 
     private static func testCodexAdapterReadsOnlyNormalizedLifecycleAndTokenFields() {

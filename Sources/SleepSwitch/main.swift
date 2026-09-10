@@ -929,6 +929,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
         capabilities.canSetSafetyPreferences = AppDistribution.supportsLidClosedAwake
         capabilities.canReceiveContextTransfers = capabilities.supportsCloudKit
+        capabilities.canUseOperator = true
         let thermalState: String = switch ProcessInfo.processInfo.thermalState {
         case .nominal:
             "nominal"
@@ -996,7 +997,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         forKey: SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled
                     )
                 )
-                : nil
+                : nil,
+            operatorSnapshot: companionOperatorSnapshot()
+        )
+    }
+
+    private func companionOperatorSnapshot() -> CompanionOperatorSnapshot {
+        CompanionOperatorProjection.make(
+            sessions: operatorCoordinator.sessions(), threads: lastOperatorRefreshResult?.codexMirror.threads ?? [],
+            skills: operatorCoordinator.skills(), sources: lastOperatorRefreshResult?.adapters ?? [],
+            workflowLanes: operatorCoordinator.threadWorkflowLanes(),
+            sharingEnabled: UserDefaults.standard.bool(forKey: CompanionOperatorProjection.sharingKey),
+            triggersEnabled: agentTriggerConfiguration.isEnabled,
+            diagnosticsEnabled: UserDefaults.standard.bool(forKey: SleepSwitchPreferenceKey.agentDiagnosticsEnabled),
+            historyEnabled: insightsRecorder.historyEnabled
         )
     }
 
@@ -1077,6 +1091,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let now = Date()
         var capabilities = RemoteEnergyController.capabilities
         capabilities.canSetSafetyPreferences = AppDistribution.supportsLidClosedAwake
+        capabilities.canUseOperator = true
         let validation = CompanionCommandPolicy.validate(
             command,
             targetDeviceID: companionBridge.deviceID,
@@ -1101,7 +1116,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         do {
+            var operatorContent: CompanionOperatorContent?
             switch command.action {
+            case .operatorRequest:
+                operatorContent = try handleOperatorRequest(command.parameters)
             case .sleepMac:
                 try RemoteEnergyController.sleepMac()
             case .sleepDisplay:
@@ -1187,7 +1205,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 accepted: true,
                 executed: true,
                 completedAt: Date(),
-                message: "\(command.action.title) completed."
+                message: "\(command.action.title) completed.",
+                operatorContent: operatorContent
             )
         } catch {
             return CompanionRemoteResult(
@@ -1198,6 +1217,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 message: error.localizedDescription
             )
         }
+    }
+
+    private func handleOperatorRequest(_ parameters: [String: String]) throws -> CompanionOperatorContent? {
+        try CompanionOperatorRequestHandler(
+            coordinator: operatorCoordinator, threads: { self.lastOperatorRefreshResult?.codexMirror.threads ?? [] },
+            defaults: .standard, refresh: { self.requestOperatorRefresh(force: true) },
+            setPreference: { key, enabled in
+                switch key {
+                case "history": self.applyPreferencesMutation(.historyEnabled(enabled))
+                case "diagnostics": self.applyPreferencesMutation(.diagnosticsEnabled(enabled))
+                case "triggers":
+                    var configuration = self.agentTriggerConfiguration
+                    configuration.isEnabled = enabled
+                    self.applyPreferencesMutation(.agentTriggers(configuration))
+                default: throw RemoteEnergyError.unavailable("Unknown Operator setting.")
+                }
+            }, didChange: { self.operatorWindowController?.refreshFromBackground() }
+        ).handle(parameters)
     }
 
     private func applyRemoteKeepAwake(_ parameters: [String: String]) {
@@ -2188,7 +2225,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             remoteWorkTitlesEnabled: defaults.bool(forKey: SleepSwitchPreferenceKey.remoteWorkTitlesEnabled),
             remoteWorkProjectNamesEnabled: defaults.bool(
                 forKey: SleepSwitchPreferenceKey.remoteWorkProjectNamesEnabled
-            )
+            ),
+            companionOperatorSharingEnabled: defaults.bool(forKey: CompanionOperatorProjection.sharingKey)
         )
     }
 
@@ -2203,6 +2241,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func applyPreferencesMutation(_ mutation: SleepSwitchPreferencesMutation) {
         let defaults = UserDefaults.standard
         switch mutation {
+        case .companionOperatorSharingEnabled(let enabled):
+            defaults.set(enabled, forKey: CompanionOperatorProjection.sharingKey)
+            companionBridge.publishStatusChange()
         case .keepDisplayAwake(let enabled):
             defaults.set(enabled, forKey: keepDisplayAwakeKey)
         case .activateOnLaunch(let enabled):

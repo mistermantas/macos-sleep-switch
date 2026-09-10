@@ -13,6 +13,7 @@ settings:
 targets:
   SleepSwitch:
     type: application
+    productName: Sleep Switch
     platform: macOS
     sources:
       - path: Sources/SleepSwitch
@@ -28,12 +29,12 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: C43F5MKJF2
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 36
+        CURRENT_PROJECT_VERSION: 38
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: AppStore/Info.plist
-        MARKETING_VERSION: 2.4.1
+        MARKETING_VERSION: 2.4.2
         OTHER_LDFLAGS: "-lsqlite3"
         OTHER_SWIFT_FLAGS: "$(inherited) -parse-as-library"
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch
@@ -48,10 +49,12 @@ targets:
 
   SleepSwitchCompanion:
     type: application
+    productName: Sleep Switch
     platform: iOS
     sources:
       - path: Sources/SleepSwitchCompanion
       - path: Sources/SleepSwitch/CompanionProtocol.swift
+      - path: Sources/SleepSwitch/CompanionOperatorModels.swift
       - path: Sources/SleepSwitch/LocalPreviewSecurity.swift
       - path: Sources/SleepSwitch/InsightsModels.swift
       - path: Sources/SleepSwitch/AppLinks.swift
@@ -73,12 +76,12 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 33
+        CURRENT_PROJECT_VERSION: 38
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: Companion/Info.plist
-        MARKETING_VERSION: 2.4.0
+        MARKETING_VERSION: 2.4.2
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion
         PRODUCT_NAME: Sleep Switch
         SWIFT_VERSION: "5.0"
@@ -96,6 +99,7 @@ targets:
 
   SleepSwitchCompanionWidgets:
     type: app-extension
+    productName: Sleep Switch Widgets
     platform: iOS
     sources:
       - path: Sources/SleepSwitchCompanionWidgets
@@ -106,10 +110,10 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 33
+        CURRENT_PROJECT_VERSION: 38
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionWidgets/Info.plist
-        MARKETING_VERSION: 2.4.0
+        MARKETING_VERSION: 2.4.2
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.widgets
         PRODUCT_NAME: Sleep Switch Widgets
         SWIFT_VERSION: "5.0"
@@ -118,6 +122,7 @@ targets:
 
   SleepSwitchCompanionShare:
     type: app-extension
+    productName: Sleep Switch Share
     platform: iOS
     sources:
       - path: Sources/SleepSwitchCompanionShare
@@ -127,10 +132,10 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionShare/SleepSwitchCompanionShare.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 33
+        CURRENT_PROJECT_VERSION: 38
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionShare/Info.plist
-        MARKETING_VERSION: 2.4.0
+        MARKETING_VERSION: 2.4.2
         PRODUCT_BUNDLE_IDENTIFIER: lt.mantas.sleepswitch.companion.share
         PRODUCT_NAME: Sleep Switch Share
         SWIFT_VERSION: "5.0"

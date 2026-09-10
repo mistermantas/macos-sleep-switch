@@ -98,8 +98,9 @@ struct AgentActivityInterval: Equatable, Codable, Identifiable {
     let endedAt: Date?
     let state: AgentActivityState
     let peakSessionCount: Int
+    var lastObservedAt: Date? = nil
 
-    var effectiveEnd: Date { endedAt ?? Date() }
+    var effectiveEnd: Date { endedAt ?? lastObservedAt ?? Date() }
 
     var duration: TimeInterval {
         max(0, effectiveEnd.timeIntervalSince(startedAt))
@@ -160,6 +161,25 @@ struct CompanionEnergyDay: Codable, Equatable, Identifiable {
     let sampleCount: Int
 
     var id: Date { dayStart }
+
+    /// Older snapshots encode zero even when every sample is missing. A
+    /// valid average distinguishes measured zero from absent energy data.
+    var recordedKilowattHours: Double? {
+        guard sampleCount > 0, let averageWatts, averageWatts.isFinite,
+              averageWatts >= 0, kilowattHours.isFinite, kilowattHours >= 0 else { return nil }
+        return kilowattHours
+    }
+}
+
+enum CompanionEnergyText {
+    static func total(_ values: [Double]) -> String {
+        let valid = values.filter { $0.isFinite && $0 >= 0 }
+        guard !valid.isEmpty else { return "Unavailable" }
+        let total = valid.reduce(0, +)
+        return total < 0.01
+            ? String(format: "%.1f Wh", total * 1_000)
+            : String(format: "%.2f kWh", total)
+    }
 }
 
 struct CompanionAgentDay: Codable, Equatable, Identifiable {

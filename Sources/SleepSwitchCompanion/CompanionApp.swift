@@ -60,7 +60,7 @@ private enum CompanionWidgetPublisher {
     static func publish(_ macs: [CompanionMacStatus]) {
         let selectedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
         let selected = CompanionMacSelection.preferred(from: macs, persistedDeviceID: selectedID)
-        let snapshots = macs.map { mac in
+        let snapshots = CompanionMacSelection.canonicalDevices(macs).map { mac in
             CompanionWidgetSnapshot(
                 deviceID: mac.deviceID,
                 macName: mac.displayName,
@@ -88,7 +88,7 @@ private enum CompanionWidgetBackgroundRefresher {
             guard try await cloud.accountStatus() == .available else { return .failed }
             let macs = try await cloud.fetchMacs()
             CompanionWidgetPublisher.publish(macs)
-            CompanionWorkNotificationManager().evaluate(macs)
+            CompanionWorkNotificationManager().evaluate(CompanionMacSelection.canonicalDevices(macs))
             return macs.isEmpty ? .noData : .newData
         } catch is CancellationError {
             return .noData
@@ -119,6 +119,8 @@ final class CompanionAppModel: ObservableObject {
     @Published private(set) var lastContextTransferStatus = "Never"
     @Published private(set) var contextTransferActivities: [CompanionContextTransferActivity]
     @Published private(set) var commandProgress: CompanionCommandProgress?
+    @Published private(set) var operatorContents: [String: CompanionOperatorContent] = [:]
+    @Published private(set) var operatorIssues: [String: String] = [:]
     @Published private(set) var sharedContextDrafts: [SharedContextDraft] = []
     @Published private(set) var sharedContextDraftIDsInFlight: Set<UUID> = []
 
@@ -154,7 +156,9 @@ final class CompanionAppModel: ObservableObject {
         #if DEBUG
         if isScreenshotDemo {
             let demo = CompanionScreenshotDemo.make()
-            macs = [demo.mac]
+            var demoMac = demo.mac
+            demoMac.operatorSnapshot = CompanionOperatorDemo.make()
+            macs = [demoMac]
             histories = [demo.mac.deviceID: demo.history]
             artifactOffersByDeviceID = demo.artifactOffersByDeviceID
             if isSharedContextDemo {
@@ -221,25 +225,8 @@ final class CompanionAppModel: ObservableObject {
     }
 
     func refreshAndWait() async {
-        reloadSharedContextDrafts()
-#if targetEnvironment(simulator)
-        showSimulatorCloudKitMessageIfNeeded()
-#else
-#if DEBUG
-        if isScreenshotDemo || isConnectionDemo { return }
-#endif
-        if isLoading {
-            if let refreshTask {
-                await refreshTask.value
-            }
-            return
-        }
-        isLoading = true
-        message = nil
-        lastSyncIssue = nil
-        syncStage = "Checking iCloud"
-        await performRefresh()
-#endif
+        refresh()
+        await refreshTask?.value
     }
 
     private func performRefresh() async {
@@ -262,6 +249,7 @@ final class CompanionAppModel: ObservableObject {
                 macs = []
                 histories = [:]
                 artifactOffersByDeviceID = [:]
+                operatorContents = [:]
                 lastSyncAt = Date()
                 syncStage = "iCloud unavailable"
                 return
@@ -270,8 +258,16 @@ final class CompanionAppModel: ObservableObject {
             try? await cloud.ensureStatusSubscription()
 
             syncStage = "Loading Macs"
-            let fetchedMacs = try await cloud.fetchMacs()
+            let rawMacs = try await cloud.fetchMacs()
+            let savedID = UserDefaults.standard.string(forKey: "selectedMacDeviceID") ?? ""
+            if let selected = CompanionMacSelection.preferred(from: rawMacs, persistedDeviceID: savedID) {
+                UserDefaults.standard.set(selected.deviceID, forKey: "selectedMacDeviceID")
+            }
+            let fetchedMacs = CompanionStatusReconciliation.merge(rawMacs, current: macs)
             macs = fetchedMacs
+            for mac in fetchedMacs where mac.operatorSnapshot?.sharingEnabled != true {
+                operatorContents = operatorContents.filter { !$0.key.hasPrefix(mac.deviceID + ":") }
+            }
             publishCompanionSurfaces(for: fetchedMacs)
             syncStage = "Loading results"
             let artifactResults = await fetchArtifactOffers(for: fetchedMacs)
@@ -320,6 +316,17 @@ final class CompanionAppModel: ObservableObject {
     func selectDashboardMac(_ deviceID: String) {
         UserDefaults.standard.set(deviceID, forKey: "selectedMacDeviceID")
         publishCompanionSurfaces(for: macs)
+    }
+
+    func operatorContent(for mac: CompanionMacStatus, itemID: String) -> CompanionOperatorContent? {
+        operatorContents[mac.deviceID + ":" + itemID]
+    }
+
+    func sendOperator(_ operation: String, to mac: CompanionMacStatus, parameters: [String: String] = [:]) {
+        var parameters = parameters
+        parameters["operation"] = operation
+        operatorIssues[mac.deviceID] = nil
+        send(.operatorRequest, to: mac, parameters: parameters)
     }
 
     func enableHeatNotifications() {
@@ -596,6 +603,14 @@ final class CompanionAppModel: ObservableObject {
                 let completionMessage: String
                 if let result {
                     self.commandProgress = self.commandProgress?.withStage(.confirming)
+                    if let confirmed = CompanionStatusReconciliation.confirmedStatus(for: command, result: result, previous: originalMac) {
+                        self.replaceMac(confirmed)
+                        self.publishCompanionSurfaces(for: self.macs)
+                    }
+                    if result.executed, let content = result.operatorContent {
+                        self.operatorContents[mac.deviceID + ":" + content.itemID] = content
+                    }
+                    if action == .operatorRequest, !result.executed { self.operatorIssues[mac.deviceID] = result.message ?? "Operator could not complete this request." }
                     completionMessage = result.message ?? (result.executed
                         ? "\(action.title) completed."
                         : "The Mac rejected \(action.title.lowercased()).")
@@ -609,6 +624,7 @@ final class CompanionAppModel: ObservableObject {
                         result.executed ? .completed : .failed
                     )
                 } else {
+                    if action == .operatorRequest { self.operatorIssues[mac.deviceID] = "The Mac has not replied yet. Try again when it is online." }
                     completionMessage = "\(action.title) is still pending. The Mac may be asleep or offline."
                     self.lastCommandStatus = "Pending — \(action.title)"
                     self.commandProgress = self.commandProgress?.withStage(.failed)
@@ -621,6 +637,7 @@ final class CompanionAppModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
+                if action == .operatorRequest { self.operatorIssues[mac.deviceID] = error.localizedDescription }
                 if action == .setKeepAwake {
                     self.replaceMac(originalMac)
                 }
@@ -873,7 +890,11 @@ final class CompanionAppModel: ObservableObject {
         guard let index = macs.firstIndex(where: { $0.deviceID == updatedMac.deviceID }) else {
             return
         }
+        guard updatedMac.lastSeen >= macs[index].lastSeen else { return }
         macs[index] = updatedMac
+        if updatedMac.operatorSnapshot?.sharingEnabled != true {
+            operatorContents = operatorContents.filter { !$0.key.hasPrefix(updatedMac.deviceID + ":") }
+        }
     }
 
 #if targetEnvironment(simulator)
@@ -882,8 +903,40 @@ final class CompanionAppModel: ObservableObject {
         to mac: CompanionMacStatus,
         parameters: [String: String]
     ) {
-        if action == .setKeepAwake {
-            replaceMac(mac.applyingKeepAwake(parameters: parameters))
+        if action == .operatorRequest, var snapshot = mac.operatorSnapshot {
+            let operation = parameters["operation"] ?? ""
+            let itemID = parameters["itemID"] ?? ""
+            switch operation {
+            case "sharing": snapshot.sharingEnabled = parameters["enabled"] == "true"
+            case "readThread", "readSkill":
+                if let content = CompanionOperatorDemo.content(itemID: itemID) { operatorContents[mac.deviceID + ":" + itemID] = content }
+            case "favourite":
+                if let index = snapshot.skills.firstIndex(where: { $0.id == itemID }) { snapshot.skills[index].isFavourite = parameters["enabled"] == "true" }
+            case "tags":
+                if let index = snapshot.skills.firstIndex(where: { $0.id == itemID }) { snapshot.skills[index].tags = (parameters["tags"] ?? "").split(separator: ",").map(String.init) }
+            case "recordUse":
+                if let index = snapshot.skills.firstIndex(where: { $0.id == itemID }) { snapshot.skills[index].useCount += 1 }
+            case "workflow":
+                if let index = snapshot.threads.firstIndex(where: { $0.id == itemID }) { snapshot.threads[index].workflowLane = parameters["lane"] ?? "Inbox" }
+            case "preferences":
+                let enabled = parameters["enabled"] == "true"
+                switch parameters["key"] {
+                case "history": snapshot.historyEnabled = enabled
+                case "triggers": snapshot.triggersEnabled = enabled
+                case "diagnostics": snapshot.diagnosticsEnabled = enabled
+                default: break
+                }
+            default: break
+            }
+            var updated = mac.refreshingLastSeen()
+            updated.operatorSnapshot = snapshot
+            replaceMac(updated)
+        }
+        let now = Date()
+        let command = CompanionRemoteCommand(id: UUID(), targetDeviceID: mac.deviceID, action: action, parameters: parameters, requesterDeviceID: requesterDeviceID, nonce: UUID().uuidString, createdAt: now, expiresAt: now.addingTimeInterval(90), policyVersion: 1)
+        let result = CompanionRemoteResult(commandID: command.id, accepted: true, executed: true, completedAt: now, message: nil)
+        if let confirmed = CompanionStatusReconciliation.confirmedStatus(for: command, result: result, previous: mac) {
+            replaceMac(confirmed)
         }
         lastCommandStatus = "Simulated — \(action.title)"
         message = "Simulated \(action.title.lowercased()). No command was sent to iCloud."
@@ -1152,6 +1205,7 @@ private enum CompanionScreenshotDemo {
     static func make(now: Date = Date()) -> Snapshot {
         let calendar = Calendar.current
         let deviceID = "demo-macbook-pro"
+        let noTelemetry = ProcessInfo.processInfo.arguments.contains("--screenshot-no-telemetry")
         let capabilities = CompanionMacCapabilities(
             canSleepMac: true,
             canSleepDisplay: true,
@@ -1164,40 +1218,40 @@ private enum CompanionScreenshotDemo {
             canSleepDisplayUntilAgentsFinish: true,
             supportsCloudKit: true,
             canControlManualSession: true,
-            canSetCoolingProfile: true,
+            canSetCoolingProfile: !noTelemetry,
             canPreventSleepWithLidClosed: true,
-            canReceiveContextTransfers: true
+            canReceiveContextTransfers: true,
+            canUseOperator: true
         )
         let mac = CompanionMacStatus(
             deviceID: deviceID,
             displayName: "Mantas’ MacBook Pro",
-            build: "2.3.1 (18)",
+            build: "2.4.2 (38)",
             lastSeen: now,
             uptimeSeconds: 2.4 * 24 * 3_600,
             powerSource: .ac,
             batteryPercent: 97,
             thermalState: "nominal",
-            activeAgentCount: 3,
-            activeSessionCount: 5,
+            activeAgentCount: 1,
+            activeSessionCount: 1,
             awakeMode: "agents",
             displayAsleep: false,
             isKeepingAwake: true,
             keepDisplayAwake: false,
             automaticAgentAwakeEnabled: true,
             wakeDisplayWhenAgentsFinish: false,
-            estimatedWatts: 38,
+            estimatedWatts: noTelemetry ? nil : 38,
             energySource: .ac,
-            energyConfidence: .estimated,
-            isCharging: true,
-            chargingWatts: 31,
+            energyConfidence: noTelemetry ? .unavailable : .estimated,
+            isCharging: !noTelemetry,
+            chargingWatts: noTelemetry ? nil : 31,
             network: .online,
             capabilities: capabilities,
             agents: [
-                CompanionAgentStatus(id: "codex", name: "Codex", sessionCount: 3),
-                CompanionAgentStatus(id: "opencode", name: "OpenCode", sessionCount: 2)
+                CompanionAgentStatus(id: "codex", name: "Codex", sessionCount: 1)
             ],
             manualSession: nil,
-            cooling: CompanionCoolingStatus(
+            cooling: noTelemetry ? CompanionCoolingStatus(profile: "systemControl", state: "Needs Attention", temperatureCelsius: nil, verifiedDemand: nil, fans: [], message: "Fan control is not available on this Mac. macOS continues to manage cooling.", availableProfiles: ["systemControl"]) : CompanionCoolingStatus(
                 profile: "aggressive",
                 state: "Aggressive",
                 temperatureCelsius: 56,
@@ -1295,9 +1349,9 @@ private enum CompanionScreenshotDemo {
             let values = [0.18, 0.24, 0.31, 0.27, 0.42, 0.36, 0.29]
             return CompanionEnergyDay(
                 dayStart: day,
-                kilowattHours: values[offset],
-                averageWatts: 31 + Double(offset),
-                peakWatts: 68 + Double(offset * 3),
+                kilowattHours: noTelemetry ? 0 : values[offset],
+                averageWatts: noTelemetry ? nil : 31 + Double(offset),
+                peakWatts: noTelemetry ? nil : 68 + Double(offset * 3),
                 sampleCount: 48
             )
         }
@@ -1313,7 +1367,7 @@ private enum CompanionScreenshotDemo {
         let energyBuckets = (0..<288).compactMap { offset -> EnergyBucket? in
             // Leave one honest gap in the demo so screenshots and visual QA do
             // not imply that missing telemetry means zero consumption.
-            guard !(86...103).contains(offset) else { return nil }
+            guard !noTelemetry, !(86...103).contains(offset) else { return nil }
             let bucketStart = now.addingTimeInterval(TimeInterval(offset - 287) * 300)
             let wave = sin(Double(offset) / 18) * 8
             let workBurst = (164...208).contains(offset) ? 24.0 : 0

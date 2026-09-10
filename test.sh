@@ -69,6 +69,10 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/InsightsRecorder.swift" \
   "$script_dir/Sources/SleepSwitch/InsightsWindowController.swift" \
   "$script_dir/Sources/SleepSwitch/CompanionProtocol.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionMachineFingerprint.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionOperatorModels.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionOperatorProjection.swift" \
+  "$script_dir/Sources/SleepSwitch/CompanionOperatorRequestHandler.swift" \
   "$script_dir/Sources/SleepSwitch/LocalPreviewSecurity.swift" \
   "$script_dir/Sources/SleepSwitch/LocalPreviewEndpoint.swift" \
   "$script_dir/Sources/SleepSwitch/NetworkAvailabilityMonitor.swift" \
@@ -100,6 +104,7 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitchFanHelper/TemperatureMonitor.swift" \
   "$script_dir/Tests/AgentTrackerTests.swift" \
   "$script_dir/Tests/OperatorAdapterTests.swift" \
+  "$script_dir/Tests/CompanionOperatorTests.swift" \
   "$script_dir/Tests/RemoteWorkProjectionTests.swift" \
   "$script_dir/Tests/RemoteWorkAttentionTests.swift" \
   "$script_dir/Tests/CodexThreadMirrorAdapterTests.swift" \

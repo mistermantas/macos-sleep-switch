@@ -78,6 +78,7 @@ final class InsightsRecorder {
     private var activeIntervals: [String: AgentActivityInterval] = [:]
     private var timer: Timer?
     private var lastPruneAt: Date?
+    private var lastAgentCheckpointAt: Date?
     private(set) var lastPersistenceError: String?
 
     init(
@@ -98,6 +99,7 @@ final class InsightsRecorder {
         UserDefaults.standard.register(defaults: [
             Self.historyEnabledKey: true
         ])
+        persist("recover interrupted agent history") { try $0.recoverInterruptedAgentIntervals() }
     }
 
     var historyEnabled: Bool {
@@ -123,10 +125,17 @@ final class InsightsRecorder {
         self.timer = timer
     }
 
-    func stop() {
+    func stop(at date: Date = Date()) {
         timer?.invalidate()
         timer = nil
         flushCurrentBucket()
+        for interval in activeIntervals.values {
+            let finished = AgentActivityInterval(id: interval.id, agentID: interval.agentID, agentName: interval.agentName,
+                startedAt: interval.startedAt, endedAt: interval.lastObservedAt ?? date, state: .finished,
+                peakSessionCount: interval.peakSessionCount, lastObservedAt: interval.lastObservedAt)
+            if historyEnabled { persist("finish agent history") { try $0.saveAgentInterval(finished) } }
+        }
+        activeIntervals.removeAll()
     }
 
     func sampleEnergy(at date: Date = Date()) {
@@ -157,6 +166,7 @@ final class InsightsRecorder {
     }
 
     func recordAgents(_ agents: [DetectedAgent], at date: Date = Date()) {
+        let shouldCheckpoint = lastAgentCheckpointAt.map { date.timeIntervalSince($0) >= 60 } ?? true
         var current: [String: DetectedAgent] = [:]
         for agent in agents {
             current[agent.definition.id] = agent
@@ -171,7 +181,8 @@ final class InsightsRecorder {
                     startedAt: interval.startedAt,
                     endedAt: date,
                     state: .finished,
-                    peakSessionCount: interval.peakSessionCount
+                    peakSessionCount: interval.peakSessionCount,
+                    lastObservedAt: date
                 )
                 activeIntervals.removeValue(forKey: agentID)
                 if historyEnabled {
@@ -182,9 +193,6 @@ final class InsightsRecorder {
                 continue
             }
 
-            guard agent.processCount != interval.peakSessionCount else {
-                continue
-            }
             let updated = AgentActivityInterval(
                 id: interval.id,
                 agentID: interval.agentID,
@@ -192,10 +200,11 @@ final class InsightsRecorder {
                 startedAt: interval.startedAt,
                 endedAt: nil,
                 state: .running,
-                peakSessionCount: max(interval.peakSessionCount, agent.processCount)
+                peakSessionCount: max(interval.peakSessionCount, agent.processCount),
+                lastObservedAt: date
             )
             activeIntervals[agentID] = updated
-            if historyEnabled {
+            if historyEnabled && (shouldCheckpoint || agent.processCount > interval.peakSessionCount) {
                 persist("save agent interval") { store in
                     try store.saveAgentInterval(updated)
                 }
@@ -210,7 +219,8 @@ final class InsightsRecorder {
                 startedAt: date,
                 endedAt: nil,
                 state: .running,
-                peakSessionCount: agent.processCount
+                peakSessionCount: agent.processCount,
+                lastObservedAt: date
             )
             activeIntervals[agent.definition.id] = interval
             if historyEnabled {
@@ -219,6 +229,7 @@ final class InsightsRecorder {
                 }
             }
         }
+        if shouldCheckpoint { lastAgentCheckpointAt = date }
         publish()
     }
 
@@ -255,9 +266,9 @@ final class InsightsRecorder {
             $0.startedAt <= now && $0.effectiveEnd >= start
         }
         var allIntervals = (intervals ?? [])
-        for interval in currentIntervals
-            where !allIntervals.contains(where: { $0.id == interval.id }) {
-            allIntervals.append(interval)
+        for interval in currentIntervals {
+            if let index = allIntervals.firstIndex(where: { $0.id == interval.id }) { allIntervals[index] = interval }
+            else { allIntervals.append(interval) }
         }
 
         return InsightsSnapshot(

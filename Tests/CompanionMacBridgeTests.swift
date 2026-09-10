@@ -14,6 +14,28 @@ enum CompanionMacBridgeTests {
         await testProcessesContextTransfers()
         await testChangedStatusPublishesWithoutHistory()
         await testPrunesExpiredRemoteHandoffs()
+        await testCommandResultIncludesResultingState()
+    }
+
+    private static func testCommandResultIncludesResultingState() async {
+        let defaults = makeDefaults()
+        let cloud = FakeCompanionCloudStore()
+        let command = makeCommand()
+        cloud.pendingCommands = [CompanionPendingCommand(recordName: command.id.uuidString, command: command)]
+        var latest = makeStatus()
+        let bridge = CompanionMacBridge(cloud: cloud, deviceID: "test-mac", statusProvider: { latest }, historyProvider: { makeHistory() }, commandHandler: { command in
+            latest.manualSession = CompanionManualSessionStatus(startedAt: Date(), endsAt: nil)
+            return CompanionRemoteResult(commandID: command.id, accepted: true, executed: true, completedAt: Date(), message: "Completed",
+                operatorContent: CompanionOperatorContent(itemID: "test", kind: "skill", title: "Test", text: "private-content-must-not-enter-ledger", messages: [], isTruncated: false))
+        }, defaults: defaults)
+        await bridge.pollCommandsAndWait()
+        expect(cloud.finishedResults.first?.status?.manualSession?.isActive == true, "completion carries the Mac state captured after executing the command")
+        var completedCommand = command
+        completedCommand.result = cloud.finishedResults.first
+        let roundTrip = try! CompanionJSON.decoder.decode(CompanionRemoteCommand.self, from: CompanionJSON.encoder.encode(completedCommand))
+        expect(roundTrip.result?.status?.manualSession?.isActive == true, "post-command state travels in the existing CloudKit payload")
+        let ledger = defaults.data(forKey: "companion.command-ledger").map { String(decoding: $0, as: UTF8.self) } ?? ""
+        expect(!ledger.contains("private-content-must-not-enter-ledger"), "the replay ledger does not persist chat or skill content")
     }
 
     private static func testPublishesAndCoalesces() async {

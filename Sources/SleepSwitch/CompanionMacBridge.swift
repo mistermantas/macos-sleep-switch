@@ -87,7 +87,7 @@ final class CompanionMacBridge {
 
     init(
         cloud: CompanionCloudStoring = CompanionCloudStore(),
-        deviceID: String = CompanionDeviceIdentity.load(key: "companionMacDeviceID"),
+        deviceID: String = CompanionMachineFingerprint.deviceID(),
         statusProvider: @escaping StatusProvider,
         historyProvider: @escaping HistoryProvider,
         commandHandler: @escaping CommandHandler,
@@ -403,7 +403,7 @@ final class CompanionMacBridge {
                 continue
             }
 
-            let result: CompanionRemoteResult
+            var result: CompanionRemoteResult
             if let entry = commandLedger[commandValue.nonce] {
                 switch entry.phase {
                 case .completed:
@@ -426,6 +426,7 @@ final class CompanionMacBridge {
             } else {
                 markCommandExecuting(commandValue)
                 result = commandHandler(commandValue)
+                result.status = statusProvider().refreshingLastSeen(at: result.completedAt)
                 markCommandCompleted(commandValue, result: result)
             }
 
@@ -580,7 +581,13 @@ final class CompanionMacBridge {
     private func persistLedger() {
         let cutoff = Date().addingTimeInterval(-Self.commandLedgerRetention)
         commandLedger = commandLedger.filter { $0.value.updatedAt >= cutoff }
-        guard let data = try? CompanionJSON.encoder.encode(commandLedger) else { return }
+        let compactLedger = commandLedger.mapValues { entry in
+            var result = entry.result
+            result?.status = nil
+            result?.operatorContent = nil
+            return CommandLedgerEntry(phase: entry.phase, result: result, updatedAt: entry.updatedAt)
+        }
+        guard let data = try? CompanionJSON.encoder.encode(compactLedger) else { return }
         defaults.set(data, forKey: Self.commandLedgerKey)
     }
 

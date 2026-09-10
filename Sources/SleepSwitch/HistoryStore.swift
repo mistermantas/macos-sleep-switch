@@ -104,15 +104,16 @@ final class HistoryStore {
     func saveAgentInterval(_ interval: AgentActivityInterval) throws {
         let sql = """
         INSERT INTO agent_intervals
-            (id, agent_id, agent_name, started_at, ended_at, state, peak_session_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+            (id, agent_id, agent_name, started_at, ended_at, state, peak_session_count, last_observed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             agent_id = excluded.agent_id,
             agent_name = excluded.agent_name,
             started_at = excluded.started_at,
             ended_at = excluded.ended_at,
             state = excluded.state,
-            peak_session_count = excluded.peak_session_count;
+            peak_session_count = excluded.peak_session_count,
+            last_observed_at = excluded.last_observed_at;
         """
         try run(sql) { statement in
             self.bindText(statement, index: 1, value: interval.id.uuidString)
@@ -126,7 +127,14 @@ final class HistoryStore {
             )
             self.bindText(statement, index: 6, value: interval.state.rawValue)
             self.bindInt(statement, index: 7, value: interval.peakSessionCount)
+            self.bindOptionalDouble(statement, index: 8, value: interval.lastObservedAt?.timeIntervalSince1970)
         }
+    }
+
+    func recoverInterruptedAgentIntervals() throws {
+        // An old writer is no longer observing these sessions. Preserve their
+        // confirmed duration, never extend them to the next app launch.
+        try run("UPDATE agent_intervals SET ended_at = MAX(started_at, COALESCE(last_observed_at, started_at)), state = 'unknown' WHERE ended_at IS NULL;")
     }
 
     func energyBuckets(from start: Date, to end: Date) throws -> [EnergyBucket] {
@@ -160,7 +168,7 @@ final class HistoryStore {
 
     func agentIntervals(from start: Date, to end: Date) throws -> [AgentActivityInterval] {
         let sql = """
-        SELECT id, agent_id, agent_name, started_at, ended_at, state, peak_session_count
+        SELECT id, agent_id, agent_name, started_at, ended_at, state, peak_session_count, last_observed_at
         FROM agent_intervals
         WHERE started_at <= ? AND (ended_at IS NULL OR ended_at >= ?)
         ORDER BY started_at ASC;
@@ -179,7 +187,8 @@ final class HistoryStore {
                 state: AgentActivityState(
                     rawValue: text(statement, column: 5)
                 ) ?? .unknown,
-                peakSessionCount: Int(sqlite3_column_int(statement, 6))
+                peakSessionCount: Int(sqlite3_column_int(statement, 6)),
+                lastObservedAt: optionalDouble(statement, column: 7).map(Date.init(timeIntervalSince1970:))
             )
         }
     }
@@ -249,6 +258,10 @@ final class HistoryStore {
         );
         """)
         try run("CREATE INDEX IF NOT EXISTS agent_intervals_started_at ON agent_intervals(started_at);")
+        let columns = try query("PRAGMA table_info(agent_intervals);") { text($0, column: 1) }
+        if !columns.contains("last_observed_at") {
+            try run("ALTER TABLE agent_intervals ADD COLUMN last_observed_at REAL;")
+        }
     }
 
     private func run(

@@ -3,8 +3,9 @@ import SQLite3
 
 /// Mirrors the Codex desktop catalog from its own local databases. This is a
 /// read-only presentation adapter: titles, previews, sections and a few local
-/// message excerpts stay in memory for the current Operator window only.
-/// Nothing here is written to Operator.sqlite or sent through CloudKit.
+/// message excerpts stay in memory. Nothing here is written to Operator.sqlite.
+/// CompanionOperatorProjection sends bounded excerpts only after the user
+/// enables private sharing and opens a chat on the companion.
 struct CodexThreadMirrorAdapter {
     let stateDatabaseURL: URL
     let historyDatabaseURL: URL

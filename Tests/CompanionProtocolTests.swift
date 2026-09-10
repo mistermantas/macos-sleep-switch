@@ -8,6 +8,9 @@ enum CompanionProtocolTests {
         testContextTransferHistoryFiltersByDevice()
         testSelectsFreshReplacementForStalePersistedMac()
         testDoesNotSwitchAStaleSelectionToAnotherMac()
+        testSelectionDoesNotRetargetByName()
+        testManualSessionAcknowledgementSurvivesDelayedStatus()
+        testMissingEnergyIsNotMeasuredZero()
         testWidgetRefreshPlan()
         expect(
             CompanionFollowUpNotePolicy.isAllowed(byteCount: 1),
@@ -392,10 +395,12 @@ enum CompanionProtocolTests {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let stale = selectionStatus(
             deviceID: "old-device",
+            machineFingerprint: "same-hardware",
             lastSeen: now.addingTimeInterval(-7 * 24 * 60 * 60)
         )
         let fresh = selectionStatus(
             deviceID: "replacement-device",
+            machineFingerprint: "same-hardware",
             lastSeen: now.addingTimeInterval(-2)
         )
 
@@ -406,8 +411,12 @@ enum CompanionProtocolTests {
         )
         expect(
             selected?.deviceID == fresh.deviceID,
-            "replaces a stale persisted Mac identity with its fresh same-name record"
+            "replaces a stale persisted Mac identity only with the same hardware"
         )
+        expect(CompanionMacSelection.canonicalDevices([stale, fresh]).map(\.deviceID) == [fresh.deviceID], "lists one current record for the same physical Mac")
+        expect(CompanionMachineFingerprint.stableDeviceID(for: "ABC-123") == CompanionMachineFingerprint.stableDeviceID(for: " abc-123 "), "Mac identity survives casing and reinstall changes")
+        let otherMac = selectionStatus(deviceID: "unrelated", machineFingerprint: "different-hardware", lastSeen: now.addingTimeInterval(5))
+        expect(CompanionMacSelection.preferred(from: [stale, fresh, otherMac], persistedDeviceID: stale.deviceID, now: now)?.deviceID == fresh.deviceID, "migrating an old identity never switches to a different fresher Mac")
     }
 
     private static func testDoesNotSwitchAStaleSelectionToAnotherMac() {
@@ -434,13 +443,26 @@ enum CompanionProtocolTests {
         )
     }
 
+    private static func testSelectionDoesNotRetargetByName() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let selected = selectionStatus(deviceID: "selected", lastSeen: now.addingTimeInterval(-600))
+        let other = selectionStatus(deviceID: "other", lastSeen: now)
+        expect(
+            CompanionMacSelection.preferred(from: [selected, other], persistedDeviceID: selected.deviceID, now: now)?.deviceID == selected.deviceID,
+            "selecting an offline Mac must show that Mac, even when another Mac has the same name"
+        )
+        expect(CompanionMacSelection.canonicalDevices([selected, other]).count == 2, "a display name is not proof of duplicate hardware")
+    }
+
     private static func selectionStatus(
         deviceID: String,
+        machineFingerprint: String? = nil,
         displayName: String = "Manto MBP",
         lastSeen: Date
     ) -> CompanionMacStatus {
         CompanionMacStatus(
             deviceID: deviceID,
+            machineFingerprint: machineFingerprint,
             displayName: displayName,
             build: "2.3.1 (18)",
             lastSeen: lastSeen,
@@ -462,6 +484,29 @@ enum CompanionProtocolTests {
             isCharging: true,
             capabilities: CompanionMacCapabilities(supportsCloudKit: true)
         )
+    }
+
+    private static func testManualSessionAcknowledgementSurvivesDelayedStatus() {
+        let now = Date()
+        let old = selectionStatus(deviceID: "mac", lastSeen: now.addingTimeInterval(-10))
+        let start = CompanionRemoteCommand(id: UUID(), targetDeviceID: old.deviceID, action: .startManualSession, parameters: ["durationSeconds": "1800"], requesterDeviceID: "phone", nonce: "start", createdAt: now, expiresAt: now.addingTimeInterval(90), policyVersion: 1)
+        let ack = CompanionRemoteResult(commandID: start.id, accepted: true, executed: true, completedAt: now, message: nil)
+        guard let running = CompanionStatusReconciliation.confirmedStatus(for: start, result: ack, previous: old) else { fatalError("Expected acknowledged manual state") }
+        expect(running.manualSession?.isActive == true, "Start immediately becomes Stop after the Mac confirms execution")
+        expect(running.manualSession?.endsAt == now.addingTimeInterval(1800), "preserves the confirmed manual duration")
+        expect(CompanionStatusReconciliation.merge([old], current: [running]).first?.manualSession?.isActive == true, "an older CloudKit response must not erase confirmed manual state")
+        let stop = CompanionRemoteCommand(id: UUID(), targetDeviceID: old.deviceID, action: .stopManualSession, parameters: [:], requesterDeviceID: "phone", nonce: "stop", createdAt: now, expiresAt: now.addingTimeInterval(90), policyVersion: 1)
+        let stopped = CompanionStatusReconciliation.confirmedStatus(for: stop, result: CompanionRemoteResult(commandID: stop.id, accepted: true, executed: true, completedAt: now.addingTimeInterval(1), message: nil), previous: running)
+        expect(stopped?.manualSession == nil, "Stop immediately becomes Start after acknowledgement")
+        expect(CompanionStatusReconciliation.confirmedStatus(for: start, result: CompanionRemoteResult(commandID: start.id, accepted: false, executed: false, completedAt: now, message: "Rejected"), previous: old) == nil, "rejected actions cannot change the controls")
+    }
+
+    private static func testMissingEnergyIsNotMeasuredZero() {
+        let missing = CompanionEnergyDay(dayStart: Date(), kilowattHours: 0, averageWatts: nil, peakWatts: nil, sampleCount: 20)
+        expect(missing.recordedKilowattHours == nil, "legacy zero totals with no valid readings stay unavailable")
+        expect(CompanionEnergyText.total([]) == "Unavailable", "missing history must not look like measured zero kWh")
+        expect(CompanionEnergyText.total([0]) == "0.0 Wh", "measured zero remains distinguishable from missing data")
+        expect(CompanionEnergyText.total([0.0005]) == "0.5 Wh", "small energy readings do not round down to zero kWh")
     }
 
     private static func testPreciseElapsedTimeText() {

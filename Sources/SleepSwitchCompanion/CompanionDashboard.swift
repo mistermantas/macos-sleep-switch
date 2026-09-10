@@ -36,6 +36,18 @@ struct CompanionDashboardRoot: View {
             NavigationStack {
                 CompanionMacDetailScreen(mac: mac)
             }
+        } else if ProcessInfo.processInfo.arguments.contains("--screenshot-availability"), let mac = selectedMac, let history = model.history(for: mac) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        MacSnapshotCard(mac: mac)
+                        CoolingControlCard(mac: mac, model: model)
+                        InsightsSummaryCard(mac: mac, history: history)
+                    }.padding(16)
+                }
+                .navigationTitle("Sleep Switch")
+                .background(Color(.systemGroupedBackground))
+            }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-controls"),
                   let mac = selectedMac {
             NavigationStack {
@@ -43,13 +55,9 @@ struct CompanionDashboardRoot: View {
             }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-operator"),
                   let mac = selectedMac,
-                  let summary = mac.operatorSummary {
+                  mac.operatorSummary != nil {
             NavigationStack {
-                ScrollView {
-                    OperatorSummaryCard(summary: summary, isStale: mac.isStale)
-                        .padding(16)
-                }
-                .navigationTitle("Operator")
+                CompanionOperatorPreview(deviceID: mac.deviceID, model: model)
             }
         } else if ProcessInfo.processInfo.arguments.contains("--screenshot-remote-work"),
                   let mac = selectedMac,
@@ -97,6 +105,18 @@ struct CompanionDashboardRoot: View {
             }
             .refreshable { await model.refreshAndWait() }
             .task { await model.refreshAndWait() }
+            .task {
+                #if DEBUG && targetEnvironment(simulator)
+                if ProcessInfo.processInfo.arguments.contains("--demo-start-command") {
+                    try? await Task.sleep(for: .seconds(2))
+                    if let mac = selectedMac { model.send(.startManualSession, to: mac) }
+                    if ProcessInfo.processInfo.arguments.contains("--demo-stop-command") {
+                        try? await Task.sleep(for: .seconds(2))
+                        if let mac = selectedMac { model.send(.stopManualSession, to: mac) }
+                    }
+                }
+                #endif
+            }
             .task(id: scenePhase) {
                 guard scenePhase == .active else { return }
                 model.reloadSharedContextDrafts()
@@ -207,7 +227,7 @@ struct CompanionDashboardRoot: View {
                     )
                 }
                 NavigationLink {
-                    CompanionMacDetailScreen(mac: mac)
+                    CompanionLiveMacView(deviceID: mac.deviceID, model: model) { CompanionMacDetailScreen(mac: $0) }
                 } label: {
                     MacSnapshotCard(mac: mac)
                 }
@@ -215,7 +235,7 @@ struct CompanionDashboardRoot: View {
                 ManualSessionCard(mac: mac, model: model)
                 if mac.capabilities.canSetSafetyPreferences == true, let safety = mac.safety {
                     NavigationLink {
-                        CompanionSafetyScreen(mac: mac, safety: safety, model: model)
+                        CompanionLiveMacView(deviceID: mac.deviceID, model: model) { CompanionSafetyScreen(mac: $0, safety: $0.safety ?? safety, model: model) }
                     } label: {
                         NavigationRow(
                             title: "Lid-closed safety",
@@ -236,7 +256,12 @@ struct CompanionDashboardRoot: View {
                     confirm: { pendingAction = $0 }
                 )
                 if let summary = mac.operatorSummary {
-                    OperatorSummaryCard(summary: summary, isStale: mac.isStale)
+                    NavigationLink {
+                        CompanionOperatorScreen(deviceID: mac.deviceID, model: model)
+                    } label: {
+                        OperatorSummaryCard(summary: summary, isStale: mac.isStale, snapshot: mac.operatorSnapshot)
+                    }
+                    .buttonStyle(.plain)
                 }
                 if let remoteWork = mac.remoteWork {
                     NavigationLink {
@@ -258,14 +283,14 @@ struct CompanionDashboardRoot: View {
                 }
                 if let history = model.history(for: mac) {
                     NavigationLink {
-                        CompanionInsightsScreen(mac: mac, history: history)
+                        CompanionLiveMacView(deviceID: mac.deviceID, model: model) { CompanionInsightsScreen(mac: $0, history: model.history(for: $0) ?? history) }
                     } label: {
                         InsightsSummaryCard(mac: mac, history: history)
                     }
                     .buttonStyle(.plain)
                 }
                 NavigationLink {
-                    CompanionRemoteControlsScreen(mac: mac, model: model)
+                    CompanionLiveMacView(deviceID: mac.deviceID, model: model) { CompanionRemoteControlsScreen(mac: $0, model: model) }
                 } label: {
                     NavigationRow(
                         title: "All Mac controls",
@@ -388,12 +413,10 @@ private struct DeviceAndRefreshHeader: View {
         HStack(spacing: 10) {
             if macs.count > 1 {
                 Menu {
-                    ForEach(macs) { mac in
-                        Button {
-                            selectedDeviceID = mac.deviceID
-                            selectMac(mac.deviceID)
-                        } label: {
-                            Label(mac.displayName, systemImage: mac.id == selectedMac.id ? "checkmark" : "laptopcomputer")
+                    ForEach(macs.filter { !$0.isStale }) { mac in deviceButton(mac) }
+                    if macs.contains(where: \.isStale) {
+                        Menu("Offline Macs") {
+                            ForEach(macs.filter(\.isStale)) { mac in deviceButton(mac) }
                         }
                     }
                 } label: {
@@ -424,6 +447,16 @@ private struct DeviceAndRefreshHeader: View {
 
         }
     }
+    private func deviceButton(_ mac: CompanionMacStatus) -> some View {
+        Button {
+            selectedDeviceID = mac.deviceID
+            selectMac(mac.deviceID)
+        } label: {
+            Label(mac.displayName, systemImage: mac.id == selectedMac.id ? "checkmark" : "laptopcomputer")
+            Text(mac.build + " · " + CompanionTimeText.elapsed(since: mac.lastSeen))
+        }
+    }
+
 }
 
 private struct MacSnapshotCard: View {
@@ -565,7 +598,7 @@ private struct MacSnapshotCard: View {
     }
 
     private var energyLabel: String {
-        mac.estimatedWatts == nil ? "No reading" : "\(mac.energySource.title) · \(mac.energyConfidence.title.lowercased())"
+        mac.estimatedWatts == nil ? "Power unavailable" : "\(mac.energySource.title) · \(mac.energyConfidence.title.lowercased())"
     }
 
     private var temperatureValue: String {
@@ -610,6 +643,8 @@ private struct SnapshotMetric: View {
 private struct OperatorSummaryCard: View {
     let summary: CompanionOperatorSummary
     let isStale: Bool
+    var snapshot: CompanionOperatorSnapshot? = nil
+    private var liveSessions: [CompanionOperatorSession] { snapshot?.sessions.filter { $0.state == .active } ?? [] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -617,35 +652,36 @@ private struct OperatorSummaryCard: View {
                 Label("Operator", systemImage: "circle.grid.2x2.fill")
                     .font(.headline)
                 Spacer()
-                Text(isStale ? "Last known" : "Live")
+                Text(isStale ? "Offline" : (snapshot == nil ? "Update Mac" : "Open"))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(isStale ? Color.secondary : Color.green)
+                    .foregroundStyle(isStale ? Color.secondary : Color.accentColor)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }
 
             HStack(spacing: 0) {
                 SnapshotMetric(
-                    value: "\(summary.activeSessionCount)",
-                    label: summary.activeSessionCount == 1 ? "Live session" : "Live sessions",
+                    value: snapshot == nil ? "—" : String(liveSessions.count),
+                    label: liveSessions.count == 1 ? "Live session" : "Live sessions",
                     symbol: "terminal"
                 )
                 Divider().frame(height: 42)
                 SnapshotMetric(
-                    value: operatorTokenText(summary.tokenDelta),
-                    label: "Token delta",
+                    value: snapshot == nil ? "—" : operatorTokenText(liveSessions.reduce(0) { $0 + $1.totalTokens }),
+                    label: "Live tokens",
                     symbol: "text.word.spacing"
                 )
                 Divider().frame(height: 42)
                 SnapshotMetric(
-                    value: operatorDurationText(summary.durationDeltaSeconds),
-                    label: "Duration delta",
+                    value: snapshot == nil ? "—" : operatorDurationText(liveSessions.reduce(0) { $0 + $1.durationSeconds }),
+                    label: "Live time",
                     symbol: "clock"
                 )
             }
 
-            if !summary.harnesses.isEmpty {
+            if let snapshot, !snapshot.sources.isEmpty {
                 VStack(alignment: .leading, spacing: 7) {
-                    ForEach(summary.harnesses) { harness in
-                        Label("\(harness.harnessName) · \(harness.liveSessionCount)", systemImage: "terminal")
+                    ForEach(snapshot.sources) { source in
+                        Label(source.name + " · " + (source.status == "Ready" ? String(liveSessions.filter { $0.harnessID == source.id }.count) : source.status), systemImage: "terminal")
                             .font(.caption.weight(.medium))
                             .padding(.horizontal, 9)
                             .padding(.vertical, 6)
@@ -669,13 +705,11 @@ private struct OperatorSummaryCard: View {
     }
 
     private func operatorTokenText(_ value: Int) -> String {
-        value >= 1_000 ? String(format: "%.1fk", Double(value) / 1_000) : "\(value)"
+        CompanionOperatorFormatting.tokens(value)
     }
 
     private func operatorDurationText(_ seconds: TimeInterval) -> String {
-        let rounded = max(0, Int(seconds))
-        if rounded >= 3_600 { return "\(rounded / 3_600)h \((rounded % 3_600) / 60)m" }
-        return "\(rounded / 60)m"
+        CompanionOperatorFormatting.duration(seconds)
     }
 
     private func operatorFinishTitle(_ rawValue: String) -> String {
@@ -1249,7 +1283,7 @@ private func stateColor(_ state: CompanionWorkState) -> Color {
     }
 }
 
-private struct CompanionMacDetailScreen: View {
+struct CompanionMacDetailScreen: View {
     let mac: CompanionMacStatus
 
     private var sensors: [CompanionTemperatureSensor] {
@@ -1268,7 +1302,8 @@ private struct CompanionMacDetailScreen: View {
     var body: some View {
         List {
             Section {
-                HStack(spacing: 0) {
+                if hottestTemperature != nil {
+                    HStack(spacing: 0) {
                     DetailMetric(
                         value: hottestTemperature.map(temperatureText) ?? "—",
                         label: "Hottest"
@@ -1282,10 +1317,13 @@ private struct CompanionMacDetailScreen: View {
                     DetailMetric(value: "\(sensors.count)", label: "Sensors")
                 }
                 .padding(.vertical, 6)
+                } else {
+                    LabeledContent("Temperature readings", value: "Unavailable")
+                }
 
                 LabeledContent("macOS thermal pressure", value: mac.thermalState.capitalized)
                 if let state = mac.cooling?.state {
-                    LabeledContent("Cooling", value: state)
+                    LabeledContent("Cooling", value: mac.capabilities.canSetCoolingProfile == true ? state : "Managed by macOS")
                 }
             } header: {
                 Label("Thermals", systemImage: "thermometer.medium")
@@ -1355,6 +1393,10 @@ private struct CompanionMacDetailScreen: View {
                 LabeledContent("Awake mode", value: awakeModeTitle)
                 LabeledContent("Uptime", value: uptimeText)
                 LabeledContent("Power", value: powerText)
+                if mac.estimatedWatts == nil {
+                    Label("macOS is not reporting power draw", systemImage: "bolt.slash")
+                        .foregroundStyle(.secondary)
+                }
                 LabeledContent("Network", value: networkText)
             }
         }
@@ -1412,7 +1454,7 @@ private struct DetailMetric: View {
     }
 }
 
-private struct ManualSessionCard: View {
+struct ManualSessionCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
 
@@ -1521,7 +1563,7 @@ private struct ManualSessionCard: View {
     }
 }
 
-private struct PrimaryRemoteControls: View {
+struct PrimaryRemoteControls: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
     let confirm: (CompanionRemoteAction) -> Void
@@ -1557,7 +1599,7 @@ private struct PrimaryRemoteControls: View {
     }
 }
 
-private struct AgentAutomationCard: View {
+struct AgentAutomationCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
     let confirm: (CompanionRemoteAction) -> Void
@@ -1630,7 +1672,7 @@ private struct AgentAutomationCard: View {
     }
 }
 
-private struct CoolingControlCard: View {
+struct CoolingControlCard: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
 
@@ -1640,12 +1682,13 @@ private struct CoolingControlCard: View {
                 Label("Cooling", systemImage: "fan")
                     .font(.headline)
                 Spacer()
-                Text(mac.cooling?.state ?? "Unavailable")
+                Text(canControlCooling ? (mac.cooling?.state ?? "Available") : "Managed by macOS")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
 
-            Picker("Cooling profile", selection: Binding(
+            if canControlCooling {
+                Picker("Cooling profile", selection: Binding(
                 get: { mac.cooling?.profile ?? "systemControl" },
                 set: { model.send(.setCoolingProfile, to: mac, parameters: ["profile": $0]) }
             )) {
@@ -1655,6 +1698,7 @@ private struct CoolingControlCard: View {
             }
             .pickerStyle(.segmented)
             .disabled(mac.capabilities.canSetCoolingProfile != true || mac.isStale || model.commandInFlight)
+            }
 
             if let cooling = mac.cooling {
                 HStack(spacing: 16) {
@@ -1671,16 +1715,32 @@ private struct CoolingControlCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            Text(mac.isStale
+            if mac.cooling?.temperatureCelsius != nil || !(mac.cooling?.fans.isEmpty ?? true) {
+                Text(mac.isStale
                 ? "Thermals last updated \(CompanionTimeText.elapsed(since: mac.lastSeen))"
                 : "Thermals updated \(CompanionTimeText.elapsed(since: mac.lastSeen))")
                 .font(.caption2)
                 .foregroundStyle(mac.isStale ? .orange : .secondary)
-            DisclosureGroup("What does Aggressive do?") {
+            }
+            if canControlCooling {
+                DisclosureGroup("What does Aggressive do?") {
                 Text("Aggressive gives the fans a brief high-response boost, then follows the Mac’s live temperature every three seconds with a smooth comfort curve. It eases down around the Mac’s chosen comfort target and climbs back to full demand as heat rises. It gives control back to macOS if readings are unreliable, thermal pressure becomes critical, or a verified maximum profile remains at 80°C or higher for 30 seconds.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
+                }
+            } else {
+                NavigationLink {
+                    List {
+                        Section("Fan control unavailable") {
+                            Text(mac.cooling?.message ?? "This Mac does not offer fan control to Sleep Switch.")
+                            Label("macOS manages cooling automatically", systemImage: "checkmark.shield")
+                        }
+                    }
+                    .navigationTitle("Cooling")
+                } label: {
+                    Label("Cooling availability", systemImage: "info.circle")
+                }
             }
         }
         .cardStyle()
@@ -1693,6 +1753,10 @@ private struct CoolingControlCard: View {
 
     private var availableProfiles: [String] {
         mac.cooling?.availableProfiles ?? ["systemControl"]
+    }
+
+    private var canControlCooling: Bool {
+        mac.capabilities.canSetCoolingProfile == true && availableProfiles.count > 1
     }
 
     private func profileTitle(_ profile: String) -> String {
@@ -1723,16 +1787,16 @@ private struct InsightsSummaryCard: View {
                 Divider().frame(height: 38)
                 SummaryValue(value: agentHours, label: "Agent hours")
                 Divider().frame(height: 38)
-                SummaryValue(value: mac.estimatedWatts.map { "\(Int($0.rounded())) W" } ?? "—", label: "Now")
+                SummaryValue(value: mac.estimatedWatts.map { "\(Int($0.rounded())) W" } ?? "Unavailable", label: "Power now")
             }
         }
         .cardStyle()
     }
 
     private var energyTotal: String {
+        guard history.historyEnabled else { return "Off" }
         let cutoff = Date().addingTimeInterval(-7 * 86_400)
-        let total = history.energyDays.filter { $0.dayStart >= cutoff }.reduce(0) { $0 + $1.kilowattHours }
-        return String(format: "%.2f kWh", total)
+        return CompanionEnergyText.total(history.energyDays.filter { $0.dayStart >= cutoff }.compactMap(\.recordedKilowattHours))
     }
 
     private var agentHours: String {
@@ -1926,8 +1990,8 @@ private struct EnergyInsightsChart: View {
 
             selectionInspector
 
-            if range == .day ? buckets.isEmpty : days.isEmpty {
-                ContentUnavailableView("Energy history is building", systemImage: "bolt")
+            if range == .day ? buckets.compactMap(\.kilowattHours).isEmpty : days.compactMap(\.recordedKilowattHours).isEmpty {
+                ContentUnavailableView(history.historyEnabled ? "No power readings" : "History is off", systemImage: "bolt.slash", description: Text(history.historyEnabled ? "macOS is not reporting power draw. Energy totals will appear when valid readings are available." : "Turn on Record history in Operator’s Automations section."))
                     .frame(minHeight: 220)
             } else {
                 Chart {
@@ -1957,7 +2021,8 @@ private struct EnergyInsightsChart: View {
                 .frame(height: 240)
             }
 
-            Label(
+            if range == .day ? !buckets.compactMap(\.kilowattHours).isEmpty : !days.compactMap(\.recordedKilowattHours).isEmpty {
+                Label(
                 range == .day
                     ? "Touch and drag for five-minute readings"
                     : "Touch and drag for daily totals",
@@ -1965,6 +2030,7 @@ private struct EnergyInsightsChart: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+            }
         }
         .cardStyle()
         .onAppear { selectLatest() }
@@ -1974,7 +2040,7 @@ private struct EnergyInsightsChart: View {
     @ChartContentBuilder
     private var energyChart: some ChartContent {
         if range == .day {
-            ForEach(buckets) { bucket in
+            ForEach(buckets.filter { $0.averageWatts != nil && $0.kilowattHours != nil }) { bucket in
                 BarMark(
                     x: .value("Time", bucket.bucketStart),
                     y: .value("Average watts", bucket.averageWatts ?? 0)
@@ -1987,7 +2053,7 @@ private struct EnergyInsightsChart: View {
                 .cornerRadius(2)
             }
         } else {
-            ForEach(dayPoints) { point in
+            ForEach(dayPoints.filter { $0.day?.recordedKilowattHours != nil }) { point in
                 BarMark(
                     x: .value("Day", point.date),
                     y: .value("Energy", point.day?.kilowattHours ?? 0)
@@ -2064,7 +2130,7 @@ private struct EnergyInsightsChart: View {
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 0) {
-                    SummaryValue(value: point.day.map { String(format: "%.3f kWh", $0.kilowattHours) } ?? "—", label: "Energy")
+                    SummaryValue(value: point.day?.recordedKilowattHours.map { CompanionEnergyText.total([$0]) } ?? "Unavailable", label: "Energy")
                     Divider().frame(height: 34)
                     SummaryValue(value: point.day.flatMap(\.averageWatts).map(wattsText) ?? "—", label: "Average")
                     Divider().frame(height: 34)
@@ -2077,10 +2143,9 @@ private struct EnergyInsightsChart: View {
     }
 
     private var totalText: String {
-        let value = range == .day
-            ? buckets.compactMap(\.kilowattHours).reduce(0, +)
-            : days.reduce(0) { $0 + $1.kilowattHours }
-        return String(format: "%.2f kWh", value)
+        CompanionEnergyText.total(range == .day
+            ? buckets.compactMap(\.kilowattHours)
+            : days.compactMap(\.recordedKilowattHours))
     }
     private var averageText: String {
         let values = range == .day ? buckets.compactMap(\.averageWatts) : days.compactMap(\.averageWatts)
@@ -2338,7 +2403,7 @@ private struct AgentDayPoint: Identifiable {
     var id: Date { date }
 }
 
-private struct CompanionRemoteControlsScreen: View {
+struct CompanionRemoteControlsScreen: View {
     let mac: CompanionMacStatus
     @ObservedObject var model: CompanionAppModel
     @State private var pendingAction: CompanionRemoteAction?
@@ -2452,7 +2517,7 @@ private struct CompanionRemoteControlsScreen: View {
     }
 }
 
-private struct CompanionSafetyScreen: View {
+struct CompanionSafetyScreen: View {
     let mac: CompanionMacStatus
     let safety: CompanionSafetySettings
     @ObservedObject var model: CompanionAppModel

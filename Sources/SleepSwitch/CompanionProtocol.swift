@@ -49,6 +49,7 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
     case setCoolingProfile
     case setSafetyPreferences
     case panicStop
+    case operatorRequest
 
     var title: String {
         switch self {
@@ -84,6 +85,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "Update Safety Settings"
         case .panicStop:
             return "Stop Sleep Switch"
+        case .operatorRequest:
+            return "Update Operator"
         }
     }
 
@@ -98,7 +101,7 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return true
         case .wakeDisplay, .wakeMac, .sleepDisplayUntilAgentsFinish, .setKeepAwake,
              .startManualSession, .stopManualSession, .setCoolingProfile,
-             .setSafetyPreferences:
+             .setSafetyPreferences, .operatorRequest:
             return false
         }
     }
@@ -137,6 +140,8 @@ enum CompanionRemoteAction: String, Codable, CaseIterable {
             return "shield.checkered"
         case .panicStop:
             return "stop.circle"
+        case .operatorRequest:
+            return "circle.grid.2x2"
         }
     }
 
@@ -210,6 +215,7 @@ struct CompanionMacCapabilities: Codable, Equatable {
     var canSetSafetyPreferences: Bool? = nil
     /// Optional so companions can safely decode status from older Mac builds.
     var canReceiveContextTransfers: Bool? = nil
+    var canUseOperator: Bool? = nil
 
     var availableActions: [CompanionRemoteAction] {
         CompanionRemoteAction.allCases.filter { action in
@@ -244,6 +250,8 @@ struct CompanionMacCapabilities: Codable, Equatable {
                 canSetSafetyPreferences == true
             case .panicStop:
                 true
+            case .operatorRequest:
+                false // Operator presents its own named operations.
             }
         }
     }
@@ -651,12 +659,13 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
     var network: CompanionNetworkStatus? = nil
     let capabilities: CompanionMacCapabilities
     let agents: [CompanionAgentStatus]?
-    let manualSession: CompanionManualSessionStatus?
+    var manualSession: CompanionManualSessionStatus?
     let cooling: CompanionCoolingStatus?
     var safety: CompanionSafetySettings? = nil
     var operatorSummary: CompanionOperatorSummary? = nil
     /// Only present when Remote Work sharing is enabled on the Mac.
     var remoteWork: CompanionRemoteWorkSummary? = nil
+    var operatorSnapshot: CompanionOperatorSnapshot? = nil
 
     init(
         deviceID: String,
@@ -688,7 +697,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         cooling: CompanionCoolingStatus? = nil,
         safety: CompanionSafetySettings? = nil,
         operatorSummary: CompanionOperatorSummary? = nil,
-        remoteWork: CompanionRemoteWorkSummary? = nil
+        remoteWork: CompanionRemoteWorkSummary? = nil,
+        operatorSnapshot: CompanionOperatorSnapshot? = nil
     ) {
         self.deviceID = deviceID
         self.machineFingerprint = machineFingerprint
@@ -720,6 +730,7 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
         self.safety = safety
         self.operatorSummary = operatorSummary
         self.remoteWork = remoteWork
+        self.operatorSnapshot = operatorSnapshot
     }
 
     var id: String { deviceID }
@@ -787,7 +798,8 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             cooling: cooling,
             safety: safety,
             operatorSummary: operatorSummary,
-            remoteWork: remoteWork
+            remoteWork: remoteWork,
+            operatorSnapshot: operatorSnapshot
         )
     }
 
@@ -828,28 +840,40 @@ struct CompanionMacStatus: Codable, Equatable, Identifiable {
             cooling: cooling,
             safety: safety,
             operatorSummary: operatorSummary,
-            remoteWork: remoteWork
+            remoteWork: remoteWork,
+            operatorSnapshot: operatorSnapshot
         )
     }
 }
 
 enum CompanionMacSelection {
+    private static func fingerprint(_ mac: CompanionMacStatus) -> String? {
+        mac.machineFingerprint.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    static func canonicalDevices(_ macs: [CompanionMacStatus]) -> [CompanionMacStatus] {
+        let groups = Dictionary(grouping: macs) { mac in
+            fingerprint(mac)
+                .map { "hardware:" + $0 } ?? "device:" + mac.deviceID
+        }
+        return groups.values.compactMap { group in
+            group.max { $0.lastSeen == $1.lastSeen ? $0.deviceID < $1.deviceID : $0.lastSeen < $1.lastSeen }
+        }.sorted {
+            if $0.displayName == $1.displayName { return $0.lastSeen > $1.lastSeen }
+            return $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
+        }
+    }
+
     static func preferred(
         from macs: [CompanionMacStatus],
         persistedDeviceID: String,
         now: Date = Date()
     ) -> CompanionMacStatus? {
         let persisted = macs.first { $0.deviceID == persistedDeviceID }
-        if let persisted, !persisted.isStale(at: now) {
-            return persisted
-        }
-
         if let persisted {
             if let replacement = macs
                 .filter({
-                    $0.deviceID != persisted.deviceID
-                        && $0.displayName == persisted.displayName
-                        && !$0.isStale(at: now)
+                    fingerprint(persisted) != nil && fingerprint($0) == fingerprint(persisted)
                 })
                 .max(by: { $0.lastSeen < $1.lastSeen }) {
                 return replacement
@@ -874,6 +898,9 @@ struct CompanionRemoteCommand: Codable, Equatable, Identifiable {
     let createdAt: Date
     let expiresAt: Date
     let policyVersion: Int
+    /// Completion travels in the existing payload field, preserving the
+    /// production CloudKit schema and compatibility with older companions.
+    var result: CompanionRemoteResult? = nil
 
     var isExpired: Bool { Date() >= expiresAt }
 }
@@ -884,6 +911,42 @@ struct CompanionRemoteResult: Codable, Equatable {
     let executed: Bool
     let completedAt: Date
     let message: String?
+    /// State captured after execution, delivered in the same record as the
+    /// acknowledgement so a delayed MacStatus query cannot undo completion.
+    var status: CompanionMacStatus? = nil
+    var operatorContent: CompanionOperatorContent? = nil
+}
+
+enum CompanionStatusReconciliation {
+    static func merge(_ incoming: [CompanionMacStatus], current: [CompanionMacStatus]) -> [CompanionMacStatus] {
+        CompanionMacSelection.canonicalDevices(incoming.map { next in
+            guard let previous = current.first(where: { $0.deviceID == next.deviceID }),
+                  previous.lastSeen > next.lastSeen else { return next }
+            return previous
+        })
+    }
+
+    static func confirmedStatus(for command: CompanionRemoteCommand, result: CompanionRemoteResult, previous: CompanionMacStatus) -> CompanionMacStatus? {
+        guard result.commandID == command.id, result.accepted, result.executed,
+              previous.deviceID == command.targetDeviceID else { return nil }
+        if let status = result.status, status.deviceID == command.targetDeviceID { return status }
+        // Older Macs acknowledge execution without returning a snapshot. Apply
+        // only deterministic state changes, after that acknowledgement.
+        var updated = previous.refreshingLastSeen(at: result.completedAt)
+        switch command.action {
+        case .startManualSession:
+            updated.manualSession = CompanionManualSessionStatus(
+                startedAt: result.completedAt,
+                endsAt: command.parameters["durationSeconds"].flatMap(Double.init).map { result.completedAt.addingTimeInterval($0) }
+            )
+        case .stopManualSession:
+            updated.manualSession = nil
+        case .setKeepAwake:
+            updated = updated.applyingKeepAwake(parameters: command.parameters)
+        default: return nil
+        }
+        return updated
+    }
 }
 
 enum CompanionCommandValidationError: Error, Equatable {
@@ -942,6 +1005,8 @@ struct CompanionCommandPolicy {
             capabilities.canShutdownMacWhenAgentsFinish == true
         case .panicStop:
             true
+        case .operatorRequest:
+            capabilities.canUseOperator == true
         }
         return supported ? .success(()) : .failure(.unsupportedAction)
     }

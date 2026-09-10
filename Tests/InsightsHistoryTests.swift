@@ -8,6 +8,23 @@ enum InsightsHistoryTests {
         testStorePruning()
         testHistoryOptOut()
         testOvernightWindow()
+        testRestartDoesNotAccumulateUnobservedAgentTime()
+    }
+
+    @MainActor
+    private static func testRestartDoesNotAccumulateUnobservedAgentTime() {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("history-restart-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date()
+        do {
+            let store = try HistoryStore(databaseURL: root.appendingPathComponent("history.sqlite"))
+            try store.saveAgentInterval(AgentActivityInterval(id: UUID(), agentID: "codex", agentName: "Codex", startedAt: now.addingTimeInterval(-2 * 86_400), endedAt: nil, state: .running, peakSessionCount: 1))
+            let recorder = InsightsRecorder(historyStore: store)
+            let recovered = recorder.snapshot(for: .month, now: now).activities
+            expect(recovered.count == 1, "restart recovery preserves old activity records")
+            expect(recovered.first?.state == .unknown, "an unfinished interval from a previous app run is not still running")
+            expect(recovered.first?.duration == 0, "legacy history with no last-observed time must not invent days of activity")
+        } catch { fatalError("History restart fixture failed: \(error)") }
     }
 
     private static func testBucketAggregation() {

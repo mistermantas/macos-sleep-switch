@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "2DA19D727C5BBDF5145BAF6E"
-               BuildableName = "SleepSwitchCompanion.app"
+               BuildableName = "Sleep Switch.app"
                BlueprintName = "SleepSwitchCompanion"
                ReferencedContainer = "container:SleepSwitch.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2DA19D727C5BBDF5145BAF6E"
-            BuildableName = "SleepSwitchCompanion.app"
+            BuildableName = "Sleep Switch.app"
             BlueprintName = "SleepSwitchCompanion"
             ReferencedContainer = "container:SleepSwitch.xcodeproj">
          </BuildableReference>
@@ -56,7 +56,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2DA19D727C5BBDF5145BAF6E"
-            BuildableName = "SleepSwitchCompanion.app"
+            BuildableName = "Sleep Switch.app"
             BlueprintName = "SleepSwitchCompanion"
             ReferencedContainer = "container:SleepSwitch.xcodeproj">
          </BuildableReference>
@@ -75,7 +75,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2DA19D727C5BBDF5145BAF6E"
-            BuildableName = "SleepSwitchCompanion.app"
+            BuildableName = "Sleep Switch.app"
             BlueprintName = "SleepSwitchCompanion"
             ReferencedContainer = "container:SleepSwitch.xcodeproj">
          </BuildableReference>

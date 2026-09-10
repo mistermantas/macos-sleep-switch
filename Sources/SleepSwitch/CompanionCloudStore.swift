@@ -499,7 +499,13 @@ final class CompanionCloudStore: CompanionCloudStoring {
             accepted: accepted,
             executed: executed,
             completedAt: completedAt,
-            message: message
+            message: message,
+            status: (record["payload"] as? Data).flatMap {
+                try? CompanionJSON.decoder.decode(CompanionRemoteCommand.self, from: $0).result?.status
+            },
+            operatorContent: (record["payload"] as? Data).flatMap {
+                try? CompanionJSON.decoder.decode(CompanionRemoteCommand.self, from: $0).result?.operatorContent
+            }
         )
     }
 
@@ -591,6 +597,10 @@ final class CompanionCloudStore: CompanionCloudStoring {
         result: CompanionRemoteResult
     ) async throws {
         let record = try record(for: command)
+        if var completedCommand = command.command {
+            completedCommand.result = result
+            record["payload"] = try CompanionJSON.encoder.encode(completedCommand) as CKRecordValue
+        }
         record["state"] = (result.executed
             ? Self.commandStateExecuted
             : Self.commandStateRejected) as CKRecordValue

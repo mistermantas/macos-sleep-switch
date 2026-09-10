@@ -1977,20 +1977,25 @@ private struct EnergyInsightsChart: View {
         guard range != .day, let selectedDate else { return nil }
         return dayPoints.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
     }
+    private var hasReadings: Bool {
+        range == .day ? !buckets.compactMap(\.kilowattHours).isEmpty : !days.compactMap(\.recordedKilowattHours).isEmpty
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 0) {
-                SummaryValue(value: totalText, label: "Energy")
-                Divider().frame(height: 38)
-                SummaryValue(value: averageText, label: "Average draw")
-                Divider().frame(height: 38)
-                SummaryValue(value: peakText, label: "Peak draw")
+            if hasReadings {
+                HStack(spacing: 0) {
+                    SummaryValue(value: totalText, label: "Energy")
+                    Divider().frame(height: 38)
+                    SummaryValue(value: averageText, label: "Average draw")
+                    Divider().frame(height: 38)
+                    SummaryValue(value: peakText, label: "Peak draw")
+                }
+
+                selectionInspector
             }
 
-            selectionInspector
-
-            if range == .day ? buckets.compactMap(\.kilowattHours).isEmpty : days.compactMap(\.recordedKilowattHours).isEmpty {
+            if !hasReadings {
                 ContentUnavailableView(history.historyEnabled ? "No power readings" : "History is off", systemImage: "bolt.slash", description: Text(history.historyEnabled ? "macOS is not reporting power draw. Energy totals will appear when valid readings are available." : "Turn on Record history in Operator’s Automations section."))
                     .frame(minHeight: 220)
             } else {
@@ -2021,7 +2026,7 @@ private struct EnergyInsightsChart: View {
                 .frame(height: 240)
             }
 
-            if range == .day ? !buckets.compactMap(\.kilowattHours).isEmpty : !days.compactMap(\.recordedKilowattHours).isEmpty {
+            if hasReadings {
                 Label(
                 range == .day
                     ? "Touch and drag for five-minute readings"

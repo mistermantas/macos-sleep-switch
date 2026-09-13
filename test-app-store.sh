@@ -39,13 +39,14 @@ test -x "$executable"
 
 executable_strings="$(strings -a "$executable")"
 if grep -Eq \
-  '/bin/ps|/usr/bin/pmset|pmset disablesleep|displaysleepnow|AppleSMC|fanhelper|FNum|F0Tg|Ftst|Cooling helper|Cooling Diagnostics' \
+  '/bin/ps|/usr/bin/pmset|pmset disablesleep|displaysleepnow|AppleSMC|fanhelper|powerhelper|FNum|F0Tg|Ftst|Cooling helper|Cooling Diagnostics' \
   <<<"$executable_strings"; then
   echo "App Store build contains a sandbox-incompatible command."
   exit 1
 fi
 
 test ! -e "$app_dir/Contents/Resources/SleepSwitchFanHelper"
+test ! -e "$app_dir/Contents/Resources/SleepSwitchPowerHelper"
 test ! -d "$app_dir/Contents/Library/LaunchDaemons"
 
 test "$(plutil -extract CFBundleIdentifier raw "$app_dir/Contents/Info.plist")" = \

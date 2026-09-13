@@ -6,6 +6,7 @@ build_dir="${SLEEP_SWITCH_DIRECT_TEST_BUILD_DIR:-$script_dir/build/direct-test}"
 app_dir="${SLEEP_SWITCH_DIRECT_APP:-$build_dir/Sleep Switch.app}"
 main_executable="$app_dir/Contents/MacOS/SleepSwitch"
 helper_executable="$app_dir/Contents/Resources/SleepSwitchFanHelper"
+power_executable="$app_dir/Contents/Resources/SleepSwitchPowerHelper"
 daemon_plist="$app_dir/Contents/Library/LaunchDaemons/lt.mantas.sleepswitch.fanhelper.plist"
 
 if [[ ! -x "$main_executable" || ! -x "$helper_executable" ]]; then
@@ -14,6 +15,16 @@ fi
 
 test -x "$main_executable"
 test -x "$helper_executable"
+test -x "$power_executable"
+power_plist="$app_dir/Contents/Library/LaunchDaemons/lt.mantas.sleepswitch.powerhelper.plist"
+test "$(plutil -extract BundleProgram raw "$power_plist")" = "Contents/Resources/SleepSwitchPowerHelper"
+test "$(plutil -extract MachServices.lt\\.mantas\\.sleepswitch\\.powerhelper raw "$power_plist")" = "true"
+power_signature="$(codesign -dvvv "$power_executable" 2>&1)"
+grep -q '^Identifier=lt.mantas.sleepswitch.powerhelper$' <<<"$power_signature"
+grep -q 'flags=.*runtime' <<<"$power_signature"
+power_architectures="$(lipo -archs "$power_executable")"
+grep -qw arm64 <<<"$power_architectures"
+grep -qw x86_64 <<<"$power_architectures"
 test -f "$daemon_plist"
 test -f "$app_dir/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
@@ -42,6 +53,15 @@ grep -qw x86_64 <<<"$helper_architectures"
 
 main_strings="$(strings -a "$main_executable")"
 helper_strings="$(strings -a "$helper_executable")"
+power_strings="$(strings -a "$power_executable")"
+if grep -Fq 'with administrator privileges' <<<"$main_strings"; then
+  echo "Session transitions must not execute administrator scripts."
+  exit 1
+fi
+if grep -Eq 'AppleSMC|FNum|F0Tg|Ftst|osascript|/bin/sh' <<<"$power_strings"; then
+  echo "The power helper must not contain fan controls or a shell executor."
+  exit 1
+fi
 
 if ! grep -q 'Sleep Switch Cooling Diagnostics' <<<"$main_strings"; then
   echo "The direct app is missing its anonymized cooling diagnostic export."
@@ -74,6 +94,8 @@ if [[ "${SLEEP_SWITCH_REQUIRE_DISTRIBUTION_SIGNATURE:-0}" == "1" ]]; then
   helper_team="$(sed -n 's/^TeamIdentifier=//p' <<<"$helper_signature")"
   test "$main_team" = "C43F5MKJF2"
   test "$helper_team" = "C43F5MKJF2"
+  test "$(sed -n 's/^TeamIdentifier=//p' <<<"$power_signature")" = "C43F5MKJF2"
+  grep -q '^Authority=Developer ID Application:' <<<"$power_signature"
   ! grep -q 'Signature=adhoc' <<<"$main_signature"
   ! grep -q 'Signature=adhoc' <<<"$helper_signature"
   grep -q '^Authority=Developer ID Application:' <<<"$main_signature"

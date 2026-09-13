@@ -89,6 +89,13 @@ xcrun swiftc \
   "$script_dir/Sources/SleepSwitch/CoolingCoordinator.swift" \
   "$script_dir/Sources/SleepSwitch/DisplayPowerController.swift" \
   "$script_dir/Sources/SleepSwitch/PowerAssertionController.swift" \
+  "$script_dir/Sources/SleepSwitch/PowerHelperClient.swift" \
+  "$script_dir/Sources/SleepSwitchPowerProtocol/PowerHelperProtocol.swift" \
+  "$script_dir/Sources/SleepSwitchPowerHelper/PowerLeaseManager.swift" \
+  "$script_dir/Sources/SleepSwitchPowerHelper/SystemSleepBackend.swift" \
+  "$script_dir/Sources/SleepSwitchPowerHelper/PowerClientValidator.swift" \
+  "$script_dir/Sources/SleepSwitchPowerHelper/PowerHelperService.swift" \
+  "$script_dir/Tests/PowerHelperTests.swift" \
   "$script_dir/Sources/SleepSwitch/SleepSwitchPreferences.swift" \
   "$script_dir/Sources/SleepSwitch/StatusBarAppearance.swift" \
   "$script_dir/Sources/SleepSwitch/ProcessInfoThermalMonitor.swift" \

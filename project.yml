@@ -18,6 +18,7 @@ targets:
     sources:
       - path: Sources/SleepSwitch
       - path: Sources/Shared/CompanionLiveActivityModels.swift
+      - path: Sources/SleepSwitchPowerProtocol
       - path: Sources/SleepSwitchFanProtocol
       - path: AppStore/Assets.xcassets
         buildPhase: resources
@@ -30,7 +31,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: C43F5MKJF2
         COMBINE_HIDPI_IMAGES: YES
-        CURRENT_PROJECT_VERSION: 39
+        CURRENT_PROJECT_VERSION: 40
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: NO
@@ -80,7 +81,7 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
-        CURRENT_PROJECT_VERSION: 39
+        CURRENT_PROJECT_VERSION: 40
         CODE_SIGN_ENTITLEMENTS: Companion/SleepSwitchCompanion.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
         GENERATE_INFOPLIST_FILE: NO
@@ -113,7 +114,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionShare/SleepSwitchCompanionShare.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 39
+        CURRENT_PROJECT_VERSION: 40
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionShare/Info.plist
         MARKETING_VERSION: 2.4.2
@@ -138,7 +139,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: CompanionWidgets/SleepSwitchCompanionWidgets.entitlements
         DEVELOPMENT_TEAM: C43F5MKJF2
-        CURRENT_PROJECT_VERSION: 39
+        CURRENT_PROJECT_VERSION: 40
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: CompanionWidgets/Info.plist
         MARKETING_VERSION: 2.4.2

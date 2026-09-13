@@ -37,7 +37,7 @@ enum KeepAwakeMode: String, CaseIterable {
         case .preventSleep:
             return "Keeps the Mac and display awake during active sessions. Closing the lid still sleeps normally."
         case .lidClosed:
-            return "Prevents sleep even after the lid closes. Administrator approval is required when this mode becomes active."
+            return "Prevents sleep even after the lid closes. Administrator approval is needed once to set up the lid-closed helper."
         }
     }
 
@@ -128,544 +128,145 @@ final class PowerAssertionController {
 enum LidClosedSleepError: Error, LocalizedError {
     case unavailable
     case authorizationCancelled
-    case commandLaunch(Error)
-    case commandFailed(Int32, String)
-    case stateUnavailable
-    case stateChangeTimedOut(Bool)
-    case markerCreationFailed
-    case restorationInProgress
-
-    var errorDescription: String? {
-        switch self {
-        case .unavailable:
-            return "Lid-closed mode is not available in this version of Sleep Switch."
-        case .authorizationCancelled:
-            return "Lid-closed mode needs administrator approval."
-        case .commandLaunch(let error):
-            return "Sleep Switch could not open the administrator approval prompt. \(error.localizedDescription)"
-        case .commandFailed:
-            return "Sleep Switch couldn’t enable lid-closed mode."
-        case .stateUnavailable:
-            return "Sleep Switch could not read the current macOS sleep state."
-        case .stateChangeTimedOut(let disabled):
-            let target = disabled ? "disable" : "restore"
-            return "macOS did not \(target) sleep in time."
-        case .markerCreationFailed:
-            return "Sleep Switch could not prepare lid-closed mode."
-        case .restorationInProgress:
-            return "macOS is still restoring normal sleep."
-        }
-    }
-
-    var recoverySuggestion: String? {
-        switch self {
-        case .authorizationCancelled:
-            return "Sleep Switch kept your previous awake mode."
-        case .commandFailed:
-            return "Normal sleep remains enabled. Try again, or quit and reopen Sleep Switch if this keeps happening."
-        case .stateChangeTimedOut(let disabled):
-#if APP_STORE
-            _ = disabled
-            return nil
-#else
-            if disabled {
-                return "Sleep Switch stopped the attempt and asked macOS to restore normal sleep."
-            }
-            return "Run “sudo pmset disablesleep 0” in Terminal to restore normal sleep."
-#endif
-        case .restorationInProgress:
-            return "Wait a moment before enabling lid-closed mode again."
-        case .unavailable, .commandLaunch, .stateUnavailable, .markerCreationFailed:
-            return nil
-        }
-    }
+    var errorDescription: String? { "Lid-closed mode is not available in this version of Sleep Switch." }
 }
 
 #if APP_STORE
 final class LidClosedSleepController {
     var isActive: Bool { false }
     var isRestoring: Bool { false }
-    var diagnosticReport: String {
-        "Lid-closed mode is unavailable in the App Store build."
-    }
-    var onRestorationFailure: ((Error) -> Void)?
-    var onRestorationFinished: (() -> Void)?
-
-    func start() throws {
-        throw LidClosedSleepError.unavailable
-    }
-
+    var diagnosticReport: String { "Lid-closed mode is unavailable in the App Store build." }
+    func start() throws { throw LidClosedSleepError.unavailable }
     func stop(waitForRestoration: Bool = true) throws {}
 }
 #else
+/// UI state belongs to the main queue; XPC requests and heartbeats share one
+/// worker queue. A stop queued during start always releases the returned lease.
 final class LidClosedSleepController {
-    static let pmsetPath = "/usr/bin/pmset"
-    static let osascriptPath = "/usr/bin/osascript"
-    static let heartbeatIntervalSeconds: TimeInterval = 2
-    static let heartbeatStaleSeconds = 15
-    static let watcherLabelPrefix =
-        "lt.mantas.sleepswitch.lidwatcher"
-
     private(set) var isActive = false
-    private(set) var ownsSystemSetting = false
+    private(set) var isStarting = false
     private(set) var isRestoring = false
-    private(set) var lastDiagnostic = "Lid-closed mode has not changed in this app session."
+    private(set) var issue: String?
     var onRestorationFailure: ((Error) -> Void)?
     var onRestorationFinished: (() -> Void)?
+    var onStateChanged: (() -> Void)?
+    private let client: PowerHelperConnecting
+    private let worker = DispatchQueue(label: "lt.mantas.sleepswitch.power-client")
+    private var generation = UUID()
+    private var retryAfter = Date.distantPast
+    // Accessed only on worker.
+    private var token: String?
+    private var timer: DispatchSourceTimer?
 
-    private let markerDirectory: URL
-    private let readSleepDisabled: () throws -> Bool
-    private let waitForSleepDisabled: (Bool) -> Bool
-    private let runAdministratorCommand: (String) throws -> Void
-    private var markerURL: URL?
-    private var watcherLabel: String?
-    private var watcherLogURL: URL?
-    private var restorationFailed = false
-    private var restorationAttemptID: UUID?
-    private let heartbeatQueue = DispatchQueue(
-        label: "lt.mantas.sleepswitch.lid-heartbeat",
-        qos: .utility
-    )
-    private let restorationQueue = DispatchQueue(
-        label: "lt.mantas.sleepswitch.lid-restoration",
-        qos: .userInitiated
-    )
-    private var heartbeatTimer: DispatchSourceTimer?
+    init(client: PowerHelperConnecting = PowerHelperClient()) { self.client = client }
+    var setupMessage: String? { client.isReady ? nil : client.setupMessage }
+    var diagnosticReport: String {
+        issue ?? setupMessage ?? (isActive ? "Lid-closed helper session active." : "Normal sleep restored.")
+    }
 
-    init(
-        markerDirectory: URL = URL(
-            fileURLWithPath: "/private/tmp",
-            isDirectory: true
-        ),
-        readSleepDisabled: @escaping () throws -> Bool = {
-            try LidClosedSleepController.readSystemSleepDisabled()
-        },
-        waitForSleepDisabled: @escaping (Bool) -> Bool = {
-            LidClosedSleepController.waitForSystemSleepDisabled($0)
-        },
-        runAdministratorCommand: @escaping (String) throws -> Void = {
-            try LidClosedSleepController.runWithAdministratorPrivileges($0)
-        }
-    ) {
-        self.markerDirectory = markerDirectory
-        self.readSleepDisabled = readSleepDisabled
-        self.waitForSleepDisabled = waitForSleepDisabled
-        self.runAdministratorCommand = runAdministratorCommand
+    func retry() {
+        retryAfter = .distantPast
+        issue = nil
     }
 
     func start() throws {
-        guard !isActive else { return }
-        guard !isRestoring, !restorationFailed else {
-            throw LidClosedSleepError.restorationInProgress
-        }
-
-        if try readSleepDisabled() {
-            isActive = true
-            ownsSystemSetting = false
+        guard !isActive, !isStarting, !isRestoring else { return }
+        guard client.isReady else {
+            issue = client.setupMessage
             return
         }
-
-        let markerURL = markerDirectory
-            .appendingPathComponent("lt.mantas.sleepswitch-lid-\(UUID().uuidString)")
-        guard FileManager.default.createFile(
-            atPath: markerURL.path,
-            contents: Data(),
-            attributes: [.posixPermissions: 0o600]
-        ) else {
-            throw LidClosedSleepError.markerCreationFailed
+        guard Date() >= retryAfter else { return }
+        issue = nil
+        isStarting = true
+        let attempt = UUID()
+        generation = attempt
+        worker.async { [weak self] in
+            guard let self else { return }
+            do {
+                self.token = try self.client.begin()
+                self.startHeartbeat(attempt: attempt)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.generation == attempt else { return }
+                    self.isStarting = false
+                    self.isActive = true
+                    self.issue = nil
+                    self.onStateChanged?()
+                }
+            } catch { self.reportFailure(error, attempt: attempt) }
         }
-
-        let watcherLabel = Self.makeWatcherLabel()
-        let watcherLogURL = markerDirectory
-            .appendingPathComponent("\(watcherLabel).log")
-        _ = FileManager.default.createFile(
-            atPath: watcherLogURL.path,
-            contents: Data(),
-            attributes: [.posixPermissions: 0o600]
-        )
-        self.markerURL = markerURL
-        self.watcherLabel = watcherLabel
-        self.watcherLogURL = watcherLogURL
-        lastDiagnostic = "Preparing the privileged lid-closed watcher."
-        startHeartbeat(for: markerURL)
-
-        do {
-            try runAdministratorCommand(
-                Self.enableCommand(
-                    markerURL: markerURL,
-                    watcherLabel: watcherLabel,
-                    watcherLogURL: watcherLogURL
-                )
-            )
-            guard waitForSleepDisabled(true) else {
-                throw LidClosedSleepError.stateChangeTimedOut(true)
-            }
-            lastDiagnostic = "Lid-closed mode enabled and verified.\n\(watcherLogSummary())"
-        } catch {
-            lastDiagnostic = "Lid-closed enable failed: \(diagnosticDescription(for: error)).\n\(watcherLogSummary())"
-            try? FileManager.default.removeItem(at: markerURL)
-            clearState()
-            _ = waitForSleepDisabled(false)
-            throw error
-        }
-
-        ownsSystemSetting = true
-        isActive = true
     }
 
     func stop(waitForRestoration: Bool = true) throws {
-        guard isActive else {
-            guard isRestoring || restorationFailed else { return }
-            if waitForRestoration {
-                try restoreSystemSleepNow(watcherLabel: watcherLabel)
-            } else if !isRestoring {
-                verifyRestorationWithoutBlocking(watcherLabel: watcherLabel)
-            }
-            return
-        }
-
-        guard ownsSystemSetting, let markerURL else {
-            clearState()
-            return
-        }
-        let watcherLabel = self.watcherLabel
-
-        if FileManager.default.fileExists(atPath: markerURL.path) {
-            try FileManager.default.removeItem(at: markerURL)
-        }
-        stopHeartbeat()
-
-        self.markerURL = nil
-        ownsSystemSetting = false
+        guard isActive || isStarting || isRestoring else { return }
+        let attempt = UUID()
+        generation = attempt
         isActive = false
-
+        isStarting = false
+        isRestoring = true
+        let restore = { [self] () -> Error? in
+            timer?.cancel()
+            timer = nil
+            defer { token = nil; client.disconnect() }
+            guard let token else { return nil }
+            do { try client.end(token); return nil }
+            catch { return error }
+        }
         if waitForRestoration {
-            try restoreSystemSleepNow(watcherLabel: watcherLabel)
+            let error = worker.sync(execute: restore)
+            finishRestoring(error: error, attempt: attempt)
+            if let error { throw error }
         } else {
-            verifyRestorationWithoutBlocking(watcherLabel: watcherLabel)
+            worker.async { [weak self] in
+                let error = restore()
+                DispatchQueue.main.async { [weak self] in
+                    self?.finishRestoring(error: error, attempt: attempt)
+                }
+            }
         }
     }
 
-    static func sleepDisabled(from output: String) -> Bool? {
-        guard let line = output
-            .split(separator: "\n")
-            .first(where: { $0.contains("SleepDisabled") })
-        else {
-            return nil
+    private func startHeartbeat(attempt: UUID) {
+        timer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: worker)
+        timer.schedule(deadline: .now() + PowerHelperConstants.heartbeatInterval,
+                       repeating: PowerHelperConstants.heartbeatInterval)
+        timer.setEventHandler { [weak self] in
+            guard let self, let token = self.token else { return }
+            do { try self.client.renew(token) }
+            catch {
+                self.timer?.cancel()
+                self.timer = nil
+                self.token = nil
+                self.client.disconnect()
+                self.reportFailure(error, attempt: attempt)
+            }
         }
-
-        guard let value = line.split(whereSeparator: \.isWhitespace).last else {
-            return nil
-        }
-        switch value {
-        case "0":
-            return false
-        case "1":
-            return true
-        default:
-            return nil
-        }
-    }
-
-    static func enableCommand(
-        markerURL: URL,
-        watcherLabel: String,
-        watcherLogURL: URL
-    ) -> String {
-        let marker = shellQuote(markerURL.path)
-        let label = shellQuote(watcherLabel)
-        let log = shellQuote(watcherLogURL.path)
-        let serviceTarget = shellQuote("system/\(watcherLabel)")
-        let watcher = restoreWatcherCommand(
-            markerURL: markerURL,
-            watcherLabel: watcherLabel
-        )
-        let cleanupAfterLaunchFailure =
-            "status=$?; "
-            + "/bin/rm -f \(marker); "
-            + "if \(pmsetPath) disablesleep 0 >/dev/null 2>&1; then "
-            + "/bin/launchctl remove \(label) >/dev/null 2>&1 || true; "
-            + "fi; "
-            + "exit $status"
-
-        return "/bin/launchctl submit -l \(label) -o \(log) -e \(log) -- "
-            + "/bin/sh -c \(shellQuote(watcher)) "
-            + "|| { /bin/rm -f \(marker); exit 1; }; "
-            + "/bin/launchctl print \(serviceTarget) >/dev/null 2>&1 "
-            + "|| { \(cleanupAfterLaunchFailure); }; "
-            + "\(pmsetPath) disablesleep 1 "
-            + "|| { \(cleanupAfterLaunchFailure); }"
-    }
-
-    static func restoreWatcherCommand(
-        markerURL: URL,
-        watcherLabel: String
-    ) -> String {
-        let marker = shellQuote(markerURL.path)
-        let label = shellQuote(watcherLabel)
-        return
-            "while /bin/test -e \(marker); do "
-            + "modified=$(/usr/bin/stat -f %m \(marker) 2>/dev/null) "
-            + "|| break; "
-            + "now=$(/bin/date +%s); "
-            + "if /bin/test $((now - modified)) -gt \(heartbeatStaleSeconds); "
-            + "then break; fi; "
-            + "/bin/sleep \(Int(heartbeatIntervalSeconds)); "
-            + "done; "
-            + "while ! { "
-            + "\(pmsetPath) disablesleep 0 >/dev/null 2>&1 "
-            + "&& \(pmsetPath) -g "
-            + "| /usr/bin/awk "
-            + shellQuote(
-                "$1 == \"SleepDisabled\" && $2 == \"0\" "
-                    + "{ restored = 1 } "
-                    + "END { exit restored ? 0 : 1 }"
-            )
-            + "; }; do "
-            + "/bin/sleep \(Int(heartbeatIntervalSeconds)); "
-            + "done; "
-            + "/bin/rm -f \(marker); "
-            + "/bin/launchctl remove \(label) >/dev/null 2>&1; "
-            + "exit 0"
-    }
-
-    static func restoreCommand(watcherLabel: String?) -> String {
-        let verification = "\(pmsetPath) -g | /usr/bin/awk "
-            + shellQuote(
-                "$1 == \"SleepDisabled\" && $2 == \"0\" "
-                    + "{ restored = 1 } END { exit restored ? 0 : 1 }"
-            )
-        let unload = watcherLabel.map {
-            "/bin/launchctl remove \(shellQuote($0)) >/dev/null 2>&1 || true"
-        } ?? "true"
-        return "\(pmsetPath) disablesleep 0 >/dev/null 2>&1; "
-            + "\(verification) || exit 1; \(unload); exit 0"
-    }
-
-    var diagnosticReport: String {
-        """
-        Lid-closed mode: \(isActive ? "active" : "inactive")
-        Restoration: \(isRestoring ? "in progress" : "idle")
-        Owns SleepDisabled: \(ownsSystemSetting ? "yes" : "no")
-        \(lastDiagnostic)
-        \(watcherLogSummary())
-        """
-    }
-
-    deinit {
-        stopHeartbeat()
-        if let markerURL {
-            try? FileManager.default.removeItem(at: markerURL)
-        }
-    }
-
-    private func clearState() {
-        stopHeartbeat()
-        markerURL = nil
-        watcherLabel = nil
-        ownsSystemSetting = false
-        isActive = false
-        isRestoring = false
-        restorationFailed = false
-        restorationAttemptID = nil
-    }
-
-    private static func makeWatcherLabel() -> String {
-        "\(watcherLabelPrefix).\(UUID().uuidString.lowercased())"
-    }
-
-    private func startHeartbeat(for markerURL: URL) {
-        stopHeartbeat()
-
-        let markerPath = markerURL.path
-        let timer = DispatchSource.makeTimerSource(queue: heartbeatQueue)
-        timer.schedule(
-            deadline: .now(),
-            repeating: Self.heartbeatIntervalSeconds
-        )
-        timer.setEventHandler {
-            try? FileManager.default.setAttributes(
-                [.modificationDate: Date()],
-                ofItemAtPath: markerPath
-            )
-        }
-        heartbeatTimer = timer
+        self.timer = timer
         timer.resume()
     }
 
-    private func stopHeartbeat() {
-        heartbeatTimer?.setEventHandler {}
-        heartbeatTimer?.cancel()
-        heartbeatTimer = nil
+    private func reportFailure(_ error: Error, attempt: UUID) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.generation == attempt else { return }
+            self.isStarting = false
+            self.isActive = false
+            self.issue = error.localizedDescription
+            self.retryAfter = Date().addingTimeInterval(15)
+            self.onStateChanged?()
+        }
     }
 
-    private func restoreSystemSleepNow(watcherLabel: String?) throws {
-        restorationAttemptID = nil
+    private func finishRestoring(error: Error?, attempt: UUID) {
+        guard generation == attempt else { return }
         isRestoring = false
-        do {
-            try runAdministratorCommand(Self.restoreCommand(watcherLabel: watcherLabel))
-        } catch {
-            restorationFailed = true
-            lastDiagnostic = "Direct normal-sleep restore failed: \(diagnosticDescription(for: error)).\n\(watcherLogSummary())"
-            throw error
-        }
-        guard waitForSleepDisabled(false) else {
-            restorationFailed = true
-            lastDiagnostic = "Direct normal-sleep restore did not verify.\n\(watcherLogSummary())"
-            throw LidClosedSleepError.stateChangeTimedOut(false)
-        }
-        restorationFailed = false
-        lastDiagnostic = "Normal lid sleep restored directly and verified.\n\(watcherLogSummary())"
+        issue = error?.localizedDescription
+        if let error {
+            retryAfter = Date().addingTimeInterval(15)
+            onRestorationFailure?(error)
+        } else { onRestorationFinished?() }
+        onStateChanged?()
     }
 
-    private func verifyRestorationWithoutBlocking(watcherLabel: String?) {
-        guard !isRestoring else { return }
-        let attemptID = UUID()
-        restorationAttemptID = attemptID
-        isRestoring = true
-        restorationFailed = false
-        let waitForSleepDisabled = waitForSleepDisabled
-        let runAdministratorCommand = runAdministratorCommand
-
-        restorationQueue.async { [weak self] in
-            var restored = waitForSleepDisabled(false)
-            var fallbackError: Error?
-            if !restored {
-                do {
-                    try runAdministratorCommand(
-                        Self.restoreCommand(watcherLabel: watcherLabel)
-                    )
-                    restored = waitForSleepDisabled(false)
-                } catch {
-                    fallbackError = error
-                }
-            }
-            DispatchQueue.main.async { [weak self] in
-                guard let self,
-                      self.restorationAttemptID == attemptID
-                else {
-                    return
-                }
-                self.restorationAttemptID = nil
-                self.isRestoring = false
-                self.restorationFailed = !restored
-                if restored {
-                    self.lastDiagnostic = "Normal lid sleep restored and verified.\n\(self.watcherLogSummary())"
-                } else if let fallbackError {
-                    self.lastDiagnostic = "Watcher and direct normal-sleep restore both failed: \(self.diagnosticDescription(for: fallbackError)).\n\(self.watcherLogSummary())"
-                } else {
-                    self.lastDiagnostic = "Watcher did not restore normal sleep; direct restore did not verify.\n\(self.watcherLogSummary())"
-                }
-                self.onRestorationFinished?()
-                if !restored {
-                    self.onRestorationFailure?(
-                        LidClosedSleepError.stateChangeTimedOut(false)
-                    )
-                }
-            }
-        }
-    }
-
-    private static func readSystemSleepDisabled() throws -> Bool {
-        let process = Process()
-        let output = Pipe()
-        let errorOutput = Pipe()
-        process.executableURL = URL(fileURLWithPath: pmsetPath)
-        process.arguments = ["-g"]
-        process.standardOutput = output
-        process.standardError = errorOutput
-
-        do {
-            try process.run()
-        } catch {
-            throw LidClosedSleepError.commandLaunch(error)
-        }
-
-        let outputData = output.fileHandleForReading.readDataToEndOfFile()
-        let errorData = errorOutput.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            let message = String(data: errorData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            throw LidClosedSleepError.commandFailed(
-                process.terminationStatus,
-                message
-            )
-        }
-
-        let text = String(data: outputData, encoding: .utf8) ?? ""
-        guard let disabled = sleepDisabled(from: text) else {
-            throw LidClosedSleepError.stateUnavailable
-        }
-        return disabled
-    }
-
-    private static func waitForSystemSleepDisabled(_ expected: Bool) -> Bool {
-        for _ in 0..<40 {
-            if (try? readSystemSleepDisabled()) == expected {
-                return true
-            }
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        return false
-    }
-
-    private static func runWithAdministratorPrivileges(_ command: String) throws {
-        let escapedCommand = command
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "do shell script \"\(escapedCommand)\" with administrator privileges"
-
-        let process = Process()
-        let errorOutput = Pipe()
-        process.executableURL = URL(fileURLWithPath: osascriptPath)
-        process.arguments = ["-e", script]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = errorOutput
-
-        do {
-            try process.run()
-        } catch {
-            throw LidClosedSleepError.commandLaunch(error)
-        }
-
-        let errorData = errorOutput.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let message = String(data: errorData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            if message.localizedCaseInsensitiveContains("User canceled") {
-                throw LidClosedSleepError.authorizationCancelled
-            }
-            throw LidClosedSleepError.commandFailed(
-                process.terminationStatus,
-                message
-            )
-        }
-    }
-
-    private static func shellQuote(_ value: String) -> String {
-        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
-    }
-
-    private func watcherLogSummary() -> String {
-        guard let watcherLogURL,
-              let text = try? String(contentsOf: watcherLogURL, encoding: .utf8),
-              !text.isEmpty else {
-            return "Watcher log: no output."
-        }
-        let tail = text.split(separator: "\n").suffix(12).joined(separator: "\n")
-        return "Watcher log:\n\(tail)"
-    }
-
-    private func diagnosticDescription(for error: Error) -> String {
-        guard case let LidClosedSleepError.commandFailed(status, message) = error else {
-            return error.localizedDescription
-        }
-        return message.isEmpty
-            ? "command exited with status \(status)"
-            : "command exited with status \(status): \(message)"
-    }
+    deinit { timer?.cancel(); client.disconnect() }
 }
 #endif

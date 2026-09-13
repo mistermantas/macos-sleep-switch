@@ -172,6 +172,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }()
     private let powerAssertions = PowerAssertionController()
     private let lidClosedSleep = LidClosedSleepController()
+#if !APP_STORE
+    private let powerHelperSetupItem = NSMenuItem(title: "Set Up Lid-Closed Mode…", action: nil, keyEquivalent: "")
+#endif
     private let displayPower = DisplayPowerController()
     private let insightsRecorder = InsightsRecorder()
     private var insightsWindowController: InsightsWindowController?
@@ -290,8 +293,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 #endif
 #if !APP_STORE
-        lidClosedSleep.onRestorationFailure = { [weak self] error in
-            self?.presentAssertionError(error)
+        lidClosedSleep.onRestorationFailure = { [weak self] _ in
+            self?.updatePresentation()
+        }
+        lidClosedSleep.onStateChanged = { [weak self] in
+            self?.updatePresentation()
         }
         lidClosedSleep.onRestorationFinished = { [weak self] in
             self?.updatePresentation()
@@ -641,7 +647,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             awakeModeItems.append(item)
             awakeModeMenu.addItem(item)
         }
+#if !APP_STORE
+        awakeModeMenu.addItem(.separator())
+        powerHelperSetupItem.target = self
+        powerHelperSetupItem.action = #selector(setUpPowerHelper)
+        awakeModeMenu.addItem(powerHelperSetupItem)
+#endif
     }
+
+#if !APP_STORE
+    @objc private func setUpPowerHelper() {
+        let client = PowerHelperClient()
+        do {
+            try client.register()
+            if client.needsApproval { SMAppService.openSystemSettingsLoginItems() }
+            lidClosedSleep.retry()
+            reconcileAndUpdatePresentation()
+        } catch { presentAssertionError(error) }
+    }
+#endif
 
 #if !APP_STORE
     private func configureCoolingMenu() {
@@ -1309,16 +1333,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func reconcileAndUpdatePresentation() {
-        let attemptedMode = effectiveAwakeMode
-        if let error = reconcilePowerAssertion(),
-           attemptedMode == .lidClosed {
-            UserDefaults.standard.set(
-                KeepAwakeMode.preventSleep.rawValue,
-                forKey: awakeModeKey
-            )
-            _ = reconcilePowerAssertion(forceRestart: true)
-            presentAssertionError(error)
-        }
+        // Helper readiness and recovery are shown inline. Background scans never
+        // prompt for administrator access or rewrite the chosen awake mode.
+        _ = reconcilePowerAssertion()
         updatePresentation()
         updateAgentPresentation()
         updateDisplayPresentation()
@@ -1362,12 +1379,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 #endif
     }
 
-    private var effectiveAwakeMode: KeepAwakeMode {
+    private var requestedAwakeMode: KeepAwakeMode {
         guard selectedAwakeMode == .lidClosed,
               lidClosedSafetyDecision == .allowed else {
             return selectedAwakeMode == .lidClosed ? .preventSleep : selectedAwakeMode
         }
         return .lidClosed
+    }
+
+    private var effectiveAwakeMode: KeepAwakeMode {
+#if !APP_STORE
+        if requestedAwakeMode == .lidClosed, !lidClosedSleep.isActive { return .preventSleep }
+#endif
+        return requestedAwakeMode
     }
 
     private var agentTriggerConfiguration: AgentTriggerConfiguration {
@@ -1549,6 +1573,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         awakeModeItem.toolTip = effectiveAwakeMode == selectedAwakeMode
             ? selectedAwakeMode.toolTip
             : (lidClosedSafetyDecision.message ?? selectedAwakeMode.toolTip)
+#if !APP_STORE
+        let helperMessage = lidClosedSleep.setupMessage ?? lidClosedSleep.issue
+        powerHelperSetupItem.isHidden = helperMessage == nil
+        powerHelperSetupItem.title = PowerHelperClient().needsApproval
+            ? "Approve Lid-Closed Mode in System Settings…"
+            : (lidClosedSleep.setupMessage == nil ? "Retry Lid-Closed Mode" : "Set Up Lid-Closed Mode…")
+        powerHelperSetupItem.toolTip = helperMessage
+        if selectedAwakeMode == .lidClosed, let helperMessage {
+            awakeModeItem.title = lidClosedSleep.setupMessage == nil
+                ? "Awake Mode · Lid Closed Unavailable" : "Awake Mode · Lid Closed Needs Setup"
+            awakeModeItem.toolTip = helperMessage
+            toggleItem.toolTip = helperMessage
+        }
+#endif
         updateAwakeModeChecks()
         updateDurationChecks()
         updateAgentFinishActionPresentation()
@@ -2592,7 +2630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         do {
-            switch effectiveAwakeMode {
+            switch requestedAwakeMode {
             case .preventSleep:
                 try lidClosedSleep.stop(waitForRestoration: false)
             case .lidClosed:
@@ -3228,6 +3266,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 struct SleepSwitchApplication {
     static func main() {
 #if !APP_STORE
+        if PowerHelperMaintenance.arguments.contains(where: CommandLine.arguments.contains) {
+            let app = NSApplication.shared
+            let delegate = PowerHelperMaintenance()
+            app.delegate = delegate
+            app.setActivationPolicy(.prohibited)
+            app.run()
+            exit(delegate.exitCode)
+        }
         if CoolingHelperMaintenance.arguments.contains(where: CommandLine.arguments.contains) {
             let app = NSApplication.shared
             let delegate = CoolingHelperMaintenance()

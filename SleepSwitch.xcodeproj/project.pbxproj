@@ -12,6 +12,7 @@
 		04D6AAEEFD0C7CE4912C39BD /* NetworkAvailabilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CDF3A21FF5FF4AC8C292B40 /* NetworkAvailabilityMonitor.swift */; };
 		09AB6F07012F46FB1E504D02 /* OperatorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51FC2025D19972895107F134 /* OperatorWindowController.swift */; };
 		0A31B27A1C77389FD39CDDC5 /* CompanionLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B8071B17869D30261EA651 /* CompanionLiveActivity.swift */; };
+		0C9F84FB33D4D089667F4484 /* PowerHelperMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A2E080A6428DAC6FBFAB44 /* PowerHelperMaintenance.swift */; };
 		0F0DC621493E4030CA508B95 /* RemoteContextInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B5BB147D0D2A4FF12863C25 /* RemoteContextInbox.swift */; };
 		15497D5FFBC2F5E435A05782 /* CompanionOperatorModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87C7AFEF7268A4BEE58FE3C0 /* CompanionOperatorModels.swift */; };
 		16BB7197553473DE32A5E5AE /* InsightsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE73E3A9B401E2143B487793 /* InsightsModels.swift */; };
@@ -27,9 +28,11 @@
 		267D942E2D1DFF995D3E37D4 /* CompanionProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 990D15A9AA1141949ADD97FC /* CompanionProtocol.swift */; };
 		2B4EC032EA843678A27E5049 /* CompanionMachineFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4650FE425A0CE21672B5AA5 /* CompanionMachineFingerprint.swift */; };
 		2FA386B6714BBC7073002D81 /* ManualSessionActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51649CB3F3B57FB34FF6952 /* ManualSessionActivityAttributes.swift */; };
+		32CB0F36D8C160F968892A84 /* PowerHelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 207B5D8C3C00A5FE99449AF9 /* PowerHelperProtocol.swift */; };
 		349CBE75BFB4CBB4746FB74C /* FanHelperMessages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99968A3C61569AE944BE2DC9 /* FanHelperMessages.swift */; };
 		3B09BCF73D5956DCB96B594A /* CompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2282BCEAA5D823FC6501E481 /* CompanionApp.swift */; };
 		3ED6391241EC59C8E936A16B /* CompanionDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A49EB5823C89689FB83B28D /* CompanionDashboard.swift */; };
+		424A219134396C91B63EB382 /* PowerHelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DBDC0ACEB84CDF842BC6683 /* PowerHelperClient.swift */; };
 		454DE36F245A4992E4550634 /* CodexSessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD0F5A03023388556010E2D /* CodexSessionTracker.swift */; };
 		464678BC2FE3991DABF9F4A6 /* EnergyTelemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF190A09425F39AB1B8F2FA /* EnergyTelemetry.swift */; };
 		476EA4624D25306D3BFB0276 /* CompanionCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 888A4935FBD1B26FDF81BB8C /* CompanionCloudStore.swift */; };
@@ -150,11 +153,14 @@
 		0FAA9784DED8E86FF1C2AE63 /* Sleep Switch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Sleep Switch.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		11C543EF1E4134BFDE371CDA /* AppDistribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDistribution.swift; sourceTree = "<group>"; };
 		1730F59467AA0E0E37B2FF82 /* RemoteWorkAttention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWorkAttention.swift; sourceTree = "<group>"; };
+		207B5D8C3C00A5FE99449AF9 /* PowerHelperProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerHelperProtocol.swift; sourceTree = "<group>"; };
 		21CB41D4D2EC2EF69305EB93 /* CompanionHeatNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHeatNotifications.swift; sourceTree = "<group>"; };
 		227EC5C9C7AEA6D82C5B3022 /* CodexThreadMirrorAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexThreadMirrorAdapter.swift; sourceTree = "<group>"; };
 		2282BCEAA5D823FC6501E481 /* CompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionApp.swift; sourceTree = "<group>"; };
+		24A2E080A6428DAC6FBFAB44 /* PowerHelperMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerHelperMaintenance.swift; sourceTree = "<group>"; };
 		27F30E9E938DC90115BE76A5 /* CoolingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolingCoordinator.swift; sourceTree = "<group>"; };
 		2B574A6E8D1F4579AC54C19B /* SystemLoadSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemLoadSampler.swift; sourceTree = "<group>"; };
+		2DBDC0ACEB84CDF842BC6683 /* PowerHelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerHelperClient.swift; sourceTree = "<group>"; };
 		2E75843A44B12F58D1504B19 /* CompanionLiveActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionLiveActivityModels.swift; sourceTree = "<group>"; };
 		3077C24C415BE1ADF7D1C8DE /* ApplicationMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationMenu.swift; sourceTree = "<group>"; };
 		39E8B8AB2D71C23085B0DE11 /* LocalPreviewSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalPreviewSecurity.swift; sourceTree = "<group>"; };
@@ -310,6 +316,8 @@
 				402C2A4514B4DA1C36845F47 /* OperatorStore.swift */,
 				51FC2025D19972895107F134 /* OperatorWindowController.swift */,
 				674AE7DC69D47094FEF0D921 /* PowerAssertionController.swift */,
+				2DBDC0ACEB84CDF842BC6683 /* PowerHelperClient.swift */,
+				24A2E080A6428DAC6FBFAB44 /* PowerHelperMaintenance.swift */,
 				4D678E5944D3B473FF4F62A5 /* PreferencesWindowController.swift */,
 				94647805FBC6B9D0863AE46F /* ProcessInfoThermalMonitor.swift */,
 				4484764A6CE593B0E65A6F62 /* RemoteArtifactDownloadStore.swift */,
@@ -368,8 +376,18 @@
 				717CE638D8E34BCFDF381990 /* SleepSwitchCompanionShare */,
 				2667DF28621D8182FB8374E9 /* SleepSwitchCompanionWidgets */,
 				7DEC96C05BDFB45BDDD5C11E /* SleepSwitchFanProtocol */,
+				A5590BA3D6AF87D92A2CB4FF /* SleepSwitchPowerProtocol */,
 				B31E40FEDFE40FBFAD8AB1FF /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A5590BA3D6AF87D92A2CB4FF /* SleepSwitchPowerProtocol */ = {
+			isa = PBXGroup;
+			children = (
+				207B5D8C3C00A5FE99449AF9 /* PowerHelperProtocol.swift */,
+			);
+			name = SleepSwitchPowerProtocol;
+			path = Sources/SleepSwitchPowerProtocol;
 			sourceTree = "<group>";
 		};
 		B31E40FEDFE40FBFAD8AB1FF /* Products */ = {
@@ -643,6 +661,9 @@
 				CA22C1DEA01AA6DA80F60EB9 /* OperatorStore.swift in Sources */,
 				09AB6F07012F46FB1E504D02 /* OperatorWindowController.swift in Sources */,
 				606C60847E43F8E90A465F6A /* PowerAssertionController.swift in Sources */,
+				424A219134396C91B63EB382 /* PowerHelperClient.swift in Sources */,
+				0C9F84FB33D4D089667F4484 /* PowerHelperMaintenance.swift in Sources */,
+				32CB0F36D8C160F968892A84 /* PowerHelperProtocol.swift in Sources */,
 				F8892DC43F2F28B377BC8877 /* PreferencesWindowController.swift in Sources */,
 				75ACD4BD952B94581698690D /* ProcessInfoThermalMonitor.swift in Sources */,
 				F6DBC86B5CB84C3829C6E532 /* RemoteArtifactDownloadStore.swift in Sources */,
@@ -682,7 +703,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -773,7 +794,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -796,7 +817,7 @@
 				CODE_SIGN_ENTITLEMENTS = CompanionWidgets/SleepSwitchCompanionWidgets.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CompanionWidgets/Info.plist;
@@ -820,7 +841,7 @@
 				CODE_SIGN_ENTITLEMENTS = CompanionShare/SleepSwitchCompanionShare.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CompanionShare/Info.plist;
@@ -844,7 +865,7 @@
 				CODE_SIGN_ENTITLEMENTS = CompanionShare/SleepSwitchCompanionShare.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CompanionShare/Info.plist;
@@ -868,7 +889,7 @@
 				CODE_SIGN_ENTITLEMENTS = CompanionWidgets/SleepSwitchCompanionWidgets.entitlements;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = CompanionWidgets/Info.plist;
@@ -950,7 +971,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Companion/Info.plist;
@@ -975,7 +996,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 39;
+				CURRENT_PROJECT_VERSION = 40;
 				DEVELOPMENT_TEAM = C43F5MKJF2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;

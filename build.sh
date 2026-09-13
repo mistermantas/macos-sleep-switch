@@ -6,6 +6,8 @@ build_dir="${SLEEP_SWITCH_BUILD_DIR:-$script_dir/build}"
 app_dir="$build_dir/Sleep Switch.app"
 arch_dir="$build_dir/arch"
 helper_arch_dir="$build_dir/helper-arch"
+power_arch_dir="$build_dir/power-helper-arch"
+power_executable="$app_dir/Contents/Resources/SleepSwitchPowerHelper"
 asset_info_plist="$build_dir/asset-info.plist"
 helper_executable="$app_dir/Contents/Resources/SleepSwitchFanHelper"
 helper_plist_dir="$app_dir/Contents/Library/LaunchDaemons"
@@ -16,7 +18,7 @@ provisioning_profile="${SLEEP_SWITCH_PROVISIONING_PROFILE:-}"
 module_cache_dir="${CLANG_MODULE_CACHE_PATH:-$build_dir/module-cache}"
 export CLANG_MODULE_CACHE_PATH="$module_cache_dir"
 
-rm -rf "$app_dir" "$arch_dir" "$helper_arch_dir"
+rm -rf "$app_dir" "$arch_dir" "$helper_arch_dir" "$power_arch_dir"
 rm -f "$asset_info_plist"
 mkdir -p \
   "$app_dir/Contents/MacOS" \
@@ -24,6 +26,7 @@ mkdir -p \
   "$helper_plist_dir" \
   "$arch_dir" \
   "$helper_arch_dir" \
+  "$power_arch_dir" \
   "$module_cache_dir"
 cp "$script_dir/Info.plist" "$app_dir/Contents/Info.plist"
 if [[ -n "$provisioning_profile" ]]; then
@@ -42,6 +45,7 @@ fi
 cp \
   "$script_dir/Config/FanHelper/$helper_plist_name" \
   "$helper_plist_dir/$helper_plist_name"
+cp "$script_dir/Config/PowerHelper/lt.mantas.sleepswitch.powerhelper.plist" "$helper_plist_dir/"
 cp "$script_dir/THIRD_PARTY_NOTICES.md" "$app_dir/Contents/Resources/"
 
 for arch in arm64 x86_64; do
@@ -58,6 +62,7 @@ for arch in arm64 x86_64; do
     -lsqlite3 \
     "$script_dir/Sources/SleepSwitch/"*.swift \
     "$script_dir/Sources/Shared/CompanionLiveActivityModels.swift" \
+    "$script_dir/Sources/SleepSwitchPowerProtocol/"*.swift \
     "$script_dir/Sources/SleepSwitchFanProtocol/"*.swift \
     -o "$arch_dir/SleepSwitch-$arch"
 
@@ -72,7 +77,19 @@ for arch in arm64 x86_64; do
     "$script_dir/Sources/SleepSwitchFanProtocol/"*.swift \
     "$script_dir/Sources/SleepSwitchFanHelper/"*.swift \
     -o "$helper_arch_dir/SleepSwitchFanHelper-$arch"
+  xcrun swiftc \
+    -O -parse-as-library -target "$arch-apple-macos13.0" \
+    -framework Foundation -framework IOKit -framework Security \
+    "$script_dir/Sources/SleepSwitchPowerProtocol/"*.swift \
+    "$script_dir/Sources/SleepSwitchPowerHelper/"*.swift \
+    "$script_dir/Sources/SleepSwitchFanHelper/SystemPowerObserver.swift" \
+    -o "$power_arch_dir/SleepSwitchPowerHelper-$arch"
 done
+
+xcrun lipo -create \
+  "$power_arch_dir/SleepSwitchPowerHelper-arm64" \
+  "$power_arch_dir/SleepSwitchPowerHelper-x86_64" \
+  -output "$power_executable"
 
 xcrun lipo -create \
   "$arch_dir/SleepSwitch-arm64" \
@@ -117,6 +134,11 @@ if [[ "$signing_identity" != "-" ]]; then
 fi
 
 codesign "${helper_sign_arguments[@]}" "$helper_executable"
+power_sign_arguments=(--force --options runtime --identifier lt.mantas.sleepswitch.powerhelper --sign "$signing_identity")
+if [[ "$signing_identity" != "-" ]]; then
+  power_sign_arguments+=(--timestamp)
+fi
+codesign "${power_sign_arguments[@]}" "$power_executable"
 codesign "${app_sign_arguments[@]}" "$app_dir"
 
 if [[ "$signing_identity" != "-" ]]; then
@@ -159,4 +181,5 @@ fi
 
 codesign --verify --deep --strict "$app_dir"
 plutil -lint "$helper_plist_dir/$helper_plist_name" >/dev/null
+plutil -lint "$helper_plist_dir/lt.mantas.sleepswitch.powerhelper.plist" >/dev/null
 echo "$app_dir"

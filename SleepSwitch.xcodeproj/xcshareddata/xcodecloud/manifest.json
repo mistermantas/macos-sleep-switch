@@ -4,6 +4,10 @@
     {
       "id" : "0e4ef30e-61a4-4654-a73c-8ad8fec3ce1a",
       "name" : "SleepSwitch"
+    },
+    {
+      "id" : "6fe81a57-863b-4da1-a04c-55cdd37a17c1",
+      "name" : "SleepSwitchCompanion"
     }
   ]
 }
